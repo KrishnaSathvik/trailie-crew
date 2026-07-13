@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --background: #f7f7f5;
+  --foreground: #171717;
+  --muted-foreground: #686866;
+  --border: #d6d6d1;
+  --subtle: #ecece8;
+  --ring: #171717;
+}
+
+:root[data-theme="dark"] {
+  --background: #111110;
+  --foreground: #f1f1ed;
+  --muted-foreground: #a3a39d;
+  --border: #353532;
+  --subtle: #20201e;
+  --ring: #f1f1ed;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-subtle: var(--subtle);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+}
+
+.route-line {
+  position: absolute;
+  top: 3rem;
+  right: 0;
+  width: 7rem;
+  height: 7rem;
+  border-top: 1px solid var(--foreground);
+  border-right: 1px solid var(--foreground);
+}
+
+.route-point {
+  position: absolute;
+  width: 0.625rem;
+  height: 0.625rem;
+  background: var(--background);
+  border: 1px solid var(--foreground);
+}
+
+.route-point-start {
+  top: -0.3125rem;
+  left: -0.3125rem;
+}
+
+.route-point-end {
+  right: -0.3125rem;
+  bottom: -0.3125rem;
+  background: var(--foreground);
+}
+
+@media (max-width: 63.999rem) {
+  .route-line {
+    top: 1.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
