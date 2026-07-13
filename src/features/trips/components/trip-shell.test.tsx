@@ -53,17 +53,19 @@ const shell = {
     },
   ],
   inviteMetadata: { shortCode: "ABCD2345" },
+  initialMessages: { messages: [], hasMore: false, nextCursor: null },
+  initialHistoryError: false,
 };
 
 describe("TripShell", () => {
-  it("renders the room, identity, crew, and honest placeholders", () => {
+  it("renders the room, identity, crew, and shared conversation", () => {
     renderShell(<TripShell data={shell} />);
     expect(
       screen.getByRole("heading", { name: "Boundary Waters" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Maya (you)")).toBeInTheDocument();
     expect(screen.getByText("Leo")).toBeInTheDocument();
-    expect(screen.getByText("Chat is coming next")).toBeInTheDocument();
+    expect(screen.getByText("Start the conversation")).toBeInTheDocument();
     expect(screen.queryByText(/chat with trailie/i)).not.toBeInTheDocument();
     expect(screen.getAllByText("Plan").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Map").length).toBeGreaterThan(0);

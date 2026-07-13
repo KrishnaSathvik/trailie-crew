@@ -30,7 +30,7 @@ App Router components are React Server Components by default. Phase 1B uses Clie
 - `@trailie/travel-tools` defines honest source-attributed provider contracts, not fake implementations.
 - `@trailie/trailverse-adapter` exposes read methods only and cannot mutate TrailVerse.
 
-## Planned data flow
+## Implemented data flow
 
 The Phase 1B identity, mutation, and read path is implemented:
 
@@ -43,7 +43,7 @@ browser -> anonymous Supabase Auth session -> authenticated JWT
 
 PostgreSQL is the authorization boundary. `auth.uid()` links one real Auth user to participant rows in any number of Trips. The browser cannot directly insert participants, invites, or rooms; cannot delete rooms; and cannot read `private.room_memory` or invite-token hashes. Hosts can update only the safe room-setting columns `name`, `expected_travelers`, and `approval_mode`.
 
-The following remains architectural intent and is not implemented in Phase 1A:
+The following remains architectural intent and is not implemented in Phase 1C:
 
 ```text
 crew action -> server application layer -> policy/invocation check
@@ -73,4 +73,19 @@ The Trip shell loads rooms, active participants, and host-only safe invite metad
 - `src/proxy.ts` refreshes auth cookies only for `/trips/*` and `/join/*`. It does not authorize routes; every action and query independently verifies identity and relies on RLS.
 - The admin client is not used by the Phase 1B product flow.
 
-See [`database-security.md`](database-security.md) for the schema, RPC, invite, RLS, and local-testing details.
+## Phase 1C chat boundaries
+
+The Trip route still authorizes and renders through a Server Component. It calls `get_room_messages` for the newest safe 30-message page alongside room, participant, and invite reads. `src/features/chat/actions` owns authenticated message, reaction, and pagination Server Actions; `src/features/chat/components` owns the live ledger, composer, reactions, scroll behavior, private channel lifecycle, presence, and typing. Pure helpers in `src/features/chat/lib` own deterministic deduplication and transient-state summaries.
+
+```text
+Server Component -> active membership -> get_room_messages -> initial safe page
+Client Component -> optimistic UUID -> send_message -> RPC/Realtime reconciliation
+                 -> private room:<uuid> channel -> Broadcast + Presence
+                 -> cursor Server Action -> one older page
+```
+
+PostgreSQL remains the source of authorization and persisted truth. Realtime presence is display state only. The browser authenticates the socket with its current session before joining one private topic. `realtime.messages` RLS authorizes only active participants whose room UUID matches the topic. Database triggers broadcast only change kind, room ID, and message ID; clients refetch the safe newest page instead of receiving message bodies or auth IDs in transient events.
+
+Message and reaction writes use user-scoped Server Actions and `SECURITY DEFINER` RPCs with explicit identity, participant ownership, active membership, room isolation, validation, idempotency, and rate controls. The admin client remains unused.
+
+See [`database-security.md`](database-security.md) and [`realtime-chat.md`](realtime-chat.md) for schema, RPC, channel, RLS, reconciliation, pagination, and local-testing details.

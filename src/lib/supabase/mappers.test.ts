@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   mapCreateTripResult,
+  mapGetRoomMessagesResult,
   mapJoinTripResult,
   mapParticipantSummary,
   mapRoomSummary,
+  mapRoomMessage,
+  mapToggleReactionResult,
 } from "./mappers";
 
 const roomId = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -76,6 +79,84 @@ describe("Supabase database mappers", () => {
       participantId,
       displayName: "Leo",
       role: "member",
+    });
+  });
+});
+
+describe("Phase 1C message mappers", () => {
+  const rawMessage = {
+    id: participantId,
+    room_id: roomId,
+    participant_id: participantId,
+    message_type: "user" as const,
+    body: "Meet at the north trailhead.",
+    client_message_id: userId,
+    reply_to_message_id: null,
+    sender: {
+      participant_id: participantId,
+      display_name: "Maya",
+      role: "host" as const,
+    },
+    reply: null,
+    reactions: [
+      {
+        reaction: "celebrate" as const,
+        count: 2,
+        reacted_by_current_participant: true,
+      },
+    ],
+    created_at: createdAt,
+    edited_at: null,
+    deleted_at: null,
+  };
+
+  it("maps a safe message and nested reaction summaries to camelCase", () => {
+    expect(mapRoomMessage(rawMessage)).toEqual({
+      id: participantId,
+      roomId,
+      participantId,
+      messageType: "user",
+      body: "Meet at the north trailhead.",
+      clientMessageId: userId,
+      replyToMessageId: null,
+      sender: { participantId, displayName: "Maya", role: "host" },
+      reply: null,
+      reactions: [
+        {
+          reaction: "celebrate",
+          count: 2,
+          reactedByCurrentParticipant: true,
+        },
+      ],
+      createdAt,
+      editedAt: null,
+      deletedAt: null,
+    });
+  });
+
+  it("maps page cursors and reaction toggle results", () => {
+    expect(
+      mapGetRoomMessagesResult({
+        messages: [rawMessage],
+        has_more: true,
+        next_cursor: { created_at: createdAt, id: participantId },
+      }),
+    ).toMatchObject({
+      hasMore: true,
+      nextCursor: { createdAt, id: participantId },
+    });
+    expect(
+      mapToggleReactionResult({
+        message_id: participantId,
+        reaction: "like",
+        active: true,
+        count: 1,
+      }),
+    ).toEqual({
+      messageId: participantId,
+      reaction: "like",
+      active: true,
+      count: 1,
     });
   });
 });

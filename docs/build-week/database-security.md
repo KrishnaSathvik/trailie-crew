@@ -63,10 +63,20 @@ API_URL        -> NEXT_PUBLIC_SUPABASE_URL
 PUBLISHABLE_KEY -> NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
-The secret key is unnecessary for Phase 1B. Create `.env.local` only when testing a future trusted-backend feature that genuinely requires the server-only admin client.
+The secret key is unnecessary for Phase 1C. Create `.env.local` only when testing a future trusted-backend feature that genuinely requires the server-only admin client.
 
 Stop the disposable local stack with `pnpm exec supabase stop`. Never run `supabase link`, `db push`, or secret-key commands against production as part of this local workflow.
 
+## Phase 1C messages and reactions
+
+`public.messages` binds `(participant_id, room_id, sender_user_id)` to a composite participant identity, so database integrity prevents cross-room participants and sender spoofing. A composite reply foreign key keeps replies in the same room. User bodies are trimmed and constrained to 1–4000 characters. The partial unique reconciliation index on `(room_id, sender_user_id, client_message_id)` makes retries idempotent.
+
+`public.message_reactions` accepts only `like`, `love`, `laugh`, `celebrate`, or `thinking`; a trigger enforces that the reacting participant belongs to the message room. Authenticated clients receive SELECT only. Active-member policies isolate both tables by room, and no direct insert, update, or delete privileges or policies exist.
+
+`send_message` validates identity, active membership, participant ownership, body, reply visibility, idempotency, and an eight-messages-per-ten-seconds rolling limit before forcing `message_type = user`. `toggle_message_reaction` validates the canonical value and ownership, then uses a transaction advisory lock to serialize the exact toggle. `get_room_messages` caps pages at 50, uses `(created_at, id)` cursor order, and constructs only safe sender/reply/reaction summaries. None returns email, auth metadata, or sender user IDs.
+
+Realtime Broadcast and Presence use the same active membership helper against a parsed `room:<uuid>` topic. Database notifications contain no body or user identity. Client-sent typing and presence payloads contain participant ID, display name, timestamps, and optional `chat` area only; receivers schema-validate them against the server-provided active crew. Presence never grants access.
+
 ## Implemented and planned
 
-Phase 1B implements identity, persistence, create/join RPCs, grants, RLS, typed clients/contracts, accessible create/join UI, Server Action mutations, RLS Trip-shell reads, one-time token handoff, and automated unit/permission/workflow/browser tests. It does not implement membership-management RPCs, chat, realtime, Trailie, OpenAI calls, planning, itinerary data, or production abuse controls.
+Phase 1C implements identity, persistence, create/join/chat/reaction RPCs, grants, RLS, private Realtime authorization, typed clients/contracts, accessible create/join/chat UI, Server Action mutations, RLS Trip-shell reads, one-time token handoff, idempotency, pagination, rate limiting, presence/typing, and automated unit/permission/workflow/browser tests. It does not implement membership-management RPCs, Trailie, OpenAI calls, planning, itinerary data, uploads, message editing/deletion, moderation, or production CAPTCHA/anonymous-user cleanup.

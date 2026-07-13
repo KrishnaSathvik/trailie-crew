@@ -12,7 +12,7 @@ Group trip planning is fragmented across chats, notes, links, polls, and spreads
 
 Trailie Crew will give friends a shared Trip with a natural group conversation. The crew will be able to mention or directly invoke Trailie for focused help and explicitly request an itinerary only when the group is ready. Planned itineraries will be structured, validated, versioned, revisable, shareable, and exportable.
 
-Those collaborative and AI capabilities are the product direction. Phase 1B now provides the first usable create/join journey and a real RLS-protected Trip shell. Conversation and AI capabilities remain intentionally unavailable.
+Those collaborative and AI capabilities are the product direction. Phase 1C now provides a real RLS-protected Trip shell with persisted realtime crew conversation, presence, typing, reactions, replies, and paginated history. Trailie and all AI planning capabilities remain intentionally unavailable.
 
 ## Relationship to TrailVerse
 
@@ -27,19 +27,19 @@ Trailie Crew is a separate application, repository, deployment, and database fro
 - Vitest, React Testing Library, jsdom, and Playwright
 - ESLint and Prettier
 - GitHub Actions CI
-- Supabase Auth/Postgres persistence with RPC-only writes, RLS, and pgTAP tests
-- OpenAI API integration remains planned and is not connected in Phase 1B
+- Supabase Auth/Postgres persistence and Realtime with RPC-only writes, private room channels, RLS, and pgTAP tests
+- OpenAI API integration remains planned and is not connected in Phase 1C
 
 ## Local setup
 
-Prerequisites: Node.js 22 or newer, pnpm 10, and a Docker-compatible container runtime for local Supabase.
+Prerequisites: Node.js 22 or newer, pnpm 10, PostgreSQL client tools (`psql` for the pagination E2E fixture), and a Docker-compatible container runtime for local Supabase.
 
 ```bash
 pnpm install
 pnpm exec supabase start
 ```
 
-For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and the Playwright launcher read only `API_URL` and `PUBLISHABLE_KEY` from the local CLI into child-process memory. The admin client remains available for future trusted backend work but is not used by Phase 1B. If you create `.env.local` manually, never commit it or expose a secret key through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329` and enables anonymous sign-ins.
+For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and the Playwright launcher read only `API_URL` and `PUBLISHABLE_KEY` from the local CLI into child-process memory. The admin client remains available for future trusted backend work but is not used by the chat path. If you create `.env.local` manually, never commit it or expose a secret key through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329`, enables anonymous sign-ins, and starts Realtime. If the stack was first started before Realtime was enabled, run `pnpm exec supabase stop` once and start it again.
 
 Reset and test the local database, then run the app:
 
@@ -64,7 +64,7 @@ pnpm exec supabase test db
 
 ## Current implementation status
 
-Implemented through Phase 1B:
+Implemented through Phase 1C:
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -82,10 +82,17 @@ Implemented through Phase 1B:
 - RLS-backed Trip shell with current identity, crew membership, host invite controls, and responsive navigation
 - memory-only one-time invitation path display/copy with safe short-code fallback
 - multi-context Playwright verification for host, member, duplicate-name, and outsider workflows
+- immutable persisted user messages with safe replies and idempotent client message IDs
+- stable 30-message cursor pagination with a database cap of 50 and scroll-preserving prepend
+- one authenticated private Realtime channel per Trip with RLS-backed topic membership
+- live cross-context delivery, optimistic reconciliation, explicit failure/retry, and reconnect refresh
+- canonical accessible reactions with optimistic rollback
+- privacy-minimal presence, online crew state, and expiring typing indicators
+- desktop editorial conversation ledger and mobile People drawer with a composer above navigation
+- pgTAP, unit/component, and real multi-context browser coverage for chat collaboration
 
 Not yet implemented:
 
-- realtime crew presence or shared chat
 - Trailie invocation, OpenAI model orchestration, or application tools
 - itinerary planning, approval, generation, validation, revisions, sharing, or export
 - live travel-data providers or TrailVerse service integration

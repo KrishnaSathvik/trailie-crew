@@ -1,7 +1,9 @@
 import type {
   ApprovalMode,
+  MessageType,
   ParticipantRole,
   ParticipantStatus,
+  ReactionType,
   RoomStatus,
 } from "@trailie/schemas";
 
@@ -50,6 +52,68 @@ export type RoomInviteRow = {
   created_at: string;
 };
 
+export type MessageRow = {
+  id: string;
+  room_id: string;
+  participant_id: string;
+  sender_user_id: string;
+  message_type: MessageType;
+  body: string;
+  client_message_id: string | null;
+  reply_to_message_id: string | null;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+};
+
+export type MessageReactionRow = {
+  message_id: string;
+  participant_id: string;
+  reaction: ReactionType;
+  created_at: string;
+};
+
+export type DbRoomMessage = {
+  id: string;
+  room_id: string;
+  participant_id: string;
+  message_type: MessageType;
+  body: string;
+  client_message_id: string | null;
+  reply_to_message_id: string | null;
+  sender: {
+    participant_id: string;
+    display_name: string;
+    role: ParticipantRole;
+  };
+  reply: {
+    id: string;
+    body: string;
+    sender_display_name: string;
+  } | null;
+  reactions: Array<{
+    reaction: ReactionType;
+    count: number;
+    reacted_by_current_participant: boolean;
+  }>;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+};
+
+export type DbGetRoomMessagesResult = {
+  messages: DbRoomMessage[];
+  has_more: boolean;
+  next_cursor: { created_at: string; id: string } | null;
+};
+
+export type DbToggleReactionResult = {
+  message_id: string;
+  reaction: ReactionType;
+  active: boolean;
+  count: number;
+};
+
 export type DbCreateTripResult = {
   room_id: string;
   room_name: string;
@@ -82,6 +146,8 @@ export type Database = {
       rooms: TableDefinition<RoomRow>;
       participants: TableDefinition<ParticipantRow>;
       room_invites: TableDefinition<RoomInviteRow>;
+      messages: TableDefinition<MessageRow>;
+      message_reactions: TableDefinition<MessageReactionRow>;
     };
     Views: {
       room_invite_metadata: {
@@ -102,12 +168,40 @@ export type Database = {
         Args: { invite_value: string; display_name: string };
         Returns: DbJoinTripResult[];
       };
+      send_message: {
+        Args: {
+          target_room_id: string;
+          participant_id: string;
+          body: string;
+          client_message_id: string;
+          reply_to_message_id?: string | null;
+        };
+        Returns: DbRoomMessage;
+      };
+      toggle_message_reaction: {
+        Args: {
+          target_message_id: string;
+          participant_id: string;
+          reaction: string;
+        };
+        Returns: DbToggleReactionResult;
+      };
+      get_room_messages: {
+        Args: {
+          target_room_id: string;
+          before_created_at?: string | null;
+          before_id?: string | null;
+          page_size?: number;
+        };
+        Returns: DbGetRoomMessagesResult;
+      };
     };
     Enums: {
       approval_mode: ApprovalMode;
       room_status: RoomStatus;
       participant_role: ParticipantRole;
       participant_status: ParticipantStatus;
+      message_type: MessageType;
     };
     CompositeTypes: Record<never, never>;
   };

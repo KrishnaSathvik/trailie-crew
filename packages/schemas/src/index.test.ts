@@ -4,10 +4,19 @@ import {
   approvalModeSchema,
   createTripInputSchema,
   createTripResultSchema,
+  getRoomMessagesInputSchema,
+  getRoomMessagesResultSchema,
   joinTripInputSchema,
+  messageTypeSchema,
   participantRoleSchema,
   participantStatusSchema,
+  presenceStateSchema,
+  reactionTypeSchema,
+  roomMessageSchema,
   roomStatusSchema,
+  sendMessageInputSchema,
+  toggleReactionInputSchema,
+  typingEventSchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -72,5 +81,117 @@ describe("Phase 1A schemas", () => {
         createdAt: "2026-07-13T18:00:00.000Z",
       }),
     ).toMatchObject({ roomCode: "ABCD2345" });
+  });
+});
+
+describe("Phase 1C chat schemas", () => {
+  it("locks message and reaction values", () => {
+    expect(messageTypeSchema.options).toEqual(["user", "system", "trailie"]);
+    expect(reactionTypeSchema.options).toEqual([
+      "like",
+      "love",
+      "laugh",
+      "celebrate",
+      "thinking",
+    ]);
+  });
+
+  it("trims valid send input and enforces the 4000 character boundary", () => {
+    expect(
+      sendMessageInputSchema.parse({
+        roomId: uuid,
+        participantId: uuid,
+        body: "  @Trailie find a campsite  ",
+        clientMessageId: uuid,
+        replyToMessageId: null,
+      }),
+    ).toMatchObject({ body: "@Trailie find a campsite" });
+    expect(
+      sendMessageInputSchema.safeParse({
+        roomId: uuid,
+        participantId: uuid,
+        body: "   ",
+        clientMessageId: uuid,
+      }).success,
+    ).toBe(false);
+    expect(
+      sendMessageInputSchema.safeParse({
+        roomId: uuid,
+        participantId: uuid,
+        body: "x".repeat(4001),
+        clientMessageId: uuid,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates safe message pages without private auth fields", () => {
+    const message = {
+      id: uuid,
+      roomId: uuid,
+      participantId: uuid,
+      messageType: "user",
+      body: "Meet at the north trailhead.",
+      clientMessageId: uuid,
+      replyToMessageId: null,
+      sender: { participantId: uuid, displayName: "Maya", role: "host" },
+      reply: null,
+      reactions: [
+        { reaction: "like", count: 2, reactedByCurrentParticipant: true },
+      ],
+      createdAt: "2026-07-13T18:00:00.000Z",
+      editedAt: null,
+      deletedAt: null,
+    };
+    expect(roomMessageSchema.parse(message)).toEqual(message);
+    expect(
+      getRoomMessagesResultSchema.parse({
+        messages: [message],
+        hasMore: true,
+        nextCursor: { createdAt: message.createdAt, id: uuid },
+      }),
+    ).toMatchObject({ hasMore: true });
+    expect(
+      roomMessageSchema.safeParse({ ...message, email: "hidden@x.test" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("requires paired cursors, caps page requests, and validates reactions", () => {
+    expect(
+      getRoomMessagesInputSchema.safeParse({ roomId: uuid, pageSize: 51 })
+        .success,
+    ).toBe(false);
+    expect(
+      getRoomMessagesInputSchema.safeParse({
+        roomId: uuid,
+        beforeCreatedAt: "2026-07-13T18:00:00.000Z",
+      }).success,
+    ).toBe(false);
+    expect(
+      toggleReactionInputSchema.safeParse({
+        messageId: uuid,
+        participantId: uuid,
+        reaction: "fire",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts privacy-minimal presence and expiring typing events", () => {
+    expect(
+      presenceStateSchema.parse({
+        participantId: uuid,
+        displayName: "Maya",
+        connectedAt: "2026-07-13T18:00:00.000Z",
+        currentArea: "chat",
+      }),
+    ).not.toHaveProperty("userId");
+    expect(
+      typingEventSchema.parse({
+        participantId: uuid,
+        displayName: "Maya",
+        isTyping: true,
+        expiresAt: "2026-07-13T18:00:03.000Z",
+      }),
+    ).toMatchObject({ isTyping: true });
   });
 });

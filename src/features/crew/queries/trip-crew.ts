@@ -1,4 +1,8 @@
-import type { ParticipantSummary, RoomSummary } from "@trailie/schemas";
+import type {
+  GetRoomMessagesResult,
+  ParticipantSummary,
+  RoomSummary,
+} from "@trailie/schemas";
 
 export type SafeInviteMetadata = { shortCode: string };
 
@@ -7,4 +11,6 @@ export type TripShellData = {
   currentParticipant: ParticipantSummary;
   participants: ParticipantSummary[];
   inviteMetadata: SafeInviteMetadata | null;
+  initialMessages: GetRoomMessagesResult;
+  initialHistoryError: boolean;
 };
