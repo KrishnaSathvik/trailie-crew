@@ -15,11 +15,13 @@ describe("Trailie Crew landing page", () => {
         name: "Plan trips together, naturally.",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Create a Trip" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Join a Trip" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create a Trip" })).toHaveAttribute(
+      "href",
+      "/trips/create",
+    );
+    expect(screen.getByRole("link", { name: "Join a Trip" })).toHaveAttribute(
+      "href",
+      "/join",
+    );
   });
 });

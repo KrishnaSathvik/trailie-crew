@@ -21,7 +21,7 @@ supabase                 local config, ordered migrations, and pgTAP tests
 
 ## Rendering boundary
 
-App Router components are React Server Components by default. A file may use `"use client"` only when browser state or direct interaction requires it. In Phase 0, the theme toggle is the only Client Component.
+App Router components are React Server Components by default. Phase 1B uses Client Components only for form state, anonymous-session establishment, copy feedback, the theme toggle, and the transient one-time invitation token. Trip-shell reads remain server-rendered.
 
 ## Package boundaries
 
@@ -32,11 +32,12 @@ App Router components are React Server Components by default. A file may use `"u
 
 ## Planned data flow
 
-The Phase 1A identity and persistence path is implemented:
+The Phase 1B identity, mutation, and read path is implemented:
 
 ```text
 browser -> anonymous Supabase Auth session -> authenticated JWT
-        -> create_trip/join_trip RPC -> validated atomic database writes
+        -> typed Server Action -> create_trip/join_trip RPC
+        -> validated atomic database writes
         -> active participant membership -> RLS-scoped room/crew reads
 ```
 
@@ -52,11 +53,24 @@ crew action -> server application layer -> policy/invocation check
 
 External data will retain source and retrieval metadata. Secrets and privileged provider clients remain server-only. TrailVerse access, if added, will use its service API through the read-only adapter rather than a shared database connection.
 
+## Phase 1B feature boundaries
+
+- `src/features/trips/actions` owns authenticated mutations and safe action results.
+- `src/features/trips/errors` maps a closed database/application error set to user-safe copy.
+- `src/features/trips/queries` owns the RLS-backed Trip-shell read.
+- `src/features/trips/components` owns the entry forms, shell, and memory-only invite handoff.
+- `src/features/crew` owns crew result types and presentation.
+
+Create and Join forms validate shared camelCase contracts in the browser, establish or reuse an anonymous session, and then call a Server Action. Each action validates again, verifies the request user, invokes the Phase 1A RPC, and explicitly maps the snake_case response. No privileged client participates.
+
+The Trip shell loads rooms, active participants, and host-only safe invite metadata through the request-scoped user client. A missing identity, RLS-empty result, malformed row, and inaccessible/nonexistent room all produce one non-enumerating unavailable state.
+
 ## Supabase client boundaries
 
 - `src/lib/supabase/browser.ts` uses only public environment values.
 - `src/lib/supabase/server.ts` creates a request-scoped App Router cookie client.
 - `src/server/supabase/admin.ts` imports `server-only` and is the sole secret-key client.
-- No proxy/middleware is present because Phase 1A has no authenticated server-rendered route requiring automatic refresh.
+- `src/proxy.ts` refreshes auth cookies only for `/trips/*` and `/join/*`. It does not authorize routes; every action and query independently verifies identity and relies on RLS.
+- The admin client is not used by the Phase 1B product flow.
 
 See [`database-security.md`](database-security.md) for the schema, RPC, invite, RLS, and local-testing details.

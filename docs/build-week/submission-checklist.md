@@ -13,7 +13,8 @@
 
 - [x] Anonymous Supabase identity and secure Trip persistence foundation
 - [x] Atomic create/join RPCs, hashed invite tokens, RLS, and database permission tests
-- [ ] Create and join flows without destination, dates, budget, or preference intake
+- [x] Create and join flows without destination, dates, budget, or preference intake
+- [x] RLS-protected responsive Trip shell with honest upcoming sections
 - [ ] Shared crew conversation
 - [ ] Silence-by-default Trailie invocation policy
 - [ ] GPT-5.6 orchestration verified against current OpenAI documentation
@@ -25,7 +26,7 @@
 
 ## Submission readiness
 
-- [ ] Accessibility and responsive review
+- [x] Accessibility and responsive review for landing, entry forms, and Trip shell
 - [ ] End-to-end demo rehearsal
 - [ ] Production deployment and environment review
 - [ ] Final validation commands pass

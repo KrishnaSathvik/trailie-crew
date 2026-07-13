@@ -12,7 +12,7 @@ Group trip planning is fragmented across chats, notes, links, polls, and spreads
 
 Trailie Crew will give friends a shared Trip with a natural group conversation. The crew will be able to mention or directly invoke Trailie for focused help and explicitly request an itinerary only when the group is ready. Planned itineraries will be structured, validated, versioned, revisable, shareable, and exportable.
 
-Those collaborative and AI capabilities are the product direction. Phase 1A now contains the secure persistence and anonymous-identity foundation, while the landing shell remains the only product UI.
+Those collaborative and AI capabilities are the product direction. Phase 1B now provides the first usable create/join journey and a real RLS-protected Trip shell. Conversation and AI capabilities remain intentionally unavailable.
 
 ## Relationship to TrailVerse
 
@@ -24,11 +24,11 @@ Trailie Crew is a separate application, repository, deployment, and database fro
 - TypeScript in strict mode
 - Tailwind CSS 4 with Geist Sans and Geist Mono
 - pnpm workspaces with typed internal `@trailie/*` packages
-- Vitest, React Testing Library, and jsdom
+- Vitest, React Testing Library, jsdom, and Playwright
 - ESLint and Prettier
 - GitHub Actions CI
 - Supabase Auth/Postgres persistence with RPC-only writes, RLS, and pgTAP tests
-- OpenAI API integration remains planned and is not connected in Phase 1A
+- OpenAI API integration remains planned and is not connected in Phase 1B
 
 ## Local setup
 
@@ -36,19 +36,18 @@ Prerequisites: Node.js 22 or newer, pnpm 10, and a Docker-compatible container r
 
 ```bash
 pnpm install
-cp .env.example .env.local
 pnpm exec supabase start
-pnpm exec supabase status -o env
 ```
 
-Copy the local `API_URL`, `PUBLISHABLE_KEY`, and `SECRET_KEY` values into `.env.local` as `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`. Never commit `.env.local` or expose the secret key through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329` to avoid collisions with other Supabase projects and enables anonymous sign-ins.
+For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and the Playwright launcher read only `API_URL` and `PUBLISHABLE_KEY` from the local CLI into child-process memory. The admin client remains available for future trusted backend work but is not used by Phase 1B. If you create `.env.local` manually, never commit it or expose a secret key through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329` and enables anonymous sign-ins.
 
 Reset and test the local database, then run the app:
 
 ```bash
 pnpm exec supabase db reset
 pnpm exec supabase test db
-pnpm dev
+pnpm dev:local
+pnpm test:e2e
 ```
 
 Run the quality checks with:
@@ -57,14 +56,15 @@ Run the quality checks with:
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm build
+pnpm build:local
+pnpm test:e2e
 pnpm exec supabase db reset
 pnpm exec supabase test db
 ```
 
 ## Current implementation status
 
-Implemented through Phase 1A:
+Implemented through Phase 1B:
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -76,13 +76,19 @@ Implemented through Phase 1A:
 - atomic `create_trip` and `join_trip` RPCs with hashed long invite tokens
 - active-membership/host RLS, field-limited room updates, and safe invite metadata
 - pgTAP workflow/permission coverage and TypeScript contract/env/mapper tests
+- functional landing links and accessible Create Trip and Join Trip forms
+- anonymous-session reuse/creation before authenticated Server Action mutations
+- typed safe application errors for validation, auth, invite, network, and response failures
+- RLS-backed Trip shell with current identity, crew membership, host invite controls, and responsive navigation
+- memory-only one-time invitation path display/copy with safe short-code fallback
+- multi-context Playwright verification for host, member, duplicate-name, and outsider workflows
 
 Not yet implemented:
 
-- Create Trip and Join Trip UI, crew presence, or shared chat
+- realtime crew presence or shared chat
 - Trailie invocation, OpenAI model orchestration, or application tools
 - itinerary planning, approval, generation, validation, revisions, sharing, or export
-- Supabase persistence or any live travel-data provider
+- live travel-data providers or TrailVerse service integration
 
 ## Build Week timing
 

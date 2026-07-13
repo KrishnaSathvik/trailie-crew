@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { TransientInviteProvider } from "@/features/trips/components/transient-invite-provider";
 import "@/styles/globals.css";
 
 const geistSans = Geist({
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <TransientInviteProvider>{children}</TransientInviteProvider>
       </body>
     </html>
   );

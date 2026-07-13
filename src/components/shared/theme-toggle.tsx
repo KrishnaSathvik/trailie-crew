@@ -1,21 +1,46 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
+const themeChangeEvent = "trailie-theme-change";
 
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme;
+  window.dispatchEvent(new Event(themeChangeEvent));
+}
+
+function subscribeToTheme(onStoreChange: () => void) {
+  window.addEventListener(themeChangeEvent, onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+  return () => {
+    window.removeEventListener(themeChangeEvent, onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+}
+
+function getThemeSnapshot(): Theme {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    getThemeSnapshot,
+    () => "light",
+  );
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("trailie-theme");
+    if (storedTheme === "light" || storedTheme === "dark") {
+      applyTheme(storedTheme);
+    }
+  }, []);
 
   function toggleTheme() {
     const nextTheme = theme === "light" ? "dark" : "light";
-    setTheme(nextTheme);
     applyTheme(nextTheme);
     window.localStorage.setItem("trailie-theme", nextTheme);
   }

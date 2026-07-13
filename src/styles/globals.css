@@ -51,6 +51,11 @@ button {
   font: inherit;
 }
 
+::selection {
+  color: var(--background);
+  background: var(--foreground);
+}
+
 .route-line {
   position: absolute;
   top: 3rem;

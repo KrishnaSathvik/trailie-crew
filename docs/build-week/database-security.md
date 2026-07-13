@@ -4,7 +4,7 @@
 
 Trailie Crew uses Supabase anonymous sign-ins so a browser receives a real `auth.users` identity and authenticated JWT without collecting personal information. Authorization always derives from `auth.uid()` and participant membership. Display names, room codes, local-storage identifiers, and cookies without a valid Supabase identity are never authorization inputs.
 
-Anonymous identities are durable only while the browser retains its session. Production setup should add CAPTCHA or Turnstile and an anonymous-user cleanup policy to limit abuse; those operational controls are not part of the local Phase 1A foundation.
+Anonymous identities are durable only while the browser retains its session. Production setup should add CAPTCHA or Turnstile and an anonymous-user cleanup policy to limit abuse; those operational controls are not part of the local persistence foundation.
 
 ## Ownership and storage
 
@@ -15,6 +15,8 @@ Anonymous identities are durable only while the browser retains its session. Pro
 
 The initial invite long token is 32 cryptographically random bytes encoded in a URL-safe form. `create_trip` returns it once and stores only its hash. `join_trip` hashes long input for lookup or normalizes an eight-character short code. Short codes are a convenience credential layered with a real authenticated identity, invite lifecycle checks, Trip status, and membership/name constraints; public invite URLs should use the high-entropy token.
 
+In Phase 1B, the create Server Action returns the raw token to the initiating form exactly once. The form places it in an in-memory React provider immediately before navigating to the Trip shell. The host may display or copy `/join/<encoded-token>` during that page lifetime. The token is not written to localStorage, cookies, analytics, application logs, a host URL, or a database row; refresh destroys it. Later host access exposes only the safe short code through `room_invite_metadata`.
+
 ## RPC-only workflows
 
 `public.create_trip(text, text, integer)` validates identity and inputs, generates unique credentials, and atomically inserts the room, host participant, invite, and private memory row.
@@ -22,6 +24,8 @@ The initial invite long token is 32 cryptographically random bytes encoded in a 
 `public.join_trip(text, text)` locks both the matching invite and room before checking revocation, expiry, usage, room status, membership, and case-insensitive active names. The lock serializes joins for a Trip and prevents `max_uses` races. Participant insertion and the single usage increment share the caller transaction.
 
 Both public RPCs are `SECURITY DEFINER`, set an empty search path, fully qualify referenced objects, reject missing `auth.uid()`, and are executable only by `authenticated`. There are no overloaded variants.
+
+Phase 1B calls those RPCs only from Server Actions using the request-scoped user client. Browser validation improves feedback, but every action repeats schema validation and identity verification. Controlled `P0001` messages from the committed Phase 1A migration map to a closed application error union; unknown database details are discarded.
 
 ## RLS and grants
 
@@ -31,6 +35,9 @@ Both public RPCs are `SECURITY DEFINER`, set an empty search path, fully qualify
 - Browser roles have no direct room insert/delete, participant write, invite write, or private-memory access.
 - Private membership helpers bypass participant RLS to avoid recursive policies. They have empty search paths and only the helpers required by policies are executable by `authenticated`; `owns_participant` remains unavailable to clients until a future workflow needs it.
 - `private.room_memory` has forced RLS plus an explicit restrictive deny policy for browser roles. Trusted secret-key/backend access bypasses RLS when deliberately used.
+- The Trip shell performs ordinary user-scoped reads. An outsider, missing session, or inaccessible identifier receives the same safe unavailable state.
+- The session-refresh proxy changes cookies only. It is not an authorization boundary.
+- The server-only admin client is unused in Phase 1B.
 
 ## Local commands
 
@@ -44,18 +51,22 @@ pnpm exec supabase db reset
 pnpm exec supabase test db
 pnpm exec supabase db lint --local --level warning
 pnpm exec supabase db advisors --local --type security --level info
+pnpm dev:local
+pnpm build:local
+pnpm test:e2e
 ```
 
-Map local status output into `.env.local`:
+The `dev:local`, `build:local`, and Playwright launchers map these public local values in process memory:
 
 ```text
 API_URL        -> NEXT_PUBLIC_SUPABASE_URL
 PUBLISHABLE_KEY -> NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-SECRET_KEY     -> SUPABASE_SECRET_KEY
 ```
+
+The secret key is unnecessary for Phase 1B. Create `.env.local` only when testing a future trusted-backend feature that genuinely requires the server-only admin client.
 
 Stop the disposable local stack with `pnpm exec supabase stop`. Never run `supabase link`, `db push`, or secret-key commands against production as part of this local workflow.
 
 ## Implemented and planned
 
-Phase 1A implements identity, persistence, create/join RPCs, grants, RLS, typed clients/contracts, and automated permission/workflow tests. It does not implement Create Trip or Join Trip UI, membership-management RPCs, chat, realtime, Trailie, OpenAI calls, planning, itinerary data, or production abuse controls.
+Phase 1B implements identity, persistence, create/join RPCs, grants, RLS, typed clients/contracts, accessible create/join UI, Server Action mutations, RLS Trip-shell reads, one-time token handoff, and automated unit/permission/workflow/browser tests. It does not implement membership-management RPCs, chat, realtime, Trailie, OpenAI calls, planning, itinerary data, or production abuse controls.

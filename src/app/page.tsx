@@ -1,4 +1,5 @@
 import { ArrowRight, UsersRound } from "lucide-react";
+import Link from "next/link";
 
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 
@@ -37,11 +38,9 @@ export default function Home() {
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                disabled
-                className="bg-foreground text-background inline-flex min-h-12 items-center justify-center gap-3 rounded-md px-5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-100"
-                title="Trip creation is planned for a later Build Week phase"
+              <Link
+                href="/trips/create"
+                className="bg-foreground text-background focus-visible:ring-ring focus-visible:ring-offset-background inline-flex min-h-12 items-center justify-center gap-3 rounded-md px-5 text-sm font-semibold transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 Create a Trip
                 <ArrowRight
@@ -49,12 +48,10 @@ export default function Home() {
                   className="size-4"
                   strokeWidth={1.75}
                 />
-              </button>
-              <button
-                type="button"
-                disabled
-                className="border-border bg-background inline-flex min-h-12 items-center justify-center gap-3 rounded-md border px-5 text-sm font-semibold transition-colors disabled:cursor-not-allowed"
-                title="Trip joining is planned for a later Build Week phase"
+              </Link>
+              <Link
+                href="/join"
+                className="border-border bg-background hover:bg-subtle focus-visible:ring-ring focus-visible:ring-offset-background inline-flex min-h-12 items-center justify-center gap-3 rounded-md border px-5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 <UsersRound
                   aria-hidden="true"
@@ -62,7 +59,7 @@ export default function Home() {
                   strokeWidth={1.75}
                 />
                 Join a Trip
-              </button>
+              </Link>
             </div>
           </div>
 
