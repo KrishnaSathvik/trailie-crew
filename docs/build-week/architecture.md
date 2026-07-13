@@ -16,7 +16,7 @@ packages/schemas        canonical cross-package schemas
 packages/validation     reusable validation results and helpers
 packages/travel-tools   provider-neutral travel tool contracts
 packages/trailverse-adapter  read-only TrailVerse contracts
-supabase                 future migrations and database tests
+supabase                 local config, ordered migrations, and pgTAP tests
 ```
 
 ## Rendering boundary
@@ -32,7 +32,17 @@ App Router components are React Server Components by default. A file may use `"u
 
 ## Planned data flow
 
-The following is architectural intent and is not implemented in Phase 0:
+The Phase 1A identity and persistence path is implemented:
+
+```text
+browser -> anonymous Supabase Auth session -> authenticated JWT
+        -> create_trip/join_trip RPC -> validated atomic database writes
+        -> active participant membership -> RLS-scoped room/crew reads
+```
+
+PostgreSQL is the authorization boundary. `auth.uid()` links one real Auth user to participant rows in any number of Trips. The browser cannot directly insert participants, invites, or rooms; cannot delete rooms; and cannot read `private.room_memory` or invite-token hashes. Hosts can update only the safe room-setting columns `name`, `expected_travelers`, and `approval_mode`.
+
+The following remains architectural intent and is not implemented in Phase 1A:
 
 ```text
 crew action -> server application layer -> policy/invocation check
@@ -41,3 +51,12 @@ crew action -> server application layer -> policy/invocation check
 ```
 
 External data will retain source and retrieval metadata. Secrets and privileged provider clients remain server-only. TrailVerse access, if added, will use its service API through the read-only adapter rather than a shared database connection.
+
+## Supabase client boundaries
+
+- `src/lib/supabase/browser.ts` uses only public environment values.
+- `src/lib/supabase/server.ts` creates a request-scoped App Router cookie client.
+- `src/server/supabase/admin.ts` imports `server-only` and is the sole secret-key client.
+- No proxy/middleware is present because Phase 1A has no authenticated server-rendered route requiring automatic refresh.
+
+See [`database-security.md`](database-security.md) for the schema, RPC, invite, RLS, and local-testing details.

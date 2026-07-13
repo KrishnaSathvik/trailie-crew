@@ -10,12 +10,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "supabase": "supabase"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.1",
+    "@supabase/supabase-js": "2.110.3",
     "@trailie/schemas": "workspace:*",
     "@trailie/trailverse-adapter": "workspace:*",
     "@trailie/travel-tools": "workspace:*",
@@ -23,7 +28,8 @@
     "lucide-react": "^1.24.0",
     "next": "^16.2.10",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
@@ -39,6 +45,7 @@
     "jsdom": "^29.1.1",
     "prettier": "^3.9.5",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "supabase": "2.109.1",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"

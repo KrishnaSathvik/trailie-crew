@@ -1,3 +1,5 @@
 # Supabase migrations
 
-Ordered database migrations will live here when persistence is introduced. Phase 0 creates no schema and is not connected to the TrailVerse database.
+Phase 1A contains ordered imperative migrations for the Trip schema and its RPC/RLS security layer. Create migration files with `pnpm exec supabase migration new <name>` and verify the full history with `pnpm exec supabase db reset`.
+
+This local project is not linked to TrailVerse or any remote production database.

@@ -11,6 +11,8 @@
 
 ## Product implementation
 
+- [x] Anonymous Supabase identity and secure Trip persistence foundation
+- [x] Atomic create/join RPCs, hashed invite tokens, RLS, and database permission tests
 - [ ] Create and join flows without destination, dates, budget, or preference intake
 - [ ] Shared crew conversation
 - [ ] Silence-by-default Trailie invocation policy
