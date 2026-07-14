@@ -67,6 +67,7 @@ describe("OpenAI environment validation", () => {
       planningPromptVersion: "trailie-planning-summary-v1",
       planningSchemaVersion: "1",
       planningTimeoutMs: 45_000,
+      itineraryTimeoutMs: 180_000,
     });
     expect(
       parseOpenAIEnv({ TRAILIE_AI_PROVIDER: "fake", NODE_ENV: "test" }),

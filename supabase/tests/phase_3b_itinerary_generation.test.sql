@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(51);
+select plan(60);
 
 select has_table('public','trip_plans','trip plans exist');
 select has_table('public','trip_plan_events','safe progress events exist');
@@ -9,6 +9,7 @@ select has_table('private','itinerary_runs','itinerary runs are private');
 select has_table('private','tool_evidence','tool evidence is private');
 select has_table('private','validation_reports','validation reports are private');
 select has_function('public','create_itinerary_generation',array['uuid','uuid'],'generation RPC exists');
+select has_function('public','retry_itinerary_generation',array['uuid','uuid'],'retry RPC exists');
 select has_function('public','get_trip_plan',array['uuid'],'safe plan query exists');
 select has_function('public','claim_itinerary_generation',array['uuid'],'service claim wrapper exists');
 select has_function('public','record_itinerary_draft',array['uuid','jsonb','text','text','bigint','bigint','bigint','bigint','bigint','integer'],'draft recorder exists');
@@ -28,6 +29,8 @@ select ok(not has_table_privilege('authenticated','public.trip_plans','delete'),
 select ok(not has_table_privilege('authenticated','private.tool_evidence','select'),'browser cannot read evidence');
 select ok(not has_function_privilege('authenticated','public.claim_itinerary_generation(uuid)','execute'),'browser cannot claim generation');
 select ok(has_function_privilege('service_role','public.claim_itinerary_generation(uuid)','execute'),'service can claim generation');
+select ok(has_function_privilege('authenticated','public.retry_itinerary_generation(uuid,uuid)','execute'),'authenticated caller may request an authorized retry');
+select ok(not has_function_privilege('anon','public.retry_itinerary_generation(uuid,uuid)','execute'),'anonymous caller cannot retry generation');
 select hasnt_column('private','itinerary_runs','raw_prompt','raw prompts are absent');
 select hasnt_column('private','itinerary_runs','reasoning','hidden reasoning is absent');
 select hasnt_column('private','tool_evidence','authorization_header','authorization headers are absent');
@@ -163,6 +166,37 @@ create temporary table duplicate_recovery_claim as select public.claim_itinerary
 reset role;
 select ok((select (payload->>'claimed')::boolean from recovery_claim),'stale worker lease is recovered once');
 select ok(not (select (payload->>'claimed')::boolean from duplicate_recovery_claim),'stale worker recovery remains exclusive');
+
+set local role service_role;
+select public.fail_itinerary_generation(((select payload->>'id' from created_plan)::uuid),'model_timeout');
+reset role;
+select set_config('request.jwt.claim.sub','',true);
+set local role authenticated;
+select throws_ok(
+  format('select public.retry_itinerary_generation(%L,%L)',(select payload->>'id' from created_plan),'82000000-0000-4000-8000-000000000001'),
+  'P0001','Authentication required.','unauthenticated retry rejected'
+);
+reset role;
+select set_config('request.jwt.claim.sub','80000000-0000-4000-8000-000000000003',true);
+set local role authenticated;
+select throws_ok(
+  format('select public.retry_itinerary_generation(%L,%L)',(select payload->>'id' from created_plan),'82000000-0000-4000-8000-000000000001'),
+  'P0001','Membership required.','outsider cannot spoof a retry participant'
+);
+reset role;
+select set_config('request.jwt.claim.sub','80000000-0000-4000-8000-000000000001',true);
+set local role authenticated;
+create temporary table retried_plan as
+  select public.retry_itinerary_generation(((select payload->>'id' from created_plan)::uuid),'82000000-0000-4000-8000-000000000001') payload;
+reset role;
+grant select on retried_plan to service_role;
+select is((select payload->>'id' from retried_plan),(select payload->>'id' from created_plan),'retry preserves the exact plan identity');
+select is((select payload->>'version' from retried_plan),'1','retry preserves the plan version');
+set local role service_role;
+create temporary table retry_claim as select public.claim_itinerary_generation(((select payload->>'id' from created_plan)::uuid)) payload;
+reset role;
+select ok((select (payload->>'claimed')::boolean from retry_claim),'retried generation receives the next exclusive worker claim');
+select is((select count(*) from public.trip_plan_events where trip_plan_id=((select payload->>'id' from created_plan)::uuid) and event_type='generation_started'),2::bigint,'retry emits one safe generation event');
 
 set local role service_role;
 select public.record_itinerary_draft(

@@ -22,7 +22,8 @@ const safetyIdentifier = `trailie_${createHmac(
     "trailie-openai-smoke-test-only-secret",
 )
   .update("openai-smoke-test")
-  .digest("hex")}`;
+  .digest("hex")
+  .slice(0, 56)}`;
 
 try {
   const response = await new OpenAI({

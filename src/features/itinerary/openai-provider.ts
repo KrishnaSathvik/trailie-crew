@@ -52,7 +52,7 @@ export async function runWithOneStructuralRepair<T>(
   }
 }
 
-function mapped(error: unknown, repair: boolean) {
+export function mapItineraryProviderError(error: unknown, repair: boolean) {
   if (error instanceof ItineraryProviderError) return error;
   if (error instanceof OpenAI.RateLimitError)
     return new ItineraryProviderError("model_rate_limited", true);
@@ -66,7 +66,14 @@ function mapped(error: unknown, repair: boolean) {
       repair ? "repair_failed" : "invalid_itinerary_response",
       !repair,
     );
-  if (error instanceof Error && error.name === "AbortError")
+  const errorName =
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    typeof error.name === "string"
+      ? error.name
+      : null;
+  if (errorName === "AbortError" || errorName === "TimeoutError")
     return new ItineraryProviderError("model_timeout", true);
   return new ItineraryProviderError(
     repair ? "repair_failed" : "model_unavailable",
@@ -110,7 +117,7 @@ export function createOpenAIItineraryProvider(configuration: {
         usage: extractUsage(response.usage),
       };
     } catch (error) {
-      throw mapped(error, repair);
+      throw mapItineraryProviderError(error, repair);
     }
   }
   function call(input: ItineraryProviderInput, repair: boolean) {

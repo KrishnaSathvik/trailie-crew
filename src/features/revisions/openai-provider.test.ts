@@ -19,6 +19,7 @@ describe("OpenAI revision requests", () => {
     });
     expect(request).not.toHaveProperty("tools");
     expect(request.instructions).toContain("trailie-change-analysis-v1");
+    expect(request.instructions).toMatch(/exactly match/i);
   });
   it("uses exact Sol and high reasoning for a complete candidate", () => {
     const request = buildItineraryRevisionRequest({

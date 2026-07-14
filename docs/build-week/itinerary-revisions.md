@@ -1,5 +1,7 @@
 # Itinerary revisions
 
+Live acceptance on 2026-07-14 verified Terra impact analysis with both feasible and needs-information outcomes, exact request-type preservation, two-user analysis approval, a full Sol candidate, deterministic change-boundary validation, two-user confirmation, and immutable Version 2 publication. The successful feasible analysis used 2,854 total tokens and its candidate used 7,570; Version 1 remained published throughout.
+
 Phase 4A adds an explicit, approval-gated revision aggregate around immutable published itineraries. A chat message never creates a revision. A member starts one through **Request a Change**, an item’s **Change this** action, or the application-owned action contract.
 
 ## Lifecycle

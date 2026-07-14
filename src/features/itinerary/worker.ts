@@ -56,6 +56,15 @@ export async function enrichWithTravelEvidence(
   const itinerary = structuredClone(source);
   const collected = [...existing];
   const now = dependencies.now ?? new Date().toISOString();
+  const referenceLocation = itinerary.days
+    .flatMap((day) => day.items)
+    .map((item) => item.location)
+    .find(
+      (location) =>
+        location !== null &&
+        location.latitude !== null &&
+        location.longitude !== null,
+    );
 
   async function getEvidence<T>(
     itemId: string | null,
@@ -171,8 +180,8 @@ export async function enrichWithTravelEvidence(
         dependencies.travelProvider.daylight({
           date: day.date,
           timezone: itinerary.timezone,
-          latitude: itinerary.days[0].items[0].location?.latitude ?? 0,
-          longitude: itinerary.days[0].items[0].location?.longitude ?? 0,
+          latitude: referenceLocation?.latitude ?? 0,
+          longitude: referenceLocation?.longitude ?? 0,
         }),
     );
   }

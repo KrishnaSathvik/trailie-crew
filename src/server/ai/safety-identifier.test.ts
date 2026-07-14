@@ -12,7 +12,8 @@ describe("privacy-preserving safety identifiers", () => {
     expect(first).toBe(
       createSafetyIdentifier(id, "a-secret-at-least-32-characters-long"),
     );
-    expect(first).toMatch(/^trailie_[a-f0-9]{64}$/);
+    expect(first).toMatch(/^trailie_[a-f0-9]{56}$/);
+    expect(first).toHaveLength(64);
     expect(first).not.toContain(id);
   });
 

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createFakeTravelProvider } from "@trailie/travel-tools";
+import {
+  createFakeTravelProvider,
+  createUnavailableTravelProvider,
+} from "@trailie/travel-tools";
 import type { PlanningSummary } from "@trailie/schemas";
 import { createFakeItineraryProvider } from "./provider";
-import { processItineraryGeneration } from "./worker";
+import { enrichWithTravelEvidence, processItineraryGeneration } from "./worker";
 import type {
   ItineraryGenerationContext,
   ItineraryRepository,
@@ -109,6 +112,26 @@ function repository() {
 }
 
 describe("itinerary worker", () => {
+  it("handles an empty day without crashing during evidence enrichment", async () => {
+    const output = await createFakeItineraryProvider().generate({
+      operationKey: "empty-day",
+      model: "gpt-5.6-sol",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1000),
+    });
+    output.itinerary.days[0].items = [];
+    output.itinerary.days[0].travelSegments = [];
+    const { repo } = repository();
+    await expect(
+      enrichWithTravelEvidence("plan-empty", output.itinerary, [], {
+        repository: repo,
+        travelProvider: createUnavailableTravelProvider("unconfigured"),
+        now: "2026-07-13T19:00:00.000Z",
+      }),
+    ).resolves.toMatchObject({ itinerary: { days: expect.any(Array) } });
+  });
+
   it("validates a route conflict, repairs once, revalidates, and publishes", async () => {
     const { repo, calls } = repository();
     await processItineraryGeneration("plan-1", {

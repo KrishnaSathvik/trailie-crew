@@ -37,6 +37,7 @@ async function client() {
 
 function map(error: { message?: string } | null): ItineraryActionError {
   const message = error?.message ?? "";
+  if (/retry exhausted/i.test(message)) return "retry_exhausted";
   if (/stale/i.test(message)) return "approved_summary_stale";
   if (/approved summary/i.test(message)) return "approved_summary_required";
   if (/membership|authentication/i.test(message)) return "membership_required";
@@ -44,6 +45,29 @@ function map(error: { message?: string } | null): ItineraryActionError {
   if (/not found/i.test(message)) return "plan_not_found";
   if (/not allowed/i.test(message)) return "plan_generation_not_allowed";
   return "unknown_error";
+}
+
+export async function retryItineraryAction(
+  input: unknown,
+): Promise<Result<{ id: string; status: string; version: number }>> {
+  const parsed = z
+    .object({ tripPlanId: z.uuid(), participantId: z.uuid() })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "unknown_error" };
+  const supabase = await client();
+  if (!supabase) return { ok: false, error: "membership_required" };
+  const { data, error } = await supabase.rpc("retry_itinerary_generation", {
+    target_trip_plan_id: parsed.data.tripPlanId,
+    participant_id: parsed.data.participantId,
+  });
+  if (error) return { ok: false, error: map(error) };
+  const result = z
+    .object({ id: z.uuid(), status: z.string(), version: z.number().int() })
+    .strict()
+    .parse(data);
+  scheduleItineraryGeneration(result.id);
+  return { ok: true, data: result };
 }
 
 export async function generateItineraryAction(

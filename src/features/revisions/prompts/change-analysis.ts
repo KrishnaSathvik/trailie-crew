@@ -1,6 +1,7 @@
 export const CHANGE_ANALYSIS_PROMPT_VERSION = "trailie-change-analysis-v1";
 export const CHANGE_ANALYSIS_PROMPT = `${CHANGE_ANALYSIS_PROMPT_VERSION}
 Analyze only the explicit requested itinerary change. Do not mutate or rewrite the plan.
+The requestedChange.type in the response must exactly match the type in EXPLICIT_CHANGE_REQUEST; never reclassify it. Use only item IDs present in BASE_PUBLISHED_ITINERARY, and keep targetItemIds empty when the explicit targetItemId is null.
 Identify affected items, days, routes, constraints, reservations, budget, and disclosed downstream consequences.
 Preserve confirmed decisions and hard constraints. Never reintroduce rejected options.
 Surface missing information and blockers. Never claim approval, validation, or publication.

@@ -9,6 +9,7 @@ import type {
 import {
   generateItineraryAction,
   getTripPlanAction,
+  retryItineraryAction,
 } from "@/features/itinerary/actions";
 import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
 import { RevisionExperience } from "@/features/revisions/components/revision-experience";
@@ -176,6 +177,26 @@ export function PlanExperience({
     await refresh();
     setGenerating(false);
   }
+  async function retryItinerary() {
+    if (!plan || generating) return;
+    setGenerating(true);
+    setError(null);
+    const result = await retryItineraryAction({
+      tripPlanId: plan.id,
+      participantId,
+    });
+    if (!result.ok) {
+      setGenerating(false);
+      setError(
+        result.error === "retry_exhausted"
+          ? "This itinerary has reached its safe retry limit."
+          : "The itinerary could not be retried safely.",
+      );
+      return;
+    }
+    await refresh();
+    setGenerating(false);
+  }
   if (loading)
     return (
       <div
@@ -195,7 +216,30 @@ export function PlanExperience({
         onPlanPublished={refresh}
       />
     );
-  if (plan) return <ItineraryExperience plan={plan} />;
+  if (plan)
+    return (
+      <>
+        <ItineraryExperience
+          plan={plan}
+          onRetry={
+            plan.status === "failed" &&
+            [
+              "model_timeout",
+              "model_rate_limited",
+              "model_unavailable",
+              "validation_failed",
+            ].includes(plan.errorCode ?? "")
+              ? retryItinerary
+              : undefined
+          }
+        />
+        {error ? (
+          <p className="text-destructive px-5 pb-4 text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </>
+    );
   if (!request && !starting)
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12 sm:px-8">

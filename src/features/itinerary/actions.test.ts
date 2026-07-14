@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { scheduleItineraryGeneration } from "./scheduler";
-import { generateItineraryAction, getTripPlanAction } from "./actions";
+import {
+  generateItineraryAction,
+  getTripPlanAction,
+  retryItineraryAction,
+} from "./actions";
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: vi.fn(),
@@ -42,6 +46,18 @@ describe("itinerary actions", () => {
     await expect(
       generateItineraryAction({ planningRequestId: id, participantId: id }),
     ).resolves.toMatchObject({ ok: true, data: { reused: true } });
+    expect(scheduleItineraryGeneration).toHaveBeenCalledWith(id);
+  });
+
+  it("retries the same server-authorized failed plan", async () => {
+    const rpc = client({ id, status: "generating", version: 1 });
+    await expect(
+      retryItineraryAction({ tripPlanId: id, participantId: id }),
+    ).resolves.toMatchObject({ ok: true, data: { id, version: 1 } });
+    expect(rpc).toHaveBeenCalledWith("retry_itinerary_generation", {
+      target_trip_plan_id: id,
+      participant_id: id,
+    });
     expect(scheduleItineraryGeneration).toHaveBeenCalledWith(id);
   });
 

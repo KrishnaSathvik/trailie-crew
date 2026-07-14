@@ -25,11 +25,25 @@ const response = await client.responses.create({
       schema: {
         type: "object",
         properties: {
-          facts: { type: "array", maxItems: 0, items: { type: "object" } },
+          facts: {
+            type: "array",
+            maxItems: 0,
+            items: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false,
+            },
+          },
           supersessions: {
             type: "array",
             maxItems: 0,
-            items: { type: "object" },
+            items: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false,
+            },
           },
         },
         required: ["facts", "supersessions"],

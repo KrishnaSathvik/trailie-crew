@@ -524,6 +524,13 @@ export type Database = {
         };
         Returns: Json;
       };
+      retry_itinerary_generation: {
+        Args: {
+          target_trip_plan_id: string;
+          participant_id: string;
+        };
+        Returns: Json;
+      };
       get_trip_plan: {
         Args: { target_room_id: string };
         Returns: Json;

@@ -327,12 +327,14 @@ export function ItineraryExperience({
   onRequestChange,
   onChangeItem,
   onHistory,
+  onRetry,
   readOnly = false,
 }: {
   plan: TripPlanView;
   onRequestChange?: () => void;
   onChangeItem?: (itemId: string, title: string) => void;
   onHistory?: () => void;
+  onRetry?: () => void;
   readOnly?: boolean;
 }) {
   const [view, setView] = useState<View>("Overview");
@@ -351,6 +353,15 @@ export function ItineraryExperience({
           The approved summary and crew conversation are unchanged. Trailie did
           not present an unvalidated plan as ready.
         </p>
+        {plan.status === "failed" && onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="bg-foreground text-background mt-6 w-fit rounded-full px-5 py-2.5 text-sm font-semibold"
+          >
+            Retry itinerary
+          </button>
+        ) : null}
       </div>
     );
   }

@@ -14,6 +14,53 @@ import {
 import { StructuredBodyExtractor } from "@/server/ai/streaming-body";
 import { extractUsage } from "@/server/ai/usage";
 
+const focusedAnswerModelSchema = trailieFocusedAnswerSchema
+  .extend({
+    title: trailieFocusedAnswerSchema.shape.title.unwrap().nullable(),
+    comparisonItems: trailieFocusedAnswerSchema.shape.comparisonItems
+      .unwrap()
+      .nullable(),
+    followUpQuestion: trailieFocusedAnswerSchema.shape.followUpQuestion
+      .unwrap()
+      .nullable(),
+  })
+  .strict();
+
+export function buildFocusedAnswerRequest(input: {
+  model: string;
+  safetyIdentifier: string;
+  context: string;
+  request: string;
+}) {
+  return {
+    model: input.model,
+    instructions: FOCUSED_ANSWER_PROMPT,
+    input: `${input.context}\n\n<CURRENT EXPLICIT REQUEST>\n${input.request}\n</CURRENT EXPLICIT REQUEST>`,
+    reasoning: { effort: "low" as const },
+    text: {
+      format: zodTextFormat(focusedAnswerModelSchema, "trailie_focused_answer"),
+    },
+    max_output_tokens: 900,
+    safety_identifier: input.safetyIdentifier,
+    store: false,
+  };
+}
+
+export function normalizeFocusedAnswerModelOutput(value: unknown) {
+  const parsed = focusedAnswerModelSchema.parse(value);
+  return trailieFocusedAnswerSchema.parse({
+    responseType: parsed.responseType,
+    body: parsed.body,
+    ...(parsed.title === null ? {} : { title: parsed.title }),
+    ...(parsed.comparisonItems === null
+      ? {}
+      : { comparisonItems: parsed.comparisonItems }),
+    ...(parsed.followUpQuestion === null
+      ? {}
+      : { followUpQuestion: parsed.followUpQuestion }),
+  });
+}
+
 function mapOpenAIError(error: unknown) {
   if (error instanceof TrailieProviderError) return error;
   let code: SafeAiErrorCode = "openai_unavailable";
@@ -51,21 +98,12 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
       let stream;
       try {
         stream = client.responses.stream(
-          {
+          buildFocusedAnswerRequest({
             model: input.model,
-            instructions: FOCUSED_ANSWER_PROMPT,
-            input: `${input.context}\n\n<CURRENT EXPLICIT REQUEST>\n${input.request}\n</CURRENT EXPLICIT REQUEST>`,
-            reasoning: { effort: "low" },
-            text: {
-              format: zodTextFormat(
-                trailieFocusedAnswerSchema,
-                "trailie_focused_answer",
-              ),
-            },
-            max_output_tokens: 900,
-            safety_identifier: input.safetyIdentifier,
-            store: false,
-          },
+            safetyIdentifier: input.safetyIdentifier,
+            context: input.context,
+            request: input.request,
+          }),
           { signal: input.signal },
         );
       } catch (error) {
@@ -75,13 +113,14 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
       const completed = stream
         .finalResponse()
         .then((response) => {
-          const answer = trailieFocusedAnswerSchema.safeParse(
-            response.output_parsed,
-          );
-          if (!answer.success)
+          let answer;
+          try {
+            answer = normalizeFocusedAnswerModelOutput(response.output_parsed);
+          } catch {
             throw new TrailieProviderError("invalid_model_response", true);
+          }
           return {
-            answer: answer.data,
+            answer,
             responseId: response.id,
             requestId:
               (response as typeof response & { _request_id?: string })

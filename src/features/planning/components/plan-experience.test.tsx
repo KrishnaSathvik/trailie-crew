@@ -21,6 +21,7 @@ vi.mock("../actions", () => ({
 vi.mock("@/features/itinerary/actions", () => ({
   generateItineraryAction: vi.fn(),
   getTripPlanAction: vi.fn(),
+  retryItineraryAction: vi.fn(),
 }));
 const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 const summary: PlanningSummary = {

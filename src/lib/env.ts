@@ -95,8 +95,8 @@ const openAIEnvSchema = z.object({
     .number()
     .int()
     .min(5_000)
-    .max(120_000)
-    .default(90_000),
+    .max(240_000)
+    .default(180_000),
   TRAILIE_AI_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });

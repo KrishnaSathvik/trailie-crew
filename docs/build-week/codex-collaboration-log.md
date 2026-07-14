@@ -1,5 +1,11 @@
 # Codex Collaboration Log
 
+## 2026-07-14 — Live OpenAI hardening
+
+After Phase 4B was committed as `72fe749`, the five credentialed OpenAI smoke scripts passed without skips for focused answers, memory, planning, itinerary generation, and revisions. A real two-browser local trip then exercised silence-by-default chat, a streamed and persisted Terra answer, Luna preference correction/supersession, a Sol planning summary, two-user approval, Sol itinerary publication, Terra revision analysis, a Sol candidate, and two-user Version 2 publication.
+
+The live run exposed boundaries that deterministic providers could not: OpenAI limits `safety_identifier` to 64 characters; strict focused-answer fields must be required-and-nullable rather than optional; the memory smoke schema needed `additionalProperties: false`; full Sol itinerary responses need more than the prior 90-second ceiling; empty model-generated days crashed daylight enrichment; validation-only recovery incorrectly consumed an AI attempt; vague itinerary prompts permitted empty/free-time-only days; and Terra could reclassify the explicit revision type. Test-first fixes added a 64-character HMAC identifier, a model-only focused-answer wire schema with null normalization, a 180-second bounded itinerary timeout, authenticated transient retry, safe empty-day validation/recovery, meaningful-day prompt/validator rules, and exact revision-type instructions. No key, raw prompt, message body, token, or provider credential was added to source or logs.
+
 ## 2026-07-14 — Phase 4B
 
 Started from clean `main` commit `0e2182c`. Human direction locked exact-version sharing/export, host-only link management, 256-bit opaque tokens, deterministic public redaction, conservative indexing/cache behavior, and no server-PDF claim without a compatible runtime. Codex implemented the database, application, route, UI, ICS, print, privacy, and test boundaries. Red-to-green work exposed and fixed two cross-runtime issues: newly published initial Version 1 rows lacked `plan_hash` after the one-time Phase 4A backfill, and a type re-export failed under Next's development Server Action loader despite a green production build. The real-stack browser proof showed Version 1 while the room remained on Version 2, then immediate generic unavailability after revocation. No commit or push was made.

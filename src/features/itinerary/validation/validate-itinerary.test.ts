@@ -240,6 +240,57 @@ describe("deterministic itinerary validation", () => {
     );
   });
 
+  it("marks an empty itinerary day as repairable", () => {
+    const plan = itinerary();
+    plan.days[0].items = [];
+    plan.days[0].travelSegments = [];
+    const summary = approvedSummary();
+    summary.confirmedDecisions = [];
+    const report = validateItinerary({
+      itinerary: plan,
+      approvedSummary: summary,
+      evidence: evidence(),
+      now: "2026-07-13T19:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+    expect(report.status).toBe("needs_revision");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({ code: "day_empty", repairable: true }),
+    );
+  });
+
+  it("does not accept free time as the only content for a day", () => {
+    const plan = itinerary();
+    plan.days[0].items = [
+      {
+        ...plan.days[0].items[0],
+        id: "item:free-time",
+        type: "free_time",
+        title: "Unscheduled free time",
+        location: null,
+      },
+    ];
+    plan.days[0].travelSegments = [];
+    const summary = approvedSummary();
+    summary.confirmedDecisions = [];
+    const report = validateItinerary({
+      itinerary: plan,
+      approvedSummary: summary,
+      evidence: evidence(),
+      now: "2026-07-13T19:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+    expect(report.status).toBe("needs_revision");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "day_without_planned_activity",
+        repairable: true,
+      }),
+    );
+  });
+
   it("marks impossible route timing and insufficient buffers repairable", () => {
     const plan = itinerary();
     plan.days[0].items[1].startTime = "16:00";

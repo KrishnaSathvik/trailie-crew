@@ -10,7 +10,7 @@ The idempotency unit is `(planning_request_id, basis_summary_version)`. The firs
 
 ## Lifecycle and worker
 
-`generating → validating → needs_revision → validating → published` is the successful conflict-demo path. `blocked` and `failed` are terminal; `superseded` is reserved for a future revision phase. Atomic claims allow one running worker, reclaim leases older than five minutes, and cap private runs at three. Recovery derives the safest stage from persisted draft, report, and evidence state instead of repeating completed work.
+`generating → validating → needs_revision → validating → published` is the successful conflict-demo path. `blocked` and `failed` are terminal; `superseded` is reserved for a future revision phase. Atomic claims allow one running worker, reclaim leases older than five minutes, and cap private AI runs at three. Validation-only recovery from an already persisted draft does not consume an AI-run slot. Recovery derives the safest stage from persisted draft, report, and evidence state instead of repeating completed work.
 
 The server builds a bounded context from the approved summary and safe active traveler labels. It excludes the full transcript, auth/invite data, unrelated memory, emails, prompts, and operational history. `gpt-5.6-sol` proposes strict schema only. It never validates or publishes.
 
@@ -18,7 +18,7 @@ The server builds a bounded context from the approved summary and safe active tr
 
 Validator `trailie-itinerary-validator-v1` checks schema, IDs/references, date range, timezone, ordering, overlap, travel buffers, arrivals/departures, verified routes, daily drive load, hard constraints, confirmed decisions, rejected options, opening/reservations when evidenced, coordinates, evidence freshness, budget, duplicates, and public-safe rendering. Critical/high issues block publication. Correctable blocking issues return `needs_revision`; contradictions or unsafe approved-decision changes return `blocked`.
 
-At most one schema repair and one itinerary conflict repair may run. The repair receives only the approved summary, draft, structured issues, and verified evidence. The demo deliberately schedules a 4:00 PM stop after a 3:00 PM activity with a verified two-hour drive; the single repair moves the stop to 5:30 PM without changing the approved destination or must-do.
+At most one schema repair and one itinerary conflict repair may run. The repair receives only the approved summary, draft, structured issues, and verified evidence. Empty days and days containing only `free_time` are deterministic repairable failures; prompts require at least one meaningful non-free-time item while keeping unsupported operational details nullable, estimated, or unknown. The demo deliberately schedules a 4:00 PM stop after a 3:00 PM activity with a verified two-hour drive; the single repair moves the stop to 5:30 PM without changing the approved destination or must-do.
 
 ## Publication and visibility
 
@@ -34,6 +34,6 @@ The Plan tab polls the safe room projection and resumes after refresh. It shows 
 - Model: `gpt-5.6-sol`
 - SDK: `openai@6.46.0`
 
-Booking, purchase, autonomous browsing, weather, semantic-review calls, and multi-agent orchestration are deferred. Live itinerary smoke was not run unless the final verification report explicitly says otherwise.
+Booking, purchase, autonomous browsing, weather, semantic-review calls, and multi-agent orchestration are deferred. On 2026-07-14 the credentialed itinerary smoke passed and a full local Sol run published a validated Version 1; the successful full-schema run used 6,625 total tokens. A preceding live repair call also completed and proved the deterministic fail-closed boundary before prompt hardening.
 
 Phase 4B exports never rerun generation and never resolve a mutable current pointer. They consume the selected PASS-published `itinerary_json`, apply the deterministic public projection, and pin the result to that plan's immutable hash and version. The Phase 4B migration also ensures initial Phase 3B publications receive a plan hash at write time, closing the gap between historical backfill and newly published Version 1 rows.

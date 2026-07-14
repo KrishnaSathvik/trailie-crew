@@ -50,7 +50,7 @@
 - [x] Forced RLS, minimum RPC grants, no browser memory reads
 - [x] One retry, claim idempotency, concurrency/output/context bounds
 - [x] Fake provider, unit/SQL/E2E silence coverage
-- [ ] Live OpenAI memory smoke test (not run; requires a real key)
+- [x] Live OpenAI memory smoke test passed with Luna correction/supersession
 - [x] Bounded recovery drain for abandoned extraction rows
 - [ ] Durable production queue/cron scheduling for recovery
 
@@ -77,7 +77,7 @@
 - [x] Required review notes and version-scoped approval reset
 - [x] Sol strict output with fake-provider E2E
 - [x] No itinerary generation path or synthetic Trailie message
-- [ ] Live OpenAI planning smoke test (not run; requires a real key)
+- [x] Live OpenAI planning smoke and two-user summary approval passed
 
 ## Phase 3B validated itinerary
 
@@ -89,6 +89,6 @@
 - [x] Persisted semantic progress with refresh recovery
 - [x] Overview/day/travel/stay/food/validation Plan experience
 - [x] Real PostgreSQL/RLS/publication E2E with fake external providers
-- [ ] Live itinerary smoke (requires `OPENAI_API_KEY`)
+- [x] Live itinerary smoke and full-schema Version 1 publication passed
 - [ ] Live travel-tools smoke (requires `MAPBOX_ACCESS_TOKEN`)
 - [ ] Durable production queue/cron scheduling for recovery

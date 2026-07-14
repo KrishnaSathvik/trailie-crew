@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TripPlanView } from "@trailie/schemas";
 import { createFakeItineraryProvider } from "../provider";
 import { ItineraryExperience } from "./itinerary-experience";
@@ -130,5 +130,28 @@ describe("ItineraryExperience", () => {
       }),
     ).toBeVisible();
     expect(screen.queryByText(/sql|stack|provider/i)).not.toBeInTheDocument();
+  });
+
+  it("offers an explicit retry for a transient failed generation", () => {
+    const onRetry = vi.fn();
+    const plan = {
+      id,
+      roomId: id,
+      planningRequestId: id,
+      version: 1,
+      status: "failed",
+      validationStatus: "pending",
+      basisSummaryVersion: 1,
+      itinerary: null,
+      validationSummary: null,
+      progressEvents: [],
+      createdAt: "2026-07-13T18:00:00.000Z",
+      updatedAt: "2026-07-13T18:00:00.000Z",
+      publishedAt: null,
+      errorCode: "model_timeout",
+    } satisfies TripPlanView;
+    render(<ItineraryExperience plan={plan} onRetry={onRetry} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry itinerary" }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

@@ -7,6 +7,22 @@ import {
 import { createFakeItineraryProvider } from "./provider";
 
 describe("itinerary provider boundary", () => {
+  it("classifies platform timeout errors as model timeouts", async () => {
+    const providerModule = (await import("./openai-provider")) as Record<
+      string,
+      unknown
+    >;
+    const mapError = providerModule.mapItineraryProviderError;
+
+    expect(mapError).toBeTypeOf("function");
+    expect(
+      (mapError as (error: unknown, repair: boolean) => { code: string })(
+        new DOMException("Timed out", "TimeoutError"),
+        false,
+      ).code,
+    ).toBe("model_timeout");
+  });
+
   it("builds the locked strict Responses API request", () => {
     const request = buildItineraryRequest({
       model: "gpt-5.6-sol",

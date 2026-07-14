@@ -136,6 +136,31 @@ export function validateItinerary(input: Input): ValidationReport {
   }
 
   for (const day of plan.days) {
+    if (day.items.length === 0) {
+      issues.push(
+        issue(
+          "day_empty",
+          "high",
+          "Each itinerary day must include at least one planned item.",
+          [day.id],
+          true,
+        ),
+      );
+    }
+    if (
+      day.items.length > 0 &&
+      !day.items.some((item) => item.type !== "free_time")
+    ) {
+      issues.push(
+        issue(
+          "day_without_planned_activity",
+          "high",
+          "Each itinerary day must include a meaningful planned activity.",
+          day.items.map((item) => item.id),
+          true,
+        ),
+      );
+    }
     const timed = day.items
       .filter((item) => item.startTime !== null && item.endTime !== null)
       .map((item) => ({
@@ -444,6 +469,7 @@ export function validateItinerary(input: Input): ValidationReport {
 
   const titles = new Map<string, string>();
   for (const item of allItems) {
+    if (item.type === "free_time") continue;
     const key = normalized(item.title);
     const prior = titles.get(key);
     if (prior) {
@@ -512,6 +538,7 @@ export function validateItinerary(input: Input): ValidationReport {
     "public_safe_rendering",
   ];
   const checkFailures: Record<string, string[]> = {
+    itinerary_schema: ["day_empty", "day_without_planned_activity"],
     referential_integrity: ["duplicate_id", "invalid_item_reference"],
     timezone: ["timezone_mismatch"],
     overlap: ["item_overlap"],

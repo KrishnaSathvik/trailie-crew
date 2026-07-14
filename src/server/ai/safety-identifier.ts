@@ -5,5 +5,9 @@ export function createSafetyIdentifier(userId: string, secret: string) {
     throw new Error(
       "OPENAI_SAFETY_HMAC_SECRET must be at least 32 characters.",
     );
-  return `trailie_${createHmac("sha256", secret).update(`trailie-safety:v1:${userId}`).digest("hex")}`;
+  const digest = createHmac("sha256", secret)
+    .update(`trailie-safety:v1:${userId}`)
+    .digest("hex")
+    .slice(0, 56);
+  return `trailie_${digest}`;
 }
