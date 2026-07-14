@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   presenceStateSchema,
   typingEventSchema,
+  type MessageType,
   type PresenceState,
   type ReactionType,
   type TypingEvent,
@@ -31,6 +32,13 @@ import {
   type ClientRoomMessage,
 } from "@/features/chat/lib/chat-state";
 import type { TripShellData } from "@/features/crew/queries/trip-crew";
+import { TrailieStreamCard } from "@/features/trailie/components/trailie-stream-card";
+import type { TrailieErrorCode } from "@/features/trailie/errors/trailie-errors";
+import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
+import {
+  invokeTrailieStream,
+  type TrailieInvocationSource,
+} from "@/features/trailie/streaming/invoke-trailie";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 function privacySafePresence(value: unknown): PresenceState | null {
@@ -77,12 +85,29 @@ export function ChatExperience({
   const [replyingTo, setReplyingTo] = useState<ClientRoomMessage | null>(null);
   const [newMessagesAvailable, setNewMessagesAvailable] = useState(false);
   const [composerKey, setComposerKey] = useState(0);
+  const [trailieAnswer, setTrailieAnswer] = useState<{
+    source: TrailieInvocationSource;
+    body: string;
+    status: "answering" | "failed";
+    errorCode: TrailieErrorCode | null;
+  } | null>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<
     ReturnType<typeof createBrowserSupabaseClient>["channel"]
   > | null>(null);
   const typingStopTimer = useRef<number | null>(null);
   const lastTypingSentAt = useRef(0);
+  const trailieAbortRef = useRef<AbortController | null>(null);
+  const trailieQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const queuedTrailieSourcesRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refreshLatest = useCallback(async () => {
     const wasNearBottom = historyRef.current
@@ -214,6 +239,7 @@ export function ChatExperience({
       if (subscribed) void channel.untrack().catch(() => undefined);
       void client.removeChannel(channel);
       if (typingStopTimer.current) window.clearTimeout(typingStopTimer.current);
+      trailieAbortRef.current?.abort();
       onPresenceChange([]);
     };
   }, [
@@ -236,6 +262,7 @@ export function ChatExperience({
     retry?: ClientRoomMessage,
   ): Promise<boolean> {
     const clientMessageId = retry?.clientMessageId ?? crypto.randomUUID();
+    const replyTargetType: MessageType | null = replyingTo?.messageType ?? null;
     if (!clientMessageId) return false;
     const optimistic: ClientRoomMessage = retry
       ? { ...retry, deliveryState: "pending" }
@@ -306,7 +333,90 @@ export function ChatExperience({
     }
     setMessages((current) => mergeRoomMessages(current, [result.data]));
     setError(null);
+    const decision = detectTrailieInvocation({
+      body: result.data.body,
+      replyTargetType,
+    });
+    if (decision.invoked) {
+      enqueueTrailie({
+        id: result.data.id,
+        body: result.data.body,
+        replyTargetType,
+      });
+    }
     return true;
+  }
+
+  function enqueueTrailie(source: TrailieInvocationSource) {
+    if (queuedTrailieSourcesRef.current.has(source.id)) return;
+    queuedTrailieSourcesRef.current.add(source.id);
+    const queued = trailieQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (mountedRef.current) await invokeTrailie(source);
+      })
+      .finally(() => queuedTrailieSourcesRef.current.delete(source.id));
+    trailieQueueRef.current = queued;
+    void queued;
+  }
+
+  async function invokeTrailie(source: TrailieInvocationSource) {
+    const controller = new AbortController();
+    trailieAbortRef.current = controller;
+    setTrailieAnswer({
+      source,
+      body: "",
+      status: "answering",
+      errorCode: null,
+    });
+    try {
+      for await (const event of invokeTrailieStream({
+        roomId: data.room.id,
+        participantId: data.currentParticipant.id,
+        sourceMessageId: source.id,
+        signal: controller.signal,
+      })) {
+        if (event.type === "text_delta") {
+          setTrailieAnswer((current) =>
+            current ? { ...current, body: current.body + event.delta } : null,
+          );
+        } else if (event.type === "response_completed") {
+          setTrailieAnswer((current) =>
+            current ? { ...current, body: event.response.body } : null,
+          );
+          await refreshLatest();
+          setTrailieAnswer(null);
+        } else if (event.type === "response_failed") {
+          setTrailieAnswer((current) =>
+            current
+              ? {
+                  ...current,
+                  status: "failed",
+                  errorCode: event.code as TrailieErrorCode,
+                }
+              : null,
+          );
+        }
+      }
+    } catch {
+      if (controller.signal.aborted) {
+        setTrailieAnswer(null);
+      } else {
+        setTrailieAnswer((current) =>
+          current
+            ? {
+                ...current,
+                status: "failed",
+                errorCode: "invocation_failed",
+              }
+            : null,
+        );
+      }
+    } finally {
+      if (trailieAbortRef.current === controller) {
+        trailieAbortRef.current = null;
+      }
+    }
   }
 
   async function retry(message: ClientRoomMessage) {
@@ -393,28 +503,20 @@ export function ChatExperience({
     const now = Date.now();
     if (body.trim() && now - lastTypingSentAt.current > 500) {
       lastTypingSentAt.current = now;
-      void channel.send({
-        type: "broadcast",
-        event: "typing",
-        payload: {
-          participantId: data.currentParticipant.id,
-          displayName: data.currentParticipant.displayName,
-          isTyping: true,
-          expiresAt: new Date(now + 3000).toISOString(),
-        },
+      void channel.httpSend("typing", {
+        participantId: data.currentParticipant.id,
+        displayName: data.currentParticipant.displayName,
+        isTyping: true,
+        expiresAt: new Date(now + 3000).toISOString(),
       });
     }
     if (typingStopTimer.current) window.clearTimeout(typingStopTimer.current);
     typingStopTimer.current = window.setTimeout(() => {
-      void channel.send({
-        type: "broadcast",
-        event: "typing",
-        payload: {
-          participantId: data.currentParticipant.id,
-          displayName: data.currentParticipant.displayName,
-          isTyping: false,
-          expiresAt: new Date().toISOString(),
-        },
+      void channel.httpSend("typing", {
+        participantId: data.currentParticipant.id,
+        displayName: data.currentParticipant.displayName,
+        isTyping: false,
+        expiresAt: new Date().toISOString(),
       });
     }, 1500);
   }
@@ -455,6 +557,15 @@ export function ChatExperience({
           }
           onReply={setReplyingTo}
         />
+        {trailieAnswer ? (
+          <TrailieStreamCard
+            body={trailieAnswer.body}
+            status={trailieAnswer.status}
+            errorCode={trailieAnswer.errorCode}
+            onCancel={() => trailieAbortRef.current?.abort()}
+            onRetry={() => enqueueTrailie(trailieAnswer.source)}
+          />
+        ) : null}
       </div>
       {newMessagesAvailable ? (
         <button

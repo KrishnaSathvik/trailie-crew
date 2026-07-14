@@ -22,6 +22,27 @@ const serverSupabaseEnvSchema = publicSupabaseEnvSchema.and(
 
 type EnvironmentSource = Record<string, string | undefined>;
 
+const openAIEnvSchema = z.object({
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_MODEL_CONVERSATION: z.string().trim().min(1).default("gpt-5.6-terra"),
+  OPENAI_MODEL_FLAGSHIP: z.string().trim().min(1).default("gpt-5.6-sol"),
+  OPENAI_PROMPT_VERSION: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("trailie-focused-v1"),
+  OPENAI_SAFETY_HMAC_SECRET: z.string().min(32).optional(),
+  OPENAI_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(5_000)
+    .max(120_000)
+    .default(30_000),
+  TRAILIE_AI_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
+  NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+});
+
 export function parsePublicSupabaseEnv(source: EnvironmentSource) {
   const values = publicSupabaseEnvSchema.parse(source);
 
@@ -47,4 +68,25 @@ export function parseServerSupabaseEnv(source: EnvironmentSource) {
     publishableKey: values.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     secretKey: values.SUPABASE_SECRET_KEY,
   };
+}
+
+export function parseOpenAIEnv(source: EnvironmentSource) {
+  const values = openAIEnvSchema.parse(source);
+  if (values.TRAILIE_AI_PROVIDER === "fake") {
+    if (values.NODE_ENV === "production")
+      throw new Error("The fake AI provider is disabled in production.");
+  } else if (!values.OPENAI_API_KEY || !values.OPENAI_SAFETY_HMAC_SECRET) {
+    throw new Error("OpenAI server configuration is incomplete.");
+  }
+  return {
+    provider: values.TRAILIE_AI_PROVIDER,
+    apiKey: values.OPENAI_API_KEY ?? null,
+    conversationModel: values.OPENAI_MODEL_CONVERSATION,
+    flagshipModel: values.OPENAI_MODEL_FLAGSHIP,
+    promptVersion: values.OPENAI_PROMPT_VERSION,
+    safetyHmacSecret:
+      values.OPENAI_SAFETY_HMAC_SECRET ??
+      "fake-provider-development-only-secret",
+    timeoutMs: values.OPENAI_TIMEOUT_MS,
+  } as const;
 }

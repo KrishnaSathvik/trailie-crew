@@ -17,10 +17,107 @@ export const reactionTypeSchema = z.enum([
   "thinking",
 ]);
 
+export const trailieInvocationTypeSchema = z.enum([
+  "explicit_mention",
+  "direct_address",
+  "reply_to_trailie",
+  "application_action",
+]);
+export const aiInvocationStatusSchema = z.enum([
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+export const aiRunStatusSchema = z.enum([
+  "started",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+export const trailieResponseTypeSchema = z.enum([
+  "plain_answer",
+  "comparison",
+  "clarifying_question",
+  "warning",
+  "error",
+]);
+
 const tripNameSchema = z.string().trim().min(1).max(100);
 const displayNameSchema = z.string().trim().min(1).max(50);
 const roomCodeSchema = z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/);
 const timestampSchema = z.iso.datetime({ offset: true });
+
+export const trailieInvocationDecisionSchema = z.discriminatedUnion("invoked", [
+  z.object({ invoked: z.literal(false) }).strict(),
+  z
+    .object({
+      invoked: z.literal(true),
+      invocationType: trailieInvocationTypeSchema,
+      normalizedRequest: z.string().trim().min(1).max(4000),
+    })
+    .strict(),
+]);
+
+export const trailieComparisonItemSchema = z
+  .object({
+    label: z.string().min(1).max(80),
+    detail: z.string().min(1).max(500),
+  })
+  .strict();
+
+export const trailieFocusedAnswerSchema = z
+  .object({
+    responseType: trailieResponseTypeSchema,
+    body: z.string().trim().min(1).max(4000),
+    title: z.string().trim().min(1).max(120).optional(),
+    comparisonItems: z.array(trailieComparisonItemSchema).max(6).optional(),
+    followUpQuestion: z.string().trim().min(1).max(300).optional(),
+  })
+  .strict();
+
+export const trailieResponseEnvelopeSchema = trailieFocusedAnswerSchema
+  .extend({
+    schemaVersion: z.literal("1"),
+    sourceMessageId: z.uuid().optional(),
+    status: z.literal("completed"),
+  })
+  .strict();
+
+export const trailieStreamEventSchema = z.discriminatedUnion("type", [
+  z
+    .object({ type: z.literal("invocation_started"), invocationId: z.uuid() })
+    .strict(),
+  z
+    .object({
+      type: z.literal("text_delta"),
+      delta: z.string().min(1).max(1000),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("response_completed"),
+      response: trailieResponseEnvelopeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("response_failed"),
+      code: z.string().min(1).max(80),
+      message: z.string().min(1).max(300),
+      retryable: z.boolean(),
+    })
+    .strict(),
+]);
+
+export const modelRouteDecisionSchema = z
+  .object({
+    model: z.string().min(1).max(100),
+    tier: z.enum(["conversation", "flagship"]),
+    reason: z.enum(["focused_answer", "complex_multi_constraint"]),
+  })
+  .strict();
 
 export const createTripInputSchema = z.object({
   tripName: tripNameSchema,
@@ -201,3 +298,16 @@ export type ToggleReactionInput = z.infer<typeof toggleReactionInputSchema>;
 export type ToggleReactionResult = z.infer<typeof toggleReactionResultSchema>;
 export type PresenceState = z.infer<typeof presenceStateSchema>;
 export type TypingEvent = z.infer<typeof typingEventSchema>;
+export type TrailieInvocationType = z.infer<typeof trailieInvocationTypeSchema>;
+export type TrailieInvocationDecision = z.infer<
+  typeof trailieInvocationDecisionSchema
+>;
+export type TrailieResponseType = z.infer<typeof trailieResponseTypeSchema>;
+export type TrailieFocusedAnswer = z.infer<typeof trailieFocusedAnswerSchema>;
+export type TrailieResponseEnvelope = z.infer<
+  typeof trailieResponseEnvelopeSchema
+>;
+export type TrailieStreamEvent = z.infer<typeof trailieStreamEventSchema>;
+export type AiInvocationStatus = z.infer<typeof aiInvocationStatusSchema>;
+export type AiRunStatus = z.infer<typeof aiRunStatusSchema>;
+export type ModelRouteDecision = z.infer<typeof modelRouteDecisionSchema>;

@@ -18,8 +18,8 @@
 - [x] Shared persisted crew conversation with realtime delivery and pagination
 - [x] Crew presence, typing indicators, replies, and canonical reactions
 - [x] Optimistic idempotent sends with explicit failure/retry reconciliation
-- [ ] Silence-by-default Trailie invocation policy
-- [ ] GPT-5.6 orchestration verified against current OpenAI documentation
+- [x] Silence-by-default Trailie invocation policy
+- [x] GPT-5.6 focused-answer orchestration verified against current OpenAI documentation
 - [ ] Explicit planning and approval workflow
 - [ ] Structured, validated, versioned itinerary revisions
 - [ ] Sharing and export
@@ -30,8 +30,8 @@
 
 - [x] Accessibility and responsive review for landing, entry forms, and Trip shell
 - [x] Real two-context Realtime collaboration and outsider-isolation coverage
-- [ ] End-to-end demo rehearsal
+- [x] Two-context focused-answer demo rehearsal with deterministic fake provider
 - [ ] Production deployment and environment review
 - [ ] Final validation commands pass
-- [ ] Demo script reflects only implemented behavior
+- [x] Demo script reflects only implemented behavior through Phase 2A
 - [ ] Submission copy makes no unsupported claims

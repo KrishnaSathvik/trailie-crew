@@ -23,6 +23,7 @@ vi.mock("@/lib/supabase/browser", () => ({
       track: vi.fn().mockResolvedValue("ok"),
       untrack: vi.fn().mockResolvedValue("ok"),
       send: vi.fn().mockResolvedValue("ok"),
+      httpSend: vi.fn().mockResolvedValue({ success: true }),
       presenceState: vi.fn(() => ({})),
     };
     return {

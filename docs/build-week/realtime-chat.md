@@ -18,6 +18,8 @@ Every outgoing message receives a UUID `clientMessageId`. The ledger inserts a p
 
 RPC or transport failure marks the row `failed`, keeps the composer draft, and exposes Retry. Retry reuses the same ID. Acceptance replaces the pending/failed row with the validated server row and clears the retained draft. Reactions snapshot the current message, apply a local canonical toggle, and restore the snapshot on failure.
 
+An invoking crew message follows this same persisted path first. Only after `send_message` returns its safe database ID does the invoking browser open `/api/trailie/invoke`. Safe answer deltas exist only in that browser's private React state. The final completion RPC inserts one immutable Trailie message; the existing database Broadcast causes every active room client to refetch and reconcile it. Partial AI text is never a database message, and other members never see a fake Trailie typing/presence identity.
+
 ## History and scroll behavior
 
 `get_room_messages` orders by `(created_at DESC, id DESC)`, returns 30 by default, and caps requests at 50. Each result includes a cursor for its oldest returned row and a `has_more` flag. The application reverses each database page for chronological display, deduplicates IDs while merging, and prepends only the requested older page.
@@ -28,8 +30,8 @@ The initial entry scrolls to the newest message once. Prepending records the old
 
 Presence state is schema-validated and filtered against the active crew loaded by the Trip shell. Multiple tabs collapse to one online participant. The crew rail/drawer shows role, current user, online/offline state, and online count. Presence is presentation only; database membership remains authorization.
 
-Typing broadcasts are sent at most twice per second while input changes, followed by an automatic stop event. Receivers exclude the current participant and discard states after three seconds, producing one-name, two-name, or several-people summaries.
+Typing broadcasts are sent at most twice per second through the SDK's explicit HTTP Broadcast method, followed by an automatic stop event. Receivers exclude the current participant and discard states after three seconds, producing one-name, two-name, or several-people summaries.
 
-## Deferred behavior
+## Trailie and deferred behavior
 
-`@Trailie` is ordinary message text in Phase 1C. There are no assistant rows, OpenAI calls, planning tools, uploads, editing/deletion, AI memory, maps, itinerary generation, exports, or moderation workflows.
+Phase 2A persists focused Trailie answers only after deterministic explicit invocation and strict final validation. There are still no planning tools, uploads, editing/deletion, AI memory extraction, maps, itinerary generation, exports, autonomous agents, or moderation workflows.

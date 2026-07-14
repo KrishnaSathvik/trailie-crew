@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 
 import type { ReactionType } from "@trailie/schemas";
 import type { ClientRoomMessage } from "@/features/chat/lib/chat-state";
@@ -52,16 +52,25 @@ export function MessageList({
   return (
     <ol className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-7">
       {messages.map((message) => {
-        const isCurrent = message.participantId === currentParticipantId;
+        const isTrailie = message.messageType === "trailie";
+        const isCurrent =
+          !isTrailie && message.participantId === currentParticipantId;
+        const senderName = isTrailie ? "Trailie" : message.sender.displayName;
         return (
           <li
             key={message.id}
-            className={`border-border border-b py-5 first:pt-1 ${isCurrent ? "border-l-2 pl-4" : "pl-0"}`}
+            className={`border-border border-b py-5 first:pt-1 ${isTrailie ? "bg-subtle/50 border-l-2 px-4" : isCurrent ? "border-l-2 pl-4" : "pl-0"}`}
           >
-            <article aria-label={`Message from ${message.sender.displayName}`}>
+            <article aria-label={`Message from ${senderName}`}>
               <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <h3 className="text-sm font-semibold">
-                  {message.sender.displayName}
+                  {isTrailie ? (
+                    <Sparkles
+                      aria-hidden="true"
+                      className="mr-1.5 inline size-3.5"
+                    />
+                  ) : null}
+                  {senderName}
                   {isCurrent ? " (you)" : ""}
                 </h3>
                 <time

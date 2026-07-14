@@ -1,23 +1,21 @@
 # Demo Script
 
-## Implemented Phase 1C demo
+## Implemented Phase 2A demo
 
-1. Open the Trailie Crew landing page and show the functional Create and Join links.
-2. Toggle light/dark with the keyboard, then open Create a Trip.
-3. Create “Boundary Waters weekend” using only a display name and optional headcount—no destination, dates, budget, or preferences.
-4. Enter the real Trip shell. Point out the room code, current host identity, empty shared conversation, and composer.
-5. Copy the one-time `/join/<token>` invitation. Explain that refresh intentionally destroys the raw token and leaves only the safe short code.
-6. Open the invitation in a separate browser context, attempt the host’s display name to show safe duplicate-name handling, then join with a unique name.
-7. Refresh the host shell and show both crew members. Wait for the two-person online count; show that the member has no host invite controls.
-8. Type in the member window and show the host’s short-lived typing indicator. Send a message, reply from the second window, and show both arrive without refresh.
-9. Add one of the five canonical reactions and show it update in both contexts. Mention that the database stores the canonical value rather than an arbitrary emoji.
-10. Send `@Trailie` and show that it remains an ordinary persisted user message: Phase 1C intentionally produces no assistant response.
-11. Refresh and show that messages, reply previews, and reactions persist. Use a prepared long-history Trip to show “Load earlier messages” without replacing the newest page.
-12. Open the Trip URL in a third unauthenticated context and show the non-enumerating unavailable state.
-13. Resize to 390×844, show the composer above navigation, open the People drawer, toggle both themes, and confirm there is no horizontal overflow.
+1. Open two isolated browser contexts as Maya and Leo in the same Trip. Show the shared persisted chat, online crew state, and restrained monochrome UI.
+2. Have Maya and Leo exchange ordinary planning messages. Point out that Trailie remains silent and no AI request occurs.
+3. Type `We can ask @Trailie later`, an inline-code mention, or a fenced-code mention. Show that each persists as ordinary crew chat without invocation.
+4. Type `@Trailie help us compare driving and flying`. Before sending, show the concise composer helper. Send once.
+5. In Maya's window, show the private “Trailie is answering…” streamed state. Explain that it is not a fake Realtime presence identity and Leo does not see another user's partial stream.
+6. Show the one final Trailie message appear in both windows through the existing Supabase Realtime reconciliation. Its reply preview links it to Maya's source message.
+7. Refresh both windows and show exactly one persisted Trailie response. Replay/duplicate submission does not create another answer.
+8. Send `Hey Trailie, can you explain what to pack?` to demonstrate direct address. Then reply normally to a persisted Trailie message to demonstrate the reply signal.
+9. Trigger the deterministic fake-provider failure in local test mode. Show that Maya's original crew message remains, no fake Trailie message persists, and Retry creates one successful response without resending the crew message.
+10. Open the Trip URL as an outsider and show the non-enumerating unavailable state.
+11. Resize to 390×844, toggle light/dark, use keyboard send, and confirm there is no horizontal overflow or browser error.
 
-## Planned product demo
+For the repeatable demo and automated suite, only the external OpenAI provider is fake. Auth, PostgreSQL, RLS, RPCs, Realtime, two browser sessions, streaming endpoint, and persisted reconciliation are real local application behavior.
 
-The eventual Build Week demo is expected to continue from the implemented shared chat by explicitly invoking Trailie, approving an itinerary request, and revising or exporting a validated itinerary.
+## Deferred product demo
 
-Trailie invocation through export is not implemented and must not be demonstrated as working yet.
+Do not demonstrate itinerary generation, approval, travel research, maps, live prices/availability, memory extraction, autonomous agents, sharing, or exports. Those capabilities are not implemented in Phase 2A.

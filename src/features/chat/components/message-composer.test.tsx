@@ -35,4 +35,22 @@ describe("MessageComposer", () => {
     fireEvent.change(input, { target: { value: "x".repeat(4001) } });
     expect(input).toHaveValue("x".repeat(4000));
   });
+
+  it("recognizes a verified invocation but stays quiet for product discussion", () => {
+    const { rerender } = render(<MessageComposer onSend={vi.fn()} />);
+    const input = screen.getByLabelText("Message your crew");
+    fireEvent.change(input, {
+      target: { value: "@Trailie compare the options" },
+    });
+    expect(
+      screen.getByText("Trailie will answer after this message is sent"),
+    ).toBeVisible();
+    rerender(<MessageComposer onSend={vi.fn()} />);
+    fireEvent.change(input, {
+      target: { value: "The @Trailie feature looks good" },
+    });
+    expect(
+      screen.queryByText("Trailie will answer after this message is sent"),
+    ).toBeNull();
+  });
 });

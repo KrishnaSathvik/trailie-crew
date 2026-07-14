@@ -3,6 +3,8 @@
 import { SendHorizontal } from "lucide-react";
 import { useState } from "react";
 
+import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
+
 export function MessageComposer({
   onSend,
   onDraftActivity,
@@ -15,6 +17,7 @@ export function MessageComposer({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const remaining = 4000 - draft.length;
+  const invokesTrailie = detectTrailieInvocation({ body: draft }).invoked;
 
   async function submit() {
     const body = draft.trim();
@@ -69,7 +72,9 @@ export function MessageComposer({
       </div>
       <div className="mt-1.5 flex min-h-4 justify-between gap-4 px-1 text-[0.6875rem]">
         <p className="text-muted-foreground">
-          Enter to send · Shift+Enter for a new line
+          {invokesTrailie
+            ? "Trailie will answer after this message is sent"
+            : "Enter to send · Shift+Enter for a new line"}
         </p>
         {remaining <= 200 ? (
           <p className="text-muted-foreground tabular-nums" aria-live="polite">

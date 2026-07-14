@@ -43,15 +43,17 @@ browser -> anonymous Supabase Auth session -> authenticated JWT
 
 PostgreSQL is the authorization boundary. `auth.uid()` links one real Auth user to participant rows in any number of Trips. The browser cannot directly insert participants, invites, or rooms; cannot delete rooms; and cannot read `private.room_memory` or invite-token hashes. Hosts can update only the safe room-setting columns `name`, `expected_travelers`, and `approval_mode`.
 
-The following remains architectural intent and is not implemented in Phase 1C:
+Phase 2A implements the focused-answer portion of the server application layer:
 
 ```text
-crew action -> server application layer -> policy/invocation check
-            -> model orchestration and approved tools
-            -> structured validation -> versioned itinerary persistence
+persisted user message -> deterministic invocation + auth checks
+                       -> idempotent private invocation/run RPCs
+                       -> bounded untrusted context + deterministic model route
+                       -> Responses API semantic stream -> strict final validation
+                       -> one Trailie message -> existing Realtime reconciliation
 ```
 
-External data will retain source and retrieval metadata. Secrets and privileged provider clients remain server-only. TrailVerse access, if added, will use its service API through the read-only adapter rather than a shared database connection.
+The OpenAI SDK and Supabase secret client import `server-only`. The browser receives only the safe NDJSON event union and never provider events, usage, IDs, prompts, or reasoning. External travel data and itinerary persistence remain future work.
 
 ## Phase 1B feature boundaries
 
@@ -71,7 +73,7 @@ The Trip shell loads rooms, active participants, and host-only safe invite metad
 - `src/lib/supabase/server.ts` creates a request-scoped App Router cookie client.
 - `src/server/supabase/admin.ts` imports `server-only` and is the sole secret-key client.
 - `src/proxy.ts` refreshes auth cookies only for `/trips/*` and `/join/*`. It does not authorize routes; every action and query independently verifies identity and relies on RLS.
-- The admin client is not used by the Phase 1B product flow.
+- The secret client is used only by the Phase 2A invocation route for authorized reads and service-only AI RPCs. Ordinary chat still uses the request-scoped client.
 
 ## Phase 1C chat boundaries
 
@@ -86,6 +88,12 @@ Client Component -> optimistic UUID -> send_message -> RPC/Realtime reconciliati
 
 PostgreSQL remains the source of authorization and persisted truth. Realtime presence is display state only. The browser authenticates the socket with its current session before joining one private topic. `realtime.messages` RLS authorizes only active participants whose room UUID matches the topic. Database triggers broadcast only change kind, room ID, and message ID; clients refetch the safe newest page instead of receiving message bodies or auth IDs in transient events.
 
-Message and reaction writes use user-scoped Server Actions and `SECURITY DEFINER` RPCs with explicit identity, participant ownership, active membership, room isolation, validation, idempotency, and rate controls. The admin client remains unused.
+Message and reaction writes use user-scoped Server Actions and `SECURITY DEFINER` RPCs with explicit identity, participant ownership, active membership, room isolation, validation, idempotency, and rate controls.
+
+## Phase 2A Trailie boundaries
+
+`src/features/trailie` owns invocation parsing, the lean prompt, UI/stream contracts, and safe errors. `src/server/ai` owns the provider interface, OpenAI/fake providers, routing, context, HMAC safety identifier, usage extraction, logging, and structured-body extraction. `packages/schemas` owns every safe cross-boundary envelope.
+
+The streaming route rechecks the Auth user, participant, source message, room, reply target, and deterministic invocation before an RPC can create work. Private tables are never Data API-readable. The completion RPC locks the invocation, validates the active run, inserts one `message_type = trailie` row, records only operational usage, and commits both changes atomically.
 
 See [`database-security.md`](database-security.md) and [`realtime-chat.md`](realtime-chat.md) for schema, RPC, channel, RLS, reconciliation, pagination, and local-testing details.

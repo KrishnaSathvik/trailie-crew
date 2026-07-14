@@ -12,6 +12,7 @@ Anonymous identities are durable only while the browser retains its session. Pro
 - `public.participants` links Auth users to Trips. One user may participate in multiple Trips, but only once per Trip.
 - `public.room_invites` owns invitation lifecycle metadata. It stores a unique short code and a deterministic SHA-256 hash of the long token.
 - `private.room_memory` owns future server-maintained group context. The `private` schema is not exposed through the Data API and browser roles receive neither schema nor table privileges.
+- `private.ai_invocations` and `private.ai_runs` own Phase 2A workflow state and operational provider metadata. They contain no prompt, transcript copy, raw provider response, secret, or hidden reasoning.
 
 The initial invite long token is 32 cryptographically random bytes encoded in a URL-safe form. `create_trip` returns it once and stores only its hash. `join_trip` hashes long input for lookup or normalizes an eight-character short code. Short codes are a convenience credential layered with a real authenticated identity, invite lifecycle checks, Trip status, and membership/name constraints; public invite URLs should use the high-entropy token.
 
@@ -37,7 +38,7 @@ Phase 1B calls those RPCs only from Server Actions using the request-scoped user
 - `private.room_memory` has forced RLS plus an explicit restrictive deny policy for browser roles. Trusted secret-key/backend access bypasses RLS when deliberately used.
 - The Trip shell performs ordinary user-scoped reads. An outsider, missing session, or inaccessible identifier receives the same safe unavailable state.
 - The session-refresh proxy changes cookies only. It is not an authorization boundary.
-- The server-only admin client is unused in Phase 1B.
+- The server-only secret client is limited to the Phase 2A invocation route. It receives SELECT on existing public messages/participants and EXECUTE on four server-only AI RPCs; it receives no direct private AI-table privilege.
 
 ## Local commands
 
@@ -63,7 +64,7 @@ API_URL        -> NEXT_PUBLIC_SUPABASE_URL
 PUBLISHABLE_KEY -> NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
-The secret key is unnecessary for Phase 1C. Create `.env.local` only when testing a future trusted-backend feature that genuinely requires the server-only admin client.
+The local launcher passes the local `SECRET_KEY` only to the server process for Phase 2A. A real OpenAI run additionally requires server-only OpenAI variables; the browser bundle never receives either secret.
 
 Stop the disposable local stack with `pnpm exec supabase stop`. Never run `supabase link`, `db push`, or secret-key commands against production as part of this local workflow.
 
@@ -75,8 +76,16 @@ Stop the disposable local stack with `pnpm exec supabase stop`. Never run `supab
 
 `send_message` validates identity, active membership, participant ownership, body, reply visibility, idempotency, and an eight-messages-per-ten-seconds rolling limit before forcing `message_type = user`. `toggle_message_reaction` validates the canonical value and ownership, then uses a transaction advisory lock to serialize the exact toggle. `get_room_messages` caps pages at 50, uses `(created_at, id)` cursor order, and constructs only safe sender/reply/reaction summaries. None returns email, auth metadata, or sender user IDs.
 
+Phase 2A redefines only the `send_message` rate-count predicate so server-created Trailie rows do not consume the human sender allowance.
+
 Realtime Broadcast and Presence use the same active membership helper against a parsed `room:<uuid>` topic. Database notifications contain no body or user identity. Client-sent typing and presence payloads contain participant ID, display name, timestamps, and optional `chat` area only; receivers schema-validate them against the server-provided active crew. Presence never grants access.
+
+## Phase 2A private AI workflow
+
+Both AI tables have forced RLS, deny policies, and revoked browser/service table privileges. `create_ai_invocation`, `start_ai_run`, `complete_ai_run`, and `fail_ai_run` are `SECURITY DEFINER`, set an empty search path, fully qualify objects, and grant EXECUTE only to `service_role`. Creation validates the active room/participant/source relationship and reply target, hashes the deterministic idempotency input, and enforces ten invocations per user/room/ten minutes. Start/completion/failure lock the invocation row and enforce the closed state machine.
+
+Completion inserts the Trailie message and marks the run/invocation complete in one transaction. The unique idempotency key, unique response-message reference, row locks, active-run state, and completed-state reuse prevent duplicate successful answers across tabs, retries, reconnects, and workers. A failed invocation can start at most one additional run. Browser roles cannot read the private tables, execute the AI RPCs, or create `message_type = trailie` rows.
 
 ## Implemented and planned
 
-Phase 1C implements identity, persistence, create/join/chat/reaction RPCs, grants, RLS, private Realtime authorization, typed clients/contracts, accessible create/join/chat UI, Server Action mutations, RLS Trip-shell reads, one-time token handoff, idempotency, pagination, rate limiting, presence/typing, and automated unit/permission/workflow/browser tests. It does not implement membership-management RPCs, Trailie, OpenAI calls, planning, itinerary data, uploads, message editing/deletion, moderation, or production CAPTCHA/anonymous-user cleanup.
+Phase 2A adds deterministic Trailie invocation, private AI workflow/usage records, server-only OpenAI access, and one persisted focused response. It does not implement membership-management RPCs, planning, itinerary data, live tools, uploads, message editing/deletion, moderation, or production CAPTCHA/anonymous-user cleanup.

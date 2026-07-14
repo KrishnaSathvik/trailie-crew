@@ -43,6 +43,9 @@ const child = spawnSync(command, args, {
     ...process.env,
     NEXT_PUBLIC_SUPABASE_URL: localEnvironment.API_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: localEnvironment.PUBLISHABLE_KEY,
+    SUPABASE_SECRET_KEY:
+      process.env.SUPABASE_SECRET_KEY ?? localEnvironment.SECRET_KEY,
+    TRAILIE_AI_PROVIDER: process.env.TRAILIE_AI_PROVIDER ?? "fake",
   },
   stdio: "inherit",
 });

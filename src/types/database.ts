@@ -195,6 +195,49 @@ export type Database = {
         };
         Returns: DbGetRoomMessagesResult;
       };
+      create_ai_invocation: {
+        Args: {
+          target_room_id: string;
+          target_source_message_id: string;
+          target_participant_id: string;
+          target_invocation_type: string;
+          target_normalized_request: string;
+          target_prompt_version: string;
+        };
+        Returns: Json;
+      };
+      start_ai_run: {
+        Args: {
+          target_invocation_id: string;
+          target_model: string;
+          target_prompt_version: string;
+        };
+        Returns: Json;
+      };
+      complete_ai_run: {
+        Args: {
+          target_invocation_id: string;
+          target_run_id: string;
+          response_body: string;
+          provider_response_id: string | null;
+          provider_request_id: string | null;
+          used_input_tokens: number | null;
+          used_output_tokens: number | null;
+          used_reasoning_tokens: number | null;
+          used_cached_input_tokens: number | null;
+          used_total_tokens: number | null;
+          measured_latency_ms: number;
+        };
+        Returns: Json;
+      };
+      fail_ai_run: {
+        Args: {
+          target_invocation_id: string;
+          target_run_id: string;
+          safe_error_code: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       approval_mode: ApprovalMode;

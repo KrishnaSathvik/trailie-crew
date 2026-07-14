@@ -12,7 +12,7 @@ Group trip planning is fragmented across chats, notes, links, polls, and spreads
 
 Trailie Crew will give friends a shared Trip with a natural group conversation. The crew will be able to mention or directly invoke Trailie for focused help and explicitly request an itinerary only when the group is ready. Planned itineraries will be structured, validated, versioned, revisable, shareable, and exportable.
 
-Those collaborative and AI capabilities are the product direction. Phase 1C now provides a real RLS-protected Trip shell with persisted realtime crew conversation, presence, typing, reactions, replies, and paginated history. Trailie and all AI planning capabilities remain intentionally unavailable.
+Phase 2A now adds silence-by-default focused Trailie answers: explicit mentions, beginning-of-message direct address, and replies to persisted Trailie messages are checked by deterministic code, streamed privately to the invoking browser, validated, persisted once, and delivered to the crew through Realtime. Planning and itinerary capabilities remain intentionally unavailable.
 
 ## Relationship to TrailVerse
 
@@ -28,7 +28,7 @@ Trailie Crew is a separate application, repository, deployment, and database fro
 - ESLint and Prettier
 - GitHub Actions CI
 - Supabase Auth/Postgres persistence and Realtime with RPC-only writes, private room channels, RLS, and pgTAP tests
-- OpenAI API integration remains planned and is not connected in Phase 1C
+- OpenAI Responses API through exact `openai@6.46.0`, strict structured output, GPT-5.6 Terra/Sol routing, and a deterministic fake provider for tests
 
 ## Local setup
 
@@ -39,7 +39,7 @@ pnpm install
 pnpm exec supabase start
 ```
 
-For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and the Playwright launcher read only `API_URL` and `PUBLISHABLE_KEY` from the local CLI into child-process memory. The admin client remains available for future trusted backend work but is not used by the chat path. If you create `.env.local` manually, never commit it or expose a secret key through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329`, enables anonymous sign-ins, and starts Realtime. If the stack was first started before Realtime was enabled, run `pnpm exec supabase stop` once and start it again.
+For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and Playwright map the local public/secret keys into child-process memory and select the deterministic fake AI provider. Real OpenAI requests require the server-only variables shown in `.env.example`. Never commit them or expose a secret through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329`, enables anonymous sign-ins, and starts Realtime.
 
 Reset and test the local database, then run the app:
 
@@ -48,6 +48,7 @@ pnpm exec supabase db reset
 pnpm exec supabase test db
 pnpm dev:local
 pnpm test:e2e
+pnpm test:openai:smoke # skips unless OPENAI_API_KEY exists
 ```
 
 Run the quality checks with:
@@ -64,7 +65,7 @@ pnpm exec supabase test db
 
 ## Current implementation status
 
-Implemented through Phase 1C:
+Implemented through Phase 2A:
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -90,10 +91,14 @@ Implemented through Phase 1C:
 - privacy-minimal presence, online crew state, and expiring typing indicators
 - desktop editorial conversation ledger and mobile People drawer with a composer above navigation
 - pgTAP, unit/component, and real multi-context browser coverage for chat collaboration
+- deterministic invocation parsing with silence for ordinary references, code, quotes, email-like text, and longer handles
+- authenticated streamed Trailie answers with private optimistic state and Realtime-persisted final messages
+- private forced-RLS invocation/run accounting, transactional idempotency, one safe retry, usage metadata, and rate controls
+- exact GPT-5.6 Terra/Sol model routing, HMAC safety identifiers, bounded untrusted context, and versioned focused prompt
+- strict safe response/stream schemas, server-only OpenAI provider, deterministic fake provider, and optional live smoke test
 
 Not yet implemented:
 
-- Trailie invocation, OpenAI model orchestration, or application tools
 - itinerary planning, approval, generation, validation, revisions, sharing, or export
 - live travel-data providers or TrailVerse service integration
 
