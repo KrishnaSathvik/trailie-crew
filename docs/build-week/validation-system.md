@@ -1,19 +1,23 @@
 # Validation System
 
-## Status
+Phase 3B implements deterministic itinerary validation before publication. The model supplies a proposed `Itinerary`; application code supplies the verdict.
 
-Phase 0 implements only the shared `ValidationResult<T>` pattern and a small Trip ID validation example. It does not implement an itinerary schema or validation pipeline.
+## Pipeline
 
-## Planned itinerary validation
+Validator `trailie-itinerary-validator-v1` runs strict schema and referential checks first, followed by date range, IANA timezone, item ordering, overlaps, travel buffers, arrival/departure feasibility, route duration, daily drive load, hard group constraints, confirmed-decision preservation, rejected-option protection, evidenced opening/reservation facts, coordinates, evidence freshness, budget ceiling, duplicate activities, and public-safe rendering.
 
-Each generated itinerary will carry a schema version and immutable revision identifier. Validation will occur at the model-output boundary before persistence and again when reading historical data after schema changes.
+Evidence-dependent checks never convert missing provider data into a verified claim. Costs are `verified`, `estimated`, or `unknown`; verified amounts require retrieval time and evidence. HTML, script-like content, arbitrary components, auth/provider identifiers, fake booking confirmations, and unsupported live claims are rejected.
 
-The planned validation layers are:
+## Outcomes and severity
 
-1. structural schema validation for required fields and types;
-2. domain rules for ordering, dates, identifiers, and internally consistent totals;
-3. provenance checks for claims that require external sources;
-4. rendering checks so every accepted revision can be displayed and exported; and
-5. revision rules that preserve prior accepted versions.
+- `pass`: no critical/high issues; warnings may remain and publication is allowed.
+- `needs_revision`: every blocking issue is deterministically repairable; one bounded conflict repair may run.
+- `blocked`: contradictory approved inputs, impossible constraints, critical unavailable evidence, or repair that would change an approved decision; publication is forbidden.
 
-Validation errors will be explicit, typed, and observable. Invalid output must not become the active itinerary. Live price and availability fields will require source metadata and retrieval time; absent live data will be represented as unknown, never fabricated.
+Severity is `critical`, `high`, `medium`, `low`, or `info`. Critical/high block. Medium remains blocking unless an explicit rule classifies it as a warning. Every issue has a stable code, safe message, affected item IDs, repairability, and evidence references.
+
+## Repair and publication
+
+The fake-provider demo proves a 3:00 PM activity followed by a 4:00 PM stop with a verified two-hour route becomes `needs_revision`. One repair moves the stop to 5:30 PM, preserves the approved Yosemite/Glacier Point decisions, validates again, and publishes only on `pass`. A second conflict failure does not loop; an unrepairable hard-constraint conflict becomes `blocked`.
+
+Private reports retain structured issues and warnings. The public plan stores only counts, passed check names, repaired issue codes, and evidence recency. The UI renders a human summary rather than raw issue JSON.

@@ -8,6 +8,8 @@ import type {
   PlanningRequestStatus,
   PlanningReadinessStatus,
   PlanningReviewDecision,
+  TripPlanStatus,
+  ValidationStatus,
 } from "@trailie/schemas";
 
 export type Json =
@@ -126,6 +128,38 @@ export type PlanningApprovalRow = {
   created_at: string;
   updated_at: string;
 };
+export type TripPlanRow = {
+  id: string;
+  room_id: string;
+  planning_request_id: string;
+  planning_summary_id: string;
+  version: number;
+  status: TripPlanStatus;
+  schema_version: string;
+  prompt_version: string;
+  model: string;
+  itinerary_json: Json | null;
+  validation_status: ValidationStatus;
+  validation_summary: Json | null;
+  basis_summary_version: number;
+  basis_summary_hash: string;
+  created_by_participant_id: string;
+  created_by_user_id: string;
+  generation_attempt_count: number;
+  lease_expires_at: string | null;
+  error_code: string | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  failed_at: string | null;
+};
+export type TripPlanEventRow = {
+  id: string;
+  trip_plan_id: string;
+  room_id: string;
+  event_type: string;
+  created_at: string;
+};
 
 export type DbRoomMessage = {
   id: string;
@@ -205,6 +239,8 @@ export type Database = {
       planning_requests: TableDefinition<PlanningRequestRow>;
       planning_summaries: TableDefinition<PlanningSummaryRow>;
       planning_approvals: TableDefinition<PlanningApprovalRow>;
+      trip_plans: TableDefinition<TripPlanRow>;
+      trip_plan_events: TableDefinition<TripPlanEventRow>;
     };
     Views: {
       room_invite_metadata: {
@@ -403,6 +439,86 @@ export type Database = {
         Args: { batch_size?: number };
         Returns: string[];
       };
+      create_itinerary_generation: {
+        Args: {
+          target_planning_request_id: string;
+          participant_id: string;
+        };
+        Returns: Json;
+      };
+      get_trip_plan: {
+        Args: { target_room_id: string };
+        Returns: Json;
+      };
+      claim_itinerary_generation: {
+        Args: { target_trip_plan_id: string };
+        Returns: Json;
+      };
+      get_itinerary_generation_context: {
+        Args: { target_trip_plan_id: string };
+        Returns: Json;
+      };
+      record_plan_progress: {
+        Args: { target_trip_plan_id: string; target_event_type: string };
+        Returns: undefined;
+      };
+      record_itinerary_draft: {
+        Args: {
+          target_trip_plan_id: string;
+          validated_draft: Json;
+          target_provider_response_id: string | null;
+          target_provider_request_id: string | null;
+          target_input_tokens: number | null;
+          target_output_tokens: number | null;
+          target_reasoning_tokens: number | null;
+          target_cached_input_tokens: number | null;
+          target_total_tokens: number | null;
+          target_latency_ms: number;
+        };
+        Returns: undefined;
+      };
+      record_tool_evidence: {
+        Args: {
+          target_trip_plan_id: string;
+          target_provider: string;
+          target_tool_name: string;
+          target_request_fingerprint: string;
+          target_retrieved_at: string;
+          target_expires_at: string | null;
+          target_status: string;
+          target_normalized_result: Json;
+          target_source_reference: Json | null;
+          target_itinerary_item_id: string | null;
+        };
+        Returns: string;
+      };
+      record_validation_report: {
+        Args: {
+          target_trip_plan_id: string;
+          target_plan_version: number;
+          target_validator_version: string;
+          target_status: string;
+          target_issues: Json;
+          target_warnings: Json;
+        };
+        Returns: string;
+      };
+      mark_itinerary_needs_revision: {
+        Args: { target_trip_plan_id: string };
+        Returns: undefined;
+      };
+      complete_itinerary_publication: {
+        Args: { target_trip_plan_id: string; validated_itinerary: Json };
+        Returns: Json;
+      };
+      fail_itinerary_generation: {
+        Args: { target_trip_plan_id: string; target_error_code: string };
+        Returns: undefined;
+      };
+      list_recoverable_itinerary_generations: {
+        Args: { batch_size?: number };
+        Returns: string[];
+      };
     };
     Enums: {
       approval_mode: ApprovalMode;
@@ -413,6 +529,8 @@ export type Database = {
       planning_request_status: PlanningRequestStatus;
       planning_readiness_status: PlanningReadinessStatus;
       planning_review_decision: PlanningReviewDecision;
+      trip_plan_status: TripPlanStatus;
+      itinerary_validation_status: ValidationStatus;
     };
     CompositeTypes: Record<never, never>;
   };

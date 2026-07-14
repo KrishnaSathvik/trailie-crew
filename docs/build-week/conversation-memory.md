@@ -55,3 +55,7 @@ No prompt, transcript duplicate, raw provider response, raw SQL/provider error, 
 Unit tests cover schemas, eligibility, context bounds, provider request fields, fake scenarios, validation, retries, and scheduling. pgTAP covers private access, claim concurrency, atomic completion, projection, versioning, and zero public/Trailie messages. E2E covers two users, deterministic skip, preference/constraint extraction, correction, proposal versus decision, provider failure, duplicate drain, refresh, mobile layout, no browser OpenAI request, and Node-side private inspection.
 
 Implemented downstream in Phase 3A: private memory can seed a reviewable planning summary and approval workflow. Deferred: durable production queue scheduling, historical reprocessing, and itinerary generation.
+
+## Phase 3B downstream use
+
+Itinerary generation does not read the raw memory ledger or full transcript. It consumes only the approved immutable planning summary and bounded safe active-traveler labels, plus verified travel evidence collected for the proposed plan. Superseded facts, unrelated preferences, extraction history, auth IDs, emails, and confidence internals stay outside the prompt. Material new memory makes the approved summary stale before generation can start.

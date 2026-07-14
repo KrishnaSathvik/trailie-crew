@@ -43,3 +43,7 @@ Memory processing does not publish Realtime broadcasts, presence, typing, or cha
 ## Phase 3A planning updates
 
 Planning state is public only to active room members and is refreshed through the safe planning RPC on a short poll. Payloads contain the review summary and display-safe approval participants, never memory facts, tokens, provider IDs, prompts, or raw errors. Summary generation creates no chat row, focused-answer invocation, Trailie presence, typing, or chat Broadcast; the existing conversation path remains unchanged.
+
+## Phase 3B itinerary invalidations
+
+Database triggers emit only `roomId`, `planId`, and a semantic event type on the existing private room topic. Plan currently uses the safe room projection on a short poll, so refresh/reconnect resumes persisted progress without relying on transient delivery. Generation and repair create no fake user/Trailie message and Chat remains independently usable. Tokens, provider IDs, prompts, evidence, and raw validation reports never enter Realtime payloads.

@@ -65,7 +65,7 @@ pnpm exec supabase test db
 
 ## Current implementation status
 
-Implemented through Phase 2A:
+Implemented through Phase 3B:
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -101,8 +101,8 @@ Implemented through Phase 2A:
 
 Not yet implemented:
 
-- itinerary generation, validation, sharing, or export
-- live travel-data providers or TrailVerse service integration
+- crew-requested itinerary revisions, public sharing, booking, or export
+- live place/reservation, hotel/flight, weather, and TrailVerse/NPS service integration
 
 ## Build Week timing
 
@@ -116,3 +116,5 @@ Phase 2B adds invisible, private conversation understanding. Persisted human mes
 Memory configuration uses `OPENAI_MEMORY_MODEL=gpt-5.6-luna`, prompt `trailie-memory-v1`, schema `1`, and a 20-second timeout. Local and E2E runs use the deterministic fake provider. Live smoke testing is opt-in and was not run for this phase.
 
 Phase 3A adds the approval-gated **Before I build the trip** workflow. Sol reconstructs a bounded review summary from private memory and recent conversation; application code owns readiness, staleness, and approval completion. `approved_for_generation` is the stopping point—no itinerary is generated. See [planning approval](docs/build-week/planning-approval.md).
+
+Phase 3B adds the explicit **Generate Itinerary** action, strict itinerary schema, source-attributed travel evidence, deterministic validation, one bounded conflict repair, immutable PASS-only publication, semantic progress, and the crew-visible Plan experience. Local/E2E work uses deterministic external-provider doubles while exercising real PostgreSQL, RLS, validation, and publication. See [itinerary generation](docs/build-week/itinerary-generation.md) and [travel tools](docs/build-week/travel-tools.md).

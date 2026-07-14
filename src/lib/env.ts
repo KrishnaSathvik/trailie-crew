@@ -72,6 +72,31 @@ const openAIEnvSchema = z.object({
     .min(5_000)
     .max(120_000)
     .default(45_000),
+  OPENAI_ITINERARY_MODEL: z.string().trim().min(1).default("gpt-5.6-sol"),
+  OPENAI_ITINERARY_PROMPT_VERSION: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("trailie-itinerary-v1"),
+  OPENAI_ITINERARY_SCHEMA_VERSION: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("1"),
+  ITINERARY_VALIDATOR_VERSION: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("trailie-itinerary-validator-v1"),
+  OPENAI_ITINERARY_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(5_000)
+    .max(120_000)
+    .default(90_000),
   TRAILIE_AI_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
@@ -129,5 +154,10 @@ export function parseOpenAIEnv(source: EnvironmentSource) {
     planningPromptVersion: values.OPENAI_PLANNING_PROMPT_VERSION,
     planningSchemaVersion: values.OPENAI_PLANNING_SCHEMA_VERSION,
     planningTimeoutMs: values.OPENAI_PLANNING_TIMEOUT_MS,
+    itineraryModel: values.OPENAI_ITINERARY_MODEL,
+    itineraryPromptVersion: values.OPENAI_ITINERARY_PROMPT_VERSION,
+    itinerarySchemaVersion: values.OPENAI_ITINERARY_SCHEMA_VERSION,
+    itineraryValidatorVersion: values.ITINERARY_VALIDATOR_VERSION,
+    itineraryTimeoutMs: values.OPENAI_ITINERARY_TIMEOUT_MS,
   } as const;
 }

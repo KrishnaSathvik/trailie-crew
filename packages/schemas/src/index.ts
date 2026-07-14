@@ -404,6 +404,382 @@ export const planningRequestViewSchema = z
   })
   .strict();
 
+export const tripPlanStatusSchema = z.enum([
+  "generating",
+  "validating",
+  "needs_revision",
+  "blocked",
+  "published",
+  "failed",
+  "superseded",
+]);
+export const validationStatusSchema = z.enum([
+  "pending",
+  "pass",
+  "needs_revision",
+  "blocked",
+]);
+export const validationSeveritySchema = z.enum([
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "info",
+]);
+export const evidenceStatusSchema = z.enum([
+  "verified",
+  "unavailable",
+  "stale",
+  "failed",
+]);
+export const costStatusSchema = z.enum(["verified", "estimated", "unknown"]);
+export const reservationStatusSchema = z.enum([
+  "required",
+  "recommended",
+  "not_required",
+  "unknown",
+]);
+export const verificationStatusSchema = z.enum([
+  "verified",
+  "estimated",
+  "unknown",
+]);
+export const itineraryItemTypeSchema = z.enum([
+  "activity",
+  "meal",
+  "travel",
+  "lodging",
+  "arrival",
+  "departure",
+  "free_time",
+]);
+export const travelModeSchema = z.enum([
+  "walk",
+  "drive",
+  "transit",
+  "bike",
+  "shuttle",
+  "flight",
+  "train",
+  "unknown",
+]);
+export const planProgressEventTypeSchema = z.enum([
+  "generation_started",
+  "structure_created",
+  "route_validation_started",
+  "constraint_validation_started",
+  "repair_started",
+  "validation_completed",
+  "published",
+  "failed",
+]);
+
+const itineraryIdSchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9-]{0,31}:[a-z0-9][a-z0-9:_-]{0,79}$/);
+const itineraryTextSchema = z.string().trim().min(1).max(1000);
+const itineraryShortTextSchema = z.string().trim().min(1).max(200);
+const localTimeSchema = z
+  .string()
+  .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
+  .nullable();
+const isoDateSchema = z.iso.date();
+const ianaTimezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .refine((value) => {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+      return value.includes("/") || value === "UTC";
+    } catch {
+      return false;
+    }
+  }, "A valid IANA timezone is required.");
+
+export const evidenceReferenceSchema = z
+  .object({
+    id: itineraryIdSchema,
+    provider: z.string().trim().min(1).max(80),
+    toolName: z.string().trim().min(1).max(80),
+    status: evidenceStatusSchema,
+    retrievedAt: timestampSchema,
+    expiresAt: timestampSchema.nullable(),
+    sourceLabel: z.string().trim().min(1).max(160),
+    sourceUrl: z.url().nullable(),
+  })
+  .strict();
+
+export const costEstimateSchema = z
+  .object({
+    status: costStatusSchema,
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    amount: z.number().finite().nonnegative().nullable(),
+    minAmount: z.number().finite().nonnegative().nullable(),
+    maxAmount: z.number().finite().nonnegative().nullable(),
+    retrievedAt: timestampSchema.nullable(),
+    evidenceRef: itineraryIdSchema.nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const hasAmount =
+      value.amount !== null ||
+      value.minAmount !== null ||
+      value.maxAmount !== null;
+    if (value.status === "unknown" && hasAmount) {
+      context.addIssue({
+        code: "custom",
+        path: ["amount"],
+        message: "Unknown cost cannot include an amount.",
+      });
+    }
+    if (
+      value.status === "verified" &&
+      (!hasAmount || !value.retrievedAt || !value.evidenceRef)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["status"],
+        message:
+          "Verified cost requires an amount, retrieval time, and evidence.",
+      });
+    }
+    if (
+      value.minAmount !== null &&
+      value.maxAmount !== null &&
+      value.minAmount > value.maxAmount
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["maxAmount"],
+        message: "Cost range is reversed.",
+      });
+    }
+  });
+
+export const itineraryLocationSchema = z
+  .object({
+    name: itineraryShortTextSchema,
+    address: z.string().trim().min(1).max(300).nullable(),
+    latitude: z.number().finite().min(-90).max(90).nullable(),
+    longitude: z.number().finite().min(-180).max(180).nullable(),
+    timezone: ianaTimezoneSchema,
+    verificationStatus: verificationStatusSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.latitude === null) !== (value.longitude === null)) {
+      context.addIssue({
+        code: "custom",
+        path: ["latitude"],
+        message: "Coordinates must be present together.",
+      });
+    }
+  });
+
+export const reservationRequirementSchema = z
+  .object({
+    status: reservationStatusSchema,
+    details: z.string().trim().min(1).max(500).nullable(),
+    evidenceRefs: z.array(itineraryIdSchema).max(10),
+  })
+  .strict();
+
+export const itineraryTravelerSchema = z
+  .object({
+    id: itineraryIdSchema,
+    displayName: displayNameSchema,
+    origin: z.string().trim().min(1).max(200).nullable(),
+    accessibilityNotes: z.array(itineraryShortTextSchema).max(12),
+    dietaryNotes: z.array(itineraryShortTextSchema).max(12),
+  })
+  .strict();
+
+const travelerTransferSchema = z
+  .object({
+    id: itineraryIdSchema,
+    travelerIds: z.array(itineraryIdSchema).min(1).max(50),
+    date: isoDateSchema,
+    localTime: localTimeSchema,
+    location: itineraryLocationSchema,
+    mode: travelModeSchema,
+    reference: z.string().trim().min(1).max(200).nullable(),
+    notes: z.array(itineraryShortTextSchema).max(12),
+  })
+  .strict();
+export const travelerArrivalSchema = travelerTransferSchema;
+export const travelerDepartureSchema = travelerTransferSchema;
+
+export const itineraryItemSchema = z
+  .object({
+    id: itineraryIdSchema,
+    type: itineraryItemTypeSchema,
+    startTime: localTimeSchema,
+    endTime: localTimeSchema,
+    title: itineraryShortTextSchema,
+    description: itineraryTextSchema,
+    location: itineraryLocationSchema.nullable(),
+    reservation: reservationRequirementSchema,
+    cost: costEstimateSchema,
+    evidenceRefs: z.array(itineraryIdSchema).max(12),
+    notes: z.array(itineraryShortTextSchema).max(12),
+  })
+  .strict();
+
+export const travelSegmentSchema = z
+  .object({
+    id: itineraryIdSchema,
+    fromItemId: itineraryIdSchema.nullable(),
+    toItemId: itineraryIdSchema.nullable(),
+    mode: travelModeSchema,
+    origin: itineraryLocationSchema,
+    destination: itineraryLocationSchema,
+    distanceMeters: z.number().int().nonnegative().nullable(),
+    durationMinutes: z.number().int().nonnegative().max(2880).nullable(),
+    bufferMinutes: z.number().int().nonnegative().max(720),
+    verificationStatus: verificationStatusSchema,
+    evidenceRefs: z.array(itineraryIdSchema).max(12),
+  })
+  .strict();
+
+export const lodgingRecommendationSchema = z
+  .object({
+    id: itineraryIdSchema,
+    name: itineraryShortTextSchema,
+    area: itineraryShortTextSchema,
+    checkInDate: isoDateSchema,
+    checkOutDate: isoDateSchema,
+    location: itineraryLocationSchema,
+    reservation: reservationRequirementSchema,
+    cost: costEstimateSchema,
+    evidenceRefs: z.array(itineraryIdSchema).max(12),
+    notes: z.array(itineraryShortTextSchema).max(12),
+  })
+  .strict();
+
+export const restaurantRecommendationSchema = z
+  .object({
+    id: itineraryIdSchema,
+    name: itineraryShortTextSchema,
+    mealWindow: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+    location: itineraryLocationSchema,
+    dietaryAlignment: z.array(itineraryShortTextSchema).max(12),
+    reservation: reservationRequirementSchema,
+    cost: costEstimateSchema,
+    evidenceRefs: z.array(itineraryIdSchema).max(12),
+    notes: z.array(itineraryShortTextSchema).max(12),
+  })
+  .strict();
+
+export const itineraryDaySchema = z
+  .object({
+    id: itineraryIdSchema,
+    date: isoDateSchema,
+    title: itineraryShortTextSchema,
+    summary: itineraryTextSchema,
+    items: z.array(itineraryItemSchema).max(40),
+    travelSegments: z.array(travelSegmentSchema).max(40),
+    estimatedDailyCost: costEstimateSchema,
+    warnings: z.array(itineraryShortTextSchema).max(24),
+  })
+  .strict();
+
+export const itinerarySchema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    title: itineraryShortTextSchema,
+    destinationSummary: itineraryTextSchema,
+    timezone: ianaTimezoneSchema,
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+    travelers: z.array(itineraryTravelerSchema).min(1).max(50),
+    arrivals: z.array(travelerArrivalSchema).max(100),
+    departures: z.array(travelerDepartureSchema).max(100),
+    lodging: z.array(lodgingRecommendationSchema).max(30),
+    days: z.array(itineraryDaySchema).min(1).max(60),
+    restaurants: z.array(restaurantRecommendationSchema).max(100),
+    unresolvedItems: z.array(itineraryTextSchema).max(50),
+    assumptions: z.array(itineraryTextSchema).max(50),
+    validationMetadata: z
+      .object({
+        validatorVersion: z.string().trim().min(1).max(100),
+        validatedAt: timestampSchema.nullable(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.startDate > value.endDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "Itinerary date range is reversed.",
+      });
+    }
+    for (const [index, day] of value.days.entries()) {
+      if (day.date < value.startDate || day.date > value.endDate) {
+        context.addIssue({
+          code: "custom",
+          path: ["days", index, "date"],
+          message: "Itinerary day is outside the trip date range.",
+        });
+      }
+    }
+  });
+
+export const validationIssueSchema = z
+  .object({
+    code: z.string().regex(/^[a-z][a-z0-9_]{1,79}$/),
+    severity: validationSeveritySchema,
+    message: z.string().trim().min(1).max(500),
+    affectedItemIds: z.array(itineraryIdSchema).max(20),
+    repairable: z.boolean(),
+    evidenceRefs: z.array(itineraryIdSchema).max(20),
+  })
+  .strict();
+export const validationWarningSchema = validationIssueSchema;
+export const validationReportSchema = z
+  .object({
+    validatorVersion: z.string().trim().min(1).max(100),
+    status: validationStatusSchema.exclude(["pending"]),
+    issues: z.array(validationIssueSchema).max(100),
+    warnings: z.array(validationWarningSchema).max(100),
+    issueCount: z.number().int().nonnegative().max(100).optional(),
+    warningCount: z.number().int().nonnegative().max(100).optional(),
+    passedChecks: z.array(z.string().regex(/^[a-z][a-z0-9_]{1,79}$/)).max(50),
+    repairedIssues: z.array(z.string().regex(/^[a-z][a-z0-9_]{1,79}$/)).max(50),
+    evidenceLastCheckedAt: timestampSchema.nullable(),
+  })
+  .strict();
+
+export const planProgressEventSchema = z
+  .object({
+    id: z.uuid(),
+    tripPlanId: z.uuid(),
+    type: planProgressEventTypeSchema,
+    createdAt: timestampSchema,
+  })
+  .strict();
+export const tripPlanViewSchema = z
+  .object({
+    id: z.uuid(),
+    roomId: z.uuid(),
+    planningRequestId: z.uuid(),
+    version: z.number().int().positive(),
+    status: tripPlanStatusSchema,
+    validationStatus: validationStatusSchema,
+    basisSummaryVersion: z.number().int().positive(),
+    itinerary: itinerarySchema.nullable(),
+    validationSummary: validationReportSchema.nullable(),
+    progressEvents: z.array(planProgressEventSchema).max(50),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    publishedAt: timestampSchema.nullable(),
+    errorCode: z.string().trim().min(1).max(80).nullable(),
+  })
+  .strict();
+
 export const modelRouteDecisionSchema = z
   .object({
     model: z.string().min(1).max(100),
@@ -650,3 +1026,27 @@ export type MissingInformationSummary = z.infer<
 export type PlanningSummary = z.infer<typeof planningSummarySchema>;
 export type PlanningApprovalState = z.infer<typeof planningApprovalStateSchema>;
 export type PlanningRequestView = z.infer<typeof planningRequestViewSchema>;
+export type TripPlanStatus = z.infer<typeof tripPlanStatusSchema>;
+export type ValidationStatus = z.infer<typeof validationStatusSchema>;
+export type Itinerary = z.infer<typeof itinerarySchema>;
+export type ItineraryTraveler = z.infer<typeof itineraryTravelerSchema>;
+export type TravelerArrival = z.infer<typeof travelerArrivalSchema>;
+export type TravelerDeparture = z.infer<typeof travelerDepartureSchema>;
+export type ItineraryDay = z.infer<typeof itineraryDaySchema>;
+export type ItineraryItem = z.infer<typeof itineraryItemSchema>;
+export type ItineraryLocation = z.infer<typeof itineraryLocationSchema>;
+export type TravelSegment = z.infer<typeof travelSegmentSchema>;
+export type LodgingRecommendation = z.infer<typeof lodgingRecommendationSchema>;
+export type RestaurantRecommendation = z.infer<
+  typeof restaurantRecommendationSchema
+>;
+export type ReservationRequirement = z.infer<
+  typeof reservationRequirementSchema
+>;
+export type CostEstimate = z.infer<typeof costEstimateSchema>;
+export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
+export type ValidationIssue = z.infer<typeof validationIssueSchema>;
+export type ValidationWarning = z.infer<typeof validationWarningSchema>;
+export type ValidationReport = z.infer<typeof validationReportSchema>;
+export type TripPlanView = z.infer<typeof tripPlanViewSchema>;
+export type PlanProgressEvent = z.infer<typeof planProgressEventSchema>;

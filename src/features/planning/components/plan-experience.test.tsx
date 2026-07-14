@@ -7,12 +7,20 @@ import {
 } from "../actions";
 import { PlanExperience } from "./plan-experience";
 import type { PlanningSummary } from "@trailie/schemas";
+import {
+  generateItineraryAction,
+  getTripPlanAction,
+} from "@/features/itinerary/actions";
 
 vi.mock("../actions", () => ({
   createPlanningRequestAction: vi.fn(),
   getPlanningRequestAction: vi.fn(),
   reviewPlanningSummaryAction: vi.fn(),
   regeneratePlanningSummaryAction: vi.fn(),
+}));
+vi.mock("@/features/itinerary/actions", () => ({
+  generateItineraryAction: vi.fn(),
+  getTripPlanAction: vi.fn(),
 }));
 const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 const summary: PlanningSummary = {
@@ -46,7 +54,10 @@ const summary: PlanningSummary = {
   evidence: { memoryVersion: 1, latestMessageId: null, sourceMessageIds: [id] },
 };
 describe("PlanExperience", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getTripPlanAction).mockResolvedValue({ ok: true, data: null });
+  });
   it("shows the empty action and starts semantic generation", async () => {
     vi.mocked(getPlanningRequestAction).mockResolvedValue({
       ok: true,
@@ -108,5 +119,38 @@ describe("PlanExperience", () => {
       screen.getByText("Add a note before requesting changes."),
     ).toBeVisible();
     expect(reviewPlanningSummaryAction).not.toHaveBeenCalled();
+  });
+  it("starts one server-authorized itinerary from an approved summary", async () => {
+    vi.mocked(getPlanningRequestAction).mockResolvedValue({
+      ok: true,
+      data: {
+        id,
+        roomId: id,
+        status: "approved_for_generation",
+        approvalMode: "all_active",
+        currentSummaryVersion: 1,
+        approvedSummaryVersion: 1,
+        readinessStatus: "ready_for_review",
+        summary,
+        approvalState: null,
+        generationErrorCode: null,
+        isStale: false,
+        createdAt: "2026-07-13T00:00:00Z",
+        updatedAt: "2026-07-13T00:00:00Z",
+      },
+    });
+    vi.mocked(generateItineraryAction).mockResolvedValue({
+      ok: true,
+      data: { id, status: "generating", version: 1, reused: false },
+    });
+    render(<PlanExperience roomId={id} participantId={id} />);
+    const button = await screen.findByRole("button", {
+      name: "Generate Itinerary",
+    });
+    fireEvent.click(button);
+    expect(generateItineraryAction).toHaveBeenCalledWith({
+      planningRequestId: id,
+      participantId: id,
+    });
   });
 });

@@ -28,6 +28,12 @@ import {
   planningRequestStatusSchema,
   planningReviewDecisionSchema,
   planningSummarySchema,
+  tripPlanStatusSchema,
+  validationStatusSchema,
+  itinerarySchema,
+  validationReportSchema,
+  tripPlanViewSchema,
+  planProgressEventSchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -272,6 +278,212 @@ describe("Phase 3A planning schemas", () => {
       blockers: [],
     });
     expect(parsed).not.toHaveProperty("userId");
+  });
+});
+
+describe("Phase 3B itinerary schemas", () => {
+  const itinerary = {
+    schemaVersion: "1",
+    title: "Yosemite crew escape",
+    destinationSummary: "Four days in Yosemite Valley",
+    timezone: "America/Los_Angeles",
+    startDate: "2026-09-12",
+    endDate: "2026-09-15",
+    travelers: [
+      {
+        id: "traveler:maya",
+        displayName: "Maya",
+        origin: "Chicago",
+        accessibilityNotes: [],
+        dietaryNotes: ["vegetarian"],
+      },
+    ],
+    arrivals: [],
+    departures: [],
+    lodging: [],
+    days: [
+      {
+        id: "day:2026-09-12",
+        date: "2026-09-12",
+        title: "Valley arrival",
+        summary: "Settle in and walk the valley floor.",
+        items: [
+          {
+            id: "item:valley-walk",
+            type: "activity",
+            startTime: "15:00",
+            endTime: "17:00",
+            title: "Valley walk",
+            description: "An easy orientation walk.",
+            location: {
+              name: "Yosemite Valley",
+              address: null,
+              latitude: 37.7459,
+              longitude: -119.5936,
+              timezone: "America/Los_Angeles",
+              verificationStatus: "verified",
+            },
+            reservation: {
+              status: "not_required",
+              details: null,
+              evidenceRefs: [],
+            },
+            cost: {
+              status: "estimated",
+              currency: "USD",
+              amount: 0,
+              minAmount: null,
+              maxAmount: null,
+              retrievedAt: null,
+              evidenceRef: null,
+            },
+            evidenceRefs: [],
+            notes: [],
+          },
+        ],
+        travelSegments: [],
+        estimatedDailyCost: {
+          status: "unknown",
+          currency: "USD",
+          amount: null,
+          minAmount: null,
+          maxAmount: null,
+          retrievedAt: null,
+          evidenceRef: null,
+        },
+        warnings: [],
+      },
+    ],
+    restaurants: [],
+    unresolvedItems: [],
+    assumptions: [],
+    validationMetadata: {
+      validatorVersion: "trailie-itinerary-validator-v1",
+      validatedAt: null,
+    },
+  };
+
+  it("locks plan, validation, and progress values", () => {
+    expect(tripPlanStatusSchema.options).toEqual([
+      "generating",
+      "validating",
+      "needs_revision",
+      "blocked",
+      "published",
+      "failed",
+      "superseded",
+    ]);
+    expect(validationStatusSchema.options).toEqual([
+      "pending",
+      "pass",
+      "needs_revision",
+      "blocked",
+    ]);
+    expect(
+      planProgressEventSchema.parse({
+        id: uuid,
+        tripPlanId: uuid,
+        type: "route_validation_started",
+        createdAt: "2026-07-13T18:00:00.000Z",
+      }),
+    ).not.toHaveProperty("reasoning");
+  });
+
+  it("strictly parses an itinerary and rejects unsafe or ambiguous fields", () => {
+    expect(itinerarySchema.parse(itinerary).days).toHaveLength(1);
+    expect(
+      itinerarySchema.safeParse({ ...itinerary, html: "<script>x</script>" })
+        .success,
+    ).toBe(false);
+    expect(
+      itinerarySchema.safeParse({ ...itinerary, timezone: "Central time" })
+        .success,
+    ).toBe(false);
+    expect(
+      itinerarySchema.safeParse({
+        ...itinerary,
+        endDate: "2026-09-11",
+      }).success,
+    ).toBe(false);
+    expect(
+      itinerarySchema.safeParse({
+        ...itinerary,
+        days: [
+          {
+            ...itinerary.days[0],
+            items: [
+              {
+                ...itinerary.days[0].items[0],
+                componentName: "BookingButton",
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("enforces cost provenance, evidence shape, stable IDs, and collection caps", () => {
+    const item = itinerary.days[0].items[0];
+    expect(
+      itinerarySchema.safeParse({
+        ...itinerary,
+        days: [
+          {
+            ...itinerary.days[0],
+            items: [
+              {
+                ...item,
+                id: crypto.randomUUID(),
+                cost: {
+                  ...item.cost,
+                  status: "verified",
+                  amount: 25,
+                  retrievedAt: null,
+                  evidenceRef: null,
+                },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      itinerarySchema.safeParse({
+        ...itinerary,
+        assumptions: Array.from({ length: 51 }, () => "assumption"),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("parses safe validation and plan projections without operational data", () => {
+    const report = validationReportSchema.parse({
+      validatorVersion: "trailie-itinerary-validator-v1",
+      status: "pass",
+      issues: [],
+      warnings: [],
+      passedChecks: ["date_range", "route_duration"],
+      repairedIssues: ["travel_buffer"],
+      evidenceLastCheckedAt: "2026-07-13T18:00:00.000Z",
+    });
+    const view = tripPlanViewSchema.parse({
+      id: uuid,
+      roomId: uuid,
+      planningRequestId: uuid,
+      version: 1,
+      status: "published",
+      validationStatus: "pass",
+      basisSummaryVersion: 1,
+      itinerary,
+      validationSummary: report,
+      progressEvents: [],
+      createdAt: "2026-07-13T18:00:00.000Z",
+      updatedAt: "2026-07-13T18:00:00.000Z",
+      publishedAt: "2026-07-13T18:01:00.000Z",
+      errorCode: null,
+    });
+    expect(view).not.toHaveProperty("providerResponseId");
+    expect(view).not.toHaveProperty("inputTokens");
   });
 });
 

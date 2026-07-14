@@ -3,7 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   PlanningRequestView,
   PlanningSummaryItem,
+  TripPlanView,
 } from "@trailie/schemas";
+import {
+  generateItineraryAction,
+  getTripPlanAction,
+} from "@/features/itinerary/actions";
+import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
 import {
   createPlanningRequestAction,
   getPlanningRequestAction,
@@ -52,14 +58,20 @@ export function PlanExperience({
   participantId: string;
 }) {
   const [request, setRequest] = useState<PlanningRequestView | null>(null);
+  const [plan, setPlan] = useState<TripPlanView | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
-    const result = await getPlanningRequestAction(roomId);
-    if (result.ok) setRequest(result.data);
+    const [planningResult, planResult] = await Promise.all([
+      getPlanningRequestAction(roomId),
+      getTripPlanAction(roomId),
+    ]);
+    if (planningResult.ok) setRequest(planningResult.data);
     else setError("Planning state could not be loaded.");
+    if (planResult.ok) setPlan(planResult.data);
     setLoading(false);
   }, [roomId]);
   useEffect(() => {
@@ -137,6 +149,26 @@ export function PlanExperience({
     }
     setRequest({ ...request, status: "generating_summary" });
   }
+  async function generateItinerary() {
+    if (!request || generating) return;
+    setGenerating(true);
+    setError(null);
+    const result = await generateItineraryAction({
+      planningRequestId: request.id,
+      participantId,
+    });
+    if (!result.ok) {
+      setGenerating(false);
+      setError(
+        result.error === "approved_summary_stale"
+          ? "Trip details changed after approval. Regenerate the summary first."
+          : "The itinerary could not be started safely.",
+      );
+      return;
+    }
+    await refresh();
+    setGenerating(false);
+  }
   if (loading)
     return (
       <div
@@ -146,6 +178,7 @@ export function PlanExperience({
         Loading Plan…
       </div>
     );
+  if (plan) return <ItineraryExperience plan={plan} />;
   if (!request && !starting)
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12 sm:px-8">
@@ -269,8 +302,22 @@ export function PlanExperience({
           <div className="mt-5 rounded-md border border-emerald-600/40 bg-emerald-500/10 p-4">
             <p className="font-semibold">Summary approved</p>
             <p className="text-muted-foreground mt-1 text-sm">
-              Itinerary generation is the next step. It has not started yet.
+              Trailie can now build the itinerary and validate it before the
+              crew sees it as ready.
             </p>
+            <button
+              type="button"
+              disabled={generating || request.isStale}
+              onClick={() => void generateItinerary()}
+              className="bg-foreground text-background mt-4 min-h-11 rounded-md px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {generating ? "Starting…" : "Generate Itinerary"}
+            </button>
+            {error ? (
+              <p role="alert" className="mt-3 text-sm">
+                {error}
+              </p>
+            ) : null}
           </div>
         ) : null}
         <div className="mt-8">

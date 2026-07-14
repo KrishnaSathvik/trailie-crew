@@ -59,3 +59,17 @@
 - [x] Sol strict output with fake-provider E2E
 - [x] No itinerary generation path or synthetic Trailie message
 - [ ] Live OpenAI planning smoke test (not run; requires a real key)
+
+## Phase 3B validated itinerary
+
+- [x] Approved-current-summary-only idempotent generation RPC
+- [x] Strict itinerary schema and deterministic validator
+- [x] Provider-attributed cached travel evidence and fake fixtures
+- [x] One route-conflict repair and PASS-only publication
+- [x] Immutable published version and current room pointer
+- [x] Persisted semantic progress with refresh recovery
+- [x] Overview/day/travel/stay/food/validation Plan experience
+- [x] Real PostgreSQL/RLS/publication E2E with fake external providers
+- [ ] Live itinerary smoke (requires `OPENAI_API_KEY`)
+- [ ] Live travel-tools smoke (requires `MAPBOX_ACCESS_TOKEN`)
+- [ ] Durable production queue/cron scheduling for recovery

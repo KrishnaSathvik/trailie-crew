@@ -9,6 +9,10 @@ vi.mock("@/features/planning/actions", () => ({
   reviewPlanningSummaryAction: vi.fn(),
   regeneratePlanningSummaryAction: vi.fn(),
 }));
+vi.mock("@/features/itinerary/actions", () => ({
+  getTripPlanAction: vi.fn().mockResolvedValue({ ok: true, data: null }),
+  generateItineraryAction: vi.fn(),
+}));
 
 function renderShell(element: React.ReactNode) {
   return render(<TransientInviteProvider>{element}</TransientInviteProvider>);

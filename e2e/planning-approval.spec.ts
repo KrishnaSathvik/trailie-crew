@@ -97,7 +97,9 @@ test("crew reviews, approves, stales, and regenerates an immutable planning summ
   await expect(member.getByText("Summary approved")).toBeVisible({
     timeout: 10_000,
   });
-  await expect(member.getByText(/It has not started yet/)).toBeVisible();
+  await expect(
+    member.getByRole("button", { name: "Generate Itinerary" }),
+  ).toBeVisible();
   await member.getByRole("button", { name: "Chat" }).first().click();
   await send(member, "Actually, I prefer kayaking");
   await member.getByRole("button", { name: "Plan" }).first().click();

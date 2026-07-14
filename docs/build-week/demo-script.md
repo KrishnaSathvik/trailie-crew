@@ -40,3 +40,14 @@ Do not demonstrate itinerary generation, approval, travel research, maps, live p
 7. Demonstrate a required change note and the host-only variant, then resize the functional Plan tab to 390×844.
 
 The local provider is deterministic, while Auth, PostgreSQL, RLS, RPCs, private memory, polling, and both browser sessions remain real. Do not demonstrate an itinerary; Phase 3A stops at `approved_for_generation`.
+
+## Phase 3B validation moment
+
+1. From the genuinely approved summary, select **Generate Itinerary** twice quickly and show only Version 1.
+2. Switch to Chat while semantic progress continues, then return to Plan.
+3. Explain the deterministic fixture: the first draft put a 4:00 PM stop after a 3:00 PM activity with a verified two-hour drive.
+4. Show the published itinerary and “Trailie adjusted the schedule after checking travel time.”
+5. Open Day-by-day, Travel, Stay, Food, and Validation. Point out unknown costs, recommendation-only lodging, evidence recency, and no booking claim.
+6. Refresh and show the same immutable version in both crew contexts; resize to 390×844 and confirm the Plan tab and subnavigation remain usable.
+
+Only model and travel providers are faked locally. Auth, PostgreSQL, RLS, progress state, validation, repair state, and publication are real.

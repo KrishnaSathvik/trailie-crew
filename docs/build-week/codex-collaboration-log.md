@@ -39,3 +39,7 @@ Started from clean `main` commit `c0e9f17`. Verified current official OpenAI mod
 ## 2026-07-13 — Phase 3A
 
 Started from clean `main` commit `b0f1330`. Human direction locked the explicit trigger, immutable review summary, deterministic readiness/staleness, all-active and host-only approvals, Sol-only reconstruction, Phase 2B recovery, and the no-itinerary boundary. Codex reverified official OpenAI guidance, designed the lifecycle and data boundary, implemented schemas/RPCs/RLS/workers/Plan UI/fake-provider coverage, removed the production memory-inspection route, and added a server-only recovery drain. Focused tests began red for absent planning contracts and database objects; browser verification later exposed and fixed optimistic-send synchronization and a completed-summary UI flag that never reset. No commit or push was made.
+
+## 2026-07-13 — Phase 3B
+
+Started from clean `main` commit `c658653`. Human direction locked approved-summary-only generation, strict Sol output, provider-neutral evidence, deterministic validation, bounded repair, immutable PASS-only publication, semantic progress, and no revision/sharing/export/booking work. Codex reverified official OpenAI guidance, implemented the database/schema/provider/worker/UI boundaries test-first, and added deterministic external-provider doubles plus a live Mapbox seam. Browser integration exposed unnamed public SQL wrapper parameters that direct pgTAP calls could not reveal; named PostgREST-safe wrappers fixed the real worker. No commit or push was made.

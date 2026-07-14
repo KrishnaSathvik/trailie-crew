@@ -107,3 +107,7 @@ Human persistence remains the critical path. `sendMessageAction` schedules `afte
 The Plan tab calls an authenticated create RPC and returns immediately. A post-response worker claims the request, reads a service-only bounded context, validates Sol's strict summary, replaces model readiness with deterministic application readiness, and transactionally inserts a new immutable version. The browser polls the safe room-scoped planning view; no private memory or operational run record crosses that boundary.
 
 Approvals and change requests use participant-owned RPCs. Database locks, one active request per room, version-scoped unique approvals, basis fingerprints, and immutable summary rows enforce concurrency and stale-version safety. A server-only recovery drain can reclaim draft/failed/stale-generating requests and abandoned Phase 2B extractions. See [planning-approval.md](planning-approval.md).
+
+## Phase 3B: validated itinerary publication
+
+`src/features/itinerary` owns bounded context, the Sol/fake provider boundary, semantic progress, evidence enrichment, deterministic validation, one repair, recovery, actions, and Plan UI. `@trailie/schemas` owns strict safe plan contracts; `@trailie/travel-tools` owns provider-neutral evidence. Public plan rows/events are room-readable, while runs, tool evidence, and reports are private forced-RLS records reached only through narrow service RPCs. See [itinerary-generation.md](itinerary-generation.md).

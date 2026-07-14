@@ -29,3 +29,7 @@ Official OpenAI documentation was reverified on July 13, 2026. Summary reconstru
 Next.js `after()` starts work after the request response and an in-process semaphore caps concurrency at two. Claims, immutable versions, and unique approvals make duplicate schedules harmless. Because `after()` is best effort, the server-only recovery drain reclaims draft/failed/stale-generating planning requests and Phase 2B queued/stale-running extractions under retry caps. Production hardening should schedule that drain through a durable cron/queue.
 
 The former memory-inspection API route was removed. E2E inspection now uses a Node-side local Supabase fixture, so the production route manifest contains no private-memory inspection endpoint.
+
+## Phase 3B handoff
+
+`approved_for_generation` still means only that the current summary is approved. The separate itinerary lifecycle snapshots its summary ID/version/hash and never updates the approval or summary. **Generate Itinerary** is visible only in this state; the server rechecks approval, staleness, readiness, membership, room state, and idempotency before Version 1 can exist. See [itinerary-generation.md](itinerary-generation.md).

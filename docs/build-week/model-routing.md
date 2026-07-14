@@ -21,3 +21,9 @@ Ordinary memory extraction always routes to `gpt-5.6-luna` with `reasoning.effor
 ## Phase 3A planning-summary route
 
 The explicit Build Our Itinerary action routes summary reconstruction directly to exact `gpt-5.6-sol`. It uses `reasoning.effort: "high"`, strict structured output, prompt `trailie-planning-summary-v1`, schema `1`, no tools, and no model-selected routing. The model proposes a review summary only; deterministic application code owns readiness, staleness, and approvals. One schema/provider repair retry is the maximum, and no itinerary model call exists in Phase 3A.
+
+## Phase 3B itinerary route
+
+The approved-only Generate Itinerary action routes generation and its single optional conflict repair to exact `gpt-5.6-sol` with `reasoning.effort: "high"`, prompt `trailie-itinerary-v1`, schema `1`, strict Responses `text.format`, `store: false`, and a 12,000-token cap. There is no model router, streaming draft, autonomous tool choice, or model-owned publish step. Application code calls travel providers, validates deterministically with `trailie-itinerary-validator-v1`, and atomically publishes only PASS.
+
+The optional semantic-review call is deferred to control scope and cost. `xhigh`/`max`, function calling, Programmatic Tool Calling, background Responses, Batch, and multi-agent orchestration were verified/considered but are not used.
