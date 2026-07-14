@@ -141,7 +141,7 @@ export function createFakeTravelProvider(configuration: {
   scenario: FakeTravelScenario;
   now?: string;
 }): TravelProvider {
-  const now = configuration.now ?? "2026-07-13T18:00:00.000Z";
+  const now = configuration.now ?? new Date().toISOString();
   const provider = "trailie-fake";
   function result<T>(
     toolName: string,

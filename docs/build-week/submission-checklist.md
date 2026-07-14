@@ -1,9 +1,9 @@
 # Submission Checklist
 
-- [ ] Phase 4B SQL, unit, integration, and deterministic two-user/public-browser E2E gates pass.
+- [x] Phase 4B SQL, unit, integration, and deterministic two-user/public-browser E2E gates pass locally.
 - [x] Version 1 remains readable, shareable, and exportable unchanged after Version 2.
-- [ ] Stale request, outsider, spoofing, duplicate publication, private leakage, and production fake controls are verified.
-- [ ] `pnpm test:revision:smoke` status is recorded; it is key-gated and excluded from CI.
+- [x] Stale request, outsider, spoofing, duplicate publication, private leakage, and production fake controls are verified locally.
+- [x] `pnpm test:revision:smoke` status is recorded; prior credentialed smoke passed and Phase 4C skipped without a key.
 
 ## Foundation
 
@@ -28,7 +28,7 @@
 - [x] Explicit planning-summary and approval workflow (no itinerary generation)
 - [x] Structured, validated, versioned itinerary revisions
 - [x] Version-pinned sharing, ICS, and print/PDF export
-- [ ] Honest source handling for live data
+- [x] Honest verified/estimated/unknown/unavailable/stale source handling is implemented and locally tested.
 - [ ] Read-only TrailVerse adapter integration, if used
 
 ## Submission readiness
@@ -37,7 +37,7 @@
 - [x] Real two-context Realtime collaboration and outsider-isolation coverage
 - [x] Two-context focused-answer demo rehearsal with deterministic fake provider
 - [ ] Production deployment and environment review
-- [ ] Final validation commands pass
+- [x] Phase 4C local validation commands pass; hosted acceptance and credentialed provider checks remain separate gates.
 - [x] Demo script reflects implemented behavior through Phase 4B
 - [ ] Submission copy makes no unsupported claims
 

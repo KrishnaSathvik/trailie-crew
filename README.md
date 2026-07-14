@@ -14,7 +14,7 @@ Group trip planning is fragmented across chats, notes, links, polls, and spreads
 
 Trailie Crew will give friends a shared Trip with a natural group conversation. The crew will be able to mention or directly invoke Trailie for focused help and explicitly request an itinerary only when the group is ready. Planned itineraries will be structured, validated, versioned, revisable, shareable, and exportable.
 
-Phase 2A now adds silence-by-default focused Trailie answers: explicit mentions, beginning-of-message direct address, and replies to persisted Trailie messages are checked by deterministic code, streamed privately to the invoking browser, validated, persisted once, and delivered to the crew through Realtime. Planning and itinerary capabilities remain intentionally unavailable.
+Phase 2A added silence-by-default focused Trailie answers: explicit mentions, beginning-of-message direct address, and replies to persisted Trailie messages are checked by deterministic code, streamed privately to the invoking browser, validated, persisted once, and delivered to the crew through Realtime. Planning and itinerary capabilities were intentionally unavailable at that phase boundary; Phases 3A through 4B now provide approval-gated planning, validated itineraries, revisions, sharing, and exports.
 
 ## Relationship to TrailVerse
 
@@ -120,7 +120,7 @@ Trailie Crew development began with Phase 0 on July 13, 2026. Work completed bef
 Codex collaboration decisions and Build Week development checkpoints are recorded in [`docs/build-week/codex-collaboration-log.md`](docs/build-week/codex-collaboration-log.md). This section will be expanded with concrete contributions as the project develops.
 Phase 2B adds invisible, private conversation understanding. Persisted human messages return immediately; eligible messages are processed after the response into normalized private facts and a rebuildable room snapshot. Extraction never creates chat output. See [conversation memory](docs/build-week/conversation-memory.md).
 
-Memory configuration uses `OPENAI_MEMORY_MODEL=gpt-5.6-luna`, prompt `trailie-memory-v1`, schema `1`, and a 20-second timeout. Local and E2E runs use the deterministic fake provider. Live smoke testing is opt-in and was not run for this phase.
+Memory configuration uses `OPENAI_MEMORY_MODEL=gpt-5.6-luna`, prompt `trailie-memory-v1`, schema `1`, and a 20-second timeout. Local and E2E runs use the deterministic fake provider. The opt-in live Luna smoke later passed during the credentialed Phase 4B verification recorded in the collaboration log; it was not rerun during the Phase 4C audit because no key was available.
 
 Phase 3A adds the approval-gated **Before I build the trip** workflow. Sol reconstructs a bounded review summary from private memory and recent conversation; application code owns readiness, staleness, and approval completion. `approved_for_generation` is the stopping point—no itinerary is generated. See [planning approval](docs/build-week/planning-approval.md).
 

@@ -7,6 +7,25 @@ import {
 } from "./index";
 
 describe("travel tool contracts", () => {
+  it("anchors default fake evidence freshness to the current test clock", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-14T19:30:00.000Z"));
+    try {
+      const evidence = await createFakeTravelProvider({
+        scenario: "valid",
+      }).route({
+        origin: { latitude: 1, longitude: 1 },
+        destination: { latitude: 2, longitude: 2 },
+        mode: "drive",
+      });
+
+      expect(evidence.retrievedAt).toBe("2026-07-14T19:30:00.000Z");
+      expect(isTravelEvidenceFresh(evidence)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns normalized source-attributed geocoding and routing evidence", async () => {
     const provider = createFakeTravelProvider({ scenario: "valid" });
     const place = await provider.geocode({ query: "Yosemite Valley" });
