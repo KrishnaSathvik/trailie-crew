@@ -1,6 +1,6 @@
 # Trailie Crew
 
-Phase 4A supports explicit, crew-approved itinerary revisions with immutable room-level version history. See [itinerary revisions](docs/build-week/itinerary-revisions.md) and [plan versioning](docs/build-week/plan-versioning.md).
+Phase 4B supports host-managed, version-pinned public links plus authenticated calendar and print/PDF exports for immutable published itineraries. See [sharing](docs/build-week/sharing.md), [exports](docs/build-week/exports.md), and [public privacy](docs/build-week/public-privacy.md).
 
 > Plan trips together. Ask Trailie when you need help.
 
@@ -67,7 +67,7 @@ pnpm exec supabase test db
 
 ## Current implementation status
 
-Implemented through Phase 3B:
+Implemented through Phase 4B:
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -100,10 +100,15 @@ Implemented through Phase 3B:
 - strict safe response/stream schemas, server-only OpenAI provider, deterministic fake provider, and optional live smoke test
 - silent normalized conversation memory with stale-job recovery and no browser inspection route
 - explicit Build Our Itinerary action, immutable planning summaries, deterministic readiness, stale protection, and all-active/host-only approval
+- immutable published-plan history, approval-gated revisions, comparison, and exact historical reads
+- 256-bit opaque share tokens with SHA-256-only persistence, host-only rotation/revocation, expiration, and one active link per version
+- server-only public projection with deterministic identity, preference, operational, evidence, coordinate, and cost redaction
+- anonymous noindex/noarchive `/share/[token]` rendering that fails closed on revocation, expiration, or snapshot drift
+- exact-version RFC 5545 calendar downloads and print-optimized browser Save-as-PDF routes
 
 Not yet implemented:
 
-- crew-requested itinerary revisions, public sharing, booking, or export
+- booking, public editing/comments, external guest collaboration, password-protected links, and public indexing
 - live place/reservation, hotel/flight, weather, and TrailVerse/NPS service integration
 
 ## Build Week timing
@@ -120,3 +125,5 @@ Memory configuration uses `OPENAI_MEMORY_MODEL=gpt-5.6-luna`, prompt `trailie-me
 Phase 3A adds the approval-gated **Before I build the trip** workflow. Sol reconstructs a bounded review summary from private memory and recent conversation; application code owns readiness, staleness, and approval completion. `approved_for_generation` is the stopping point—no itinerary is generated. See [planning approval](docs/build-week/planning-approval.md).
 
 Phase 3B adds the explicit **Generate Itinerary** action, strict itinerary schema, source-attributed travel evidence, deterministic validation, one bounded conflict repair, immutable PASS-only publication, semantic progress, and the crew-visible Plan experience. Local/E2E work uses deterministic external-provider doubles while exercising real PostgreSQL, RLS, validation, and publication. See [itinerary generation](docs/build-week/itinerary-generation.md) and [travel tools](docs/build-week/travel-tools.md).
+
+Phase 4A adds explicit crew-approved revisions and immutable historical comparison. Phase 4B adds exact-version sharing and exports: the room may be on Version 2 while a Version 1 link, calendar, or print view remains Version 1 until its host revokes it. Raw share tokens are shown once and never stored. Public pages are strict, read-only, non-indexed projections with conservative cache headers.

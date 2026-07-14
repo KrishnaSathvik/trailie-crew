@@ -34,4 +34,6 @@ The Plan tab polls the safe room projection and resumes after refresh. It shows 
 - Model: `gpt-5.6-sol`
 - SDK: `openai@6.46.0`
 
-Crew-requested revisions, sharing, PDF/calendar export, booking, purchase, autonomous browsing, weather, semantic-review calls, and multi-agent orchestration are deferred. Live itinerary smoke was not run unless the final verification report explicitly says otherwise.
+Booking, purchase, autonomous browsing, weather, semantic-review calls, and multi-agent orchestration are deferred. Live itinerary smoke was not run unless the final verification report explicitly says otherwise.
+
+Phase 4B exports never rerun generation and never resolve a mutable current pointer. They consume the selected PASS-published `itinerary_json`, apply the deterministic public projection, and pin the result to that plan's immutable hash and version. The Phase 4B migration also ensures initial Phase 3B publications receive a plan hash at write time, closing the gap between historical backfill and newly published Version 1 rows.

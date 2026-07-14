@@ -4,6 +4,18 @@
 
 Open Version 1, choose **Change this** on Glacier Point, request a later time, and show both users receiving impact analysis. Demonstrate one `all_active` approval is insufficient. After both approve, show validation repairing an overlap, the final diff, both confirmations, Version 2, unchanged read-only Version 1, and mobile comparison.
 
+## Phase 4B immutable sharing moment
+
+1. Keep the private room visibly on published Version 2.
+2. Open history, select read-only Version 1, and choose **Create share link**.
+3. Open the one-time opaque URL in a signed-out browser. Show **Pinned Version 1**, the public-safe itinerary, validation badge, and no-booking disclaimer; point out that crew, chat, approvals, and private notes are absent.
+4. Return to the private room and show it remains on Version 2. The public link has not followed it.
+5. From historical Version 1, download the calendar and open **Print or Save PDF**. Show Version 1 in the calendar UIDs/content and print footer.
+6. Create a separate Version 2 link. Verify the Version 1 link still displays Version 1.
+7. Revoke Version 1, refresh the public browser, and show the generic unavailable state immediately.
+
+The local demo uses real Auth, PostgreSQL, RLS, token hashing, server verification, and browser isolation. PDF is the browser's print-to-PDF path, not a claimed server-generated artifact.
+
 ## Implemented Phase 2A demo
 
 1. Open two isolated browser contexts as Maya and Leo in the same Trip. Show the shared persisted chat, online crew state, and restrained monochrome UI.
@@ -20,7 +32,7 @@ Open Version 1, choose **Change this** on Glacier Point, request a later time, a
 
 For the repeatable demo and automated suite, only the external OpenAI provider is fake. Auth, PostgreSQL, RLS, RPCs, Realtime, two browser sessions, streaming endpoint, and persisted reconciliation are real local application behavior.
 
-## Deferred product demo
+## Deferred Phase 2A product demo
 
 Do not demonstrate itinerary generation, approval, travel research, maps, live prices/availability, memory extraction, autonomous agents, sharing, or exports. Those capabilities are not implemented in Phase 2A.
 

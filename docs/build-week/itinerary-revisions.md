@@ -26,4 +26,6 @@ Model output cannot downgrade deterministic classification. Raw prompts, provide
 
 ## Recovery and deferred scope
 
-Lease-backed claims recover abandoned analysis, generation, validation, and publication without duplicating completed work. Attempts are capped, approvals remain mandatory, and stale bases are never rebased. Rollback is only a future new request; sharing, exports, purchasing, branching variants, and automatic rollback remain deferred.
+Lease-backed claims recover abandoned analysis, generation, validation, and publication without duplicating completed work. Attempts are capped, approvals remain mandatory, and stale bases are never rebased. Rollback is only a future new request; purchasing, branching variants, and automatic rollback remain deferred.
+
+Phase 4B adds sharing/export controls to current and historical published views. Controls pass the selected plan ID and version directly; candidates and every non-published revision state are rejected. Link lifecycle Realtime events are safe invalidations and never broadcast a raw token, token-bearing URL, visitor data, or artifact path.

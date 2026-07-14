@@ -1,7 +1,7 @@
 # Submission Checklist
 
-- [ ] Phase 4A SQL, unit, integration, and deterministic two-user E2E gates pass.
-- [ ] Version 1 remains readable and unchanged after Version 2.
+- [ ] Phase 4B SQL, unit, integration, and deterministic two-user/public-browser E2E gates pass.
+- [x] Version 1 remains readable, shareable, and exportable unchanged after Version 2.
 - [ ] Stale request, outsider, spoofing, duplicate publication, private leakage, and production fake controls are verified.
 - [ ] `pnpm test:revision:smoke` status is recorded; it is key-gated and excluded from CI.
 
@@ -26,8 +26,8 @@
 - [x] Silence-by-default Trailie invocation policy
 - [x] GPT-5.6 focused-answer orchestration verified against current OpenAI documentation
 - [x] Explicit planning-summary and approval workflow (no itinerary generation)
-- [ ] Structured, validated, versioned itinerary revisions
-- [ ] Sharing and export
+- [x] Structured, validated, versioned itinerary revisions
+- [x] Version-pinned sharing, ICS, and print/PDF export
 - [ ] Honest source handling for live data
 - [ ] Read-only TrailVerse adapter integration, if used
 
@@ -38,7 +38,7 @@
 - [x] Two-context focused-answer demo rehearsal with deterministic fake provider
 - [ ] Production deployment and environment review
 - [ ] Final validation commands pass
-- [x] Demo script reflects only implemented behavior through Phase 3A
+- [x] Demo script reflects implemented behavior through Phase 4B
 - [ ] Submission copy makes no unsupported claims
 
 ## Phase 2B conversation memory
@@ -53,6 +53,20 @@
 - [ ] Live OpenAI memory smoke test (not run; requires a real key)
 - [x] Bounded recovery drain for abandoned extraction rows
 - [ ] Durable production queue/cron scheduling for recovery
+
+## Phase 4B sharing and exports
+
+- [x] Host-only create, rotate, expire, and idempotent revoke
+- [x] 256-bit URL-safe token; database stores SHA-256 hash and safe prefix only
+- [x] One active link per immutable plan version; Version 1 never follows Version 2
+- [x] Strict public schema and deterministic private-data redaction
+- [x] Generic invalid/revoked/expired public state and snapshot-drift fail-closed behavior
+- [x] `noindex`, `nofollow`, `noarchive`, referrer suppression, and conservative cache headers
+- [x] Exact-version RFC 5545 ICS with CRLF, escaping, folding, timezones, and stable UIDs
+- [x] Exact-version print route with page breaks, footer/version, and browser Save as PDF
+- [x] Real local Auth/Postgres/RLS E2E at desktop and 390×844
+- [ ] Server-generated or persisted PDF artifacts (intentionally deferred; no compatible runtime dependency added)
+- [ ] Password protection, invited viewers, organizations, and public indexing (deferred)
 
 ## Phase 3A planning approval
 

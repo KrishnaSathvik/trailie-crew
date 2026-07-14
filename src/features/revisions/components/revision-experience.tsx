@@ -9,6 +9,7 @@ import type {
 } from "@trailie/schemas";
 import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { ShareControls } from "@/features/sharing/components/share-controls";
 import {
   cancelPlanChangeAction,
   comparePlanVersionsAction,
@@ -367,11 +368,13 @@ export function RevisionExperience({
   roomId,
   participantId,
   plan,
+  isHost,
   onPlanPublished,
 }: {
   roomId: string;
   participantId: string;
   plan: TripPlanView;
+  isHost: boolean;
   onPlanPublished: () => Promise<void>;
 }) {
   const [request, setRequest] = useState<PlanChangeRequest | null>(null);
@@ -514,6 +517,13 @@ export function RevisionExperience({
             Back to current
           </button>
         </div>
+        <ShareControls
+          roomId={roomId}
+          participantId={participantId}
+          tripPlanId={historical.id}
+          version={historical.version}
+          isHost={isHost}
+        />
         <ItineraryExperience
           plan={historical}
           readOnly
@@ -526,6 +536,13 @@ export function RevisionExperience({
     );
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      <ShareControls
+        roomId={roomId}
+        participantId={participantId}
+        tripPlanId={plan.id}
+        version={plan.version}
+        isHost={isHost}
+      />
       <ItineraryExperience
         plan={plan}
         onRequestChange={() => start()}

@@ -4,6 +4,7 @@ import type {
   PlanningRequestView,
   PlanningSummaryItem,
   TripPlanView,
+  ParticipantRole,
 } from "@trailie/schemas";
 import {
   generateItineraryAction,
@@ -54,9 +55,11 @@ function SummarySection({
 export function PlanExperience({
   roomId,
   participantId,
+  participantRole = "member",
 }: {
   roomId: string;
   participantId: string;
+  participantRole?: ParticipantRole;
 }) {
   const [request, setRequest] = useState<PlanningRequestView | null>(null);
   const [plan, setPlan] = useState<TripPlanView | null>(null);
@@ -187,6 +190,7 @@ export function PlanExperience({
       <RevisionExperience
         roomId={roomId}
         participantId={participantId}
+        isHost={participantRole === "host"}
         plan={plan}
         onPlanPublished={refresh}
       />

@@ -4,6 +4,12 @@
 
 Published itineraries are immutable. `plan_change_requests` owns revision state; immutable analysis, versioned approvals, separate candidate confirmations, safe events, private runs, reused evidence/validation reports, and atomic publication surround it. Browser writes use verified RPCs only. Private room Broadcast carries invalidations and clients refetch safe projections.
 
+## Phase 4B sharing boundary
+
+Every public link and export begins with one `trip_plans.id` and its immutable `version`; no query resolves `rooms.current_plan_version` on behalf of a link. The application generates a 32-byte base64url token, stores only its SHA-256 hash, and passes the raw value back once. A service-only verifier hashes the request token, validates active/expiry state, the published plan hash, and the stored public snapshot hash, then returns only a strict redacted projection.
+
+Host mutations use locked RPCs; active members see safe status and can export. Anonymous roles receive no direct table or verifier grants. `/share/*` is dynamic, noindex/noarchive, referrer-suppressed, and non-cacheable/revalidated. ICS and print both rebuild from the explicitly selected version. See [sharing.md](sharing.md), [exports.md](exports.md), and [public-privacy.md](public-privacy.md).
+
 ## Repository shape
 
 The repository is a lightweight pnpm workspace. The Next.js application lives at the root; reusable domain contracts live in independently exported `packages/*` workspaces. No Turborepo or additional task runner is used.
@@ -76,7 +82,7 @@ The Trip shell loads rooms, active participants, and host-only safe invite metad
 - `src/lib/supabase/browser.ts` uses only public environment values.
 - `src/lib/supabase/server.ts` creates a request-scoped App Router cookie client.
 - `src/server/supabase/admin.ts` imports `server-only` and is the sole secret-key client.
-- `src/proxy.ts` refreshes auth cookies only for `/trips/*` and `/join/*`. It does not authorize routes; every action and query independently verifies identity and relies on RLS.
+- `src/proxy.ts` refreshes auth cookies for private Trip/join routes and applies conservative security headers to share and print routes. It does not authorize routes; every action and query independently verifies identity and relies on RLS.
 - The secret client is used only by the Phase 2A invocation route for authorized reads and service-only AI RPCs. Ordinary chat still uses the request-scoped client.
 
 ## Phase 1C chat boundaries

@@ -1,5 +1,9 @@
 # Codex Collaboration Log
 
+## 2026-07-14 — Phase 4B
+
+Started from clean `main` commit `0e2182c`. Human direction locked exact-version sharing/export, host-only link management, 256-bit opaque tokens, deterministic public redaction, conservative indexing/cache behavior, and no server-PDF claim without a compatible runtime. Codex implemented the database, application, route, UI, ICS, print, privacy, and test boundaries. Red-to-green work exposed and fixed two cross-runtime issues: newly published initial Version 1 rows lacked `plan_hash` after the one-time Phase 4A backfill, and a type re-export failed under Next's development Server Action loader despite a green production build. The real-stack browser proof showed Version 1 while the room remained on Version 2, then immediate generic unavailability after revocation. No commit or push was made.
+
 ## 2026-07-13 — Phase 4A
 
 Started from clean `d9bce9c` on `main`. Implemented explicit immutable itinerary revisions, deterministic materiality/routing/diffs, two-stage crew review, reused full validation with bounded repair, stale-base protection, recovery claims, safe Realtime invalidation, and history/compare UI with test-first SQL/domain coverage. No commit or push was created.

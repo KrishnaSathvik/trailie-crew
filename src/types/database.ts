@@ -14,6 +14,8 @@ import type {
   PlanChangeStatus,
   ChangeMateriality,
   ChangeFeasibility,
+  PlanShareMode,
+  PlanShareStatus,
 } from "@trailie/schemas";
 
 export type Json =
@@ -205,6 +207,27 @@ export type PlanChangeAnalysisRow = {
   basis_plan_version: number;
   created_at: string;
 };
+export type PlanShareLinkRow = {
+  id: string;
+  room_id: string;
+  trip_plan_id: string;
+  plan_version: number;
+  mode: PlanShareMode;
+  status: PlanShareStatus;
+  token_hash: string;
+  token_prefix: string | null;
+  snapshot_plan_hash: string;
+  snapshot_hash: string;
+  public_snapshot: Json;
+  created_by_participant_id: string;
+  created_by_user_id: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  last_accessed_at: string | null;
+  access_count: number;
+};
 export type TripPlanEventRow = {
   id: string;
   trip_plan_id: string;
@@ -295,6 +318,7 @@ export type Database = {
       trip_plan_events: TableDefinition<TripPlanEventRow>;
       plan_change_requests: TableDefinition<PlanChangeRequestRow>;
       plan_change_analyses: TableDefinition<PlanChangeAnalysisRow>;
+      plan_share_links: TableDefinition<PlanShareLinkRow>;
     };
     Views: {
       room_invite_metadata: {
@@ -627,6 +651,37 @@ export type Database = {
         };
         Returns: Json;
       };
+      authorize_plan_export: {
+        Args: {
+          target_room_id: string;
+          target_version: number;
+          target_export_type: string;
+        };
+        Returns: boolean;
+      };
+      create_plan_share_link: {
+        Args: {
+          target_trip_plan_id: string;
+          participant_id: string;
+          share_mode: string;
+          target_token_hash: string;
+          target_token_prefix: string;
+          target_expires_at?: string | null;
+        };
+        Returns: Json;
+      };
+      revoke_plan_share_link: {
+        Args: { share_link_id: string; participant_id: string };
+        Returns: Json;
+      };
+      get_plan_share_status: {
+        Args: { target_trip_plan_id: string; target_plan_version: number };
+        Returns: Json;
+      };
+      verify_plan_share_token_hash: {
+        Args: { target_token_hash: string };
+        Returns: Json;
+      };
       claim_change_analysis: {
         Args: {
           target_change_request_id: string;
@@ -737,6 +792,8 @@ export type Database = {
       plan_change_status: PlanChangeStatus;
       change_materiality: ChangeMateriality;
       change_feasibility: ChangeFeasibility;
+      plan_share_mode: PlanShareMode;
+      plan_share_status: PlanShareStatus;
     };
     CompositeTypes: Record<never, never>;
   };

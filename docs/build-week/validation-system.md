@@ -23,3 +23,7 @@ Severity is `critical`, `high`, `medium`, `low`, or `info`. Critical/high block.
 The fake-provider demo proves a 3:00 PM activity followed by a 4:00 PM stop with a verified two-hour route becomes `needs_revision`. One repair moves the stop to 5:30 PM, preserves the approved Yosemite/Glacier Point decisions, validates again, and publishes only on `pass`. A second conflict failure does not loop; an unrepairable hard-constraint conflict becomes `blocked`.
 
 Private reports retain structured issues and warnings. The public plan stores only counts, passed check names, repaired issue codes, and evidence recency. The UI renders a human summary rather than raw issue JSON.
+
+## Phase 4B public validation
+
+Public sharing exposes only `{status: "pass", passed: true}` plus safe itinerary warnings and per-item data-status labels. It never exposes validation reports or issue objects. Share verification recomputes the stored public snapshot hash and compares the linked plan hash; any mismatch returns the same generic unavailable state as an unknown token.

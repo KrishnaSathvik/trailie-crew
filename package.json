@@ -28,6 +28,9 @@
     "test:planning:smoke": "node scripts/planning-smoke.mjs",
     "test:itinerary:smoke": "node scripts/itinerary-smoke.mjs",
     "test:revision:smoke": "node scripts/revision-smoke.mjs",
+    "test:share:smoke": "vitest run src/features/sharing",
+    "test:pdf:smoke": "vitest run src/features/sharing/components/public-itinerary.test.tsx src/app/trips/[roomId]/plans/[version]/print/page.test.tsx",
+    "test:calendar:smoke": "vitest run src/features/exports/ics.test.ts src/app/api/trips/[roomId]/plans/[version]/calendar/route.test.ts",
     "test:travel-tools:smoke": "node scripts/travel-tools-smoke.mjs",
     "test:watch": "vitest",
     "supabase": "supabase"

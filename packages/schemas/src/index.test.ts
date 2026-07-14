@@ -40,6 +40,9 @@ import {
   changeFeasibilitySchema,
   planChangeAnalysisSchema,
   planVersionDiffSchema,
+  planShareModeSchema,
+  planShareStatusSchema,
+  publicSharedItinerarySchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -609,6 +612,97 @@ describe("Phase 3B itinerary schemas", () => {
     });
     expect(view).not.toHaveProperty("providerResponseId");
     expect(view).not.toHaveProperty("inputTokens");
+  });
+});
+
+describe("Phase 4B public sharing schemas", () => {
+  const shared = {
+    schemaVersion: "1",
+    title: "Yosemite crew escape",
+    destinationSummary: "Yosemite Valley",
+    timezone: "America/Los_Angeles",
+    startDate: "2026-09-12",
+    endDate: "2026-09-13",
+    version: 1,
+    publishedAt: "2026-07-14T00:00:00.000Z",
+    validation: { status: "pass", passed: true },
+    days: [
+      {
+        date: "2026-09-12",
+        title: "Valley arrival",
+        summary: "Arrival and sunset.",
+        items: [
+          {
+            key: "item:sunset",
+            type: "activity",
+            startTime: "17:30",
+            endTime: "19:00",
+            title: "Glacier Point sunset",
+            description: "Watch sunset.",
+            location: {
+              name: "Glacier Point",
+              timezone: "America/Los_Angeles",
+              verificationStatus: "verified",
+            },
+            reservationStatus: "recommended",
+            dataStatus: "verified",
+          },
+        ],
+        travelSegments: [],
+        warnings: ["Road timing can change"],
+      },
+    ],
+    lodging: [],
+    food: [],
+    disclaimer: "No bookings were made by Trailie",
+  } as const;
+
+  it("locks modes, derived states, and the strict public projection", () => {
+    expect(planShareModeSchema.options).toEqual([
+      "private",
+      "public_link",
+      "expiring_link",
+    ]);
+    expect(planShareStatusSchema.options).toEqual([
+      "active",
+      "revoked",
+      "expired",
+    ]);
+    expect(publicSharedItinerarySchema.parse(shared)).toEqual(shared);
+    const databaseProjectionWithOmittedNulls = structuredClone(
+      shared,
+    ) as unknown as {
+      days: Array<{
+        items: Array<{ startTime?: string; endTime?: string }>;
+      }>;
+    };
+    delete databaseProjectionWithOmittedNulls.days[0]?.items[0]?.startTime;
+    delete databaseProjectionWithOmittedNulls.days[0]?.items[0]?.endTime;
+    expect(
+      publicSharedItinerarySchema.safeParse(databaseProjectionWithOmittedNulls)
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects private, operational, HTML, URL, and identity-shaped fields", () => {
+    for (const extra of [
+      { travelers: [{ displayName: "Maya" }] },
+      { roomId: uuid },
+      { participantId: uuid },
+      { model: "gpt-private" },
+      { evidenceRefs: ["evidence:secret"] },
+      { sourceUrl: "https://private.example" },
+    ]) {
+      expect(
+        publicSharedItinerarySchema.safeParse({ ...shared, ...extra }).success,
+      ).toBe(false);
+    }
+    expect(
+      publicSharedItinerarySchema.safeParse({
+        ...shared,
+        title: "<script>alert(1)</script>",
+      }).success,
+    ).toBe(false);
   });
 });
 

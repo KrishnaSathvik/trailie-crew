@@ -113,6 +113,7 @@ export function TripShell({ data }: { data: TripShellData }) {
           <PlanExperience
             roomId={data.room.id}
             participantId={data.currentParticipant.id}
+            participantRole={data.currentParticipant.role}
           />
         )}
       </section>

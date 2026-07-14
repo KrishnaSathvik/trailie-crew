@@ -728,6 +728,122 @@ export const itinerarySchema = z
     }
   });
 
+export const planShareModeSchema = z.enum([
+  "private",
+  "public_link",
+  "expiring_link",
+]);
+export const planShareStatusSchema = z.enum(["active", "revoked", "expired"]);
+
+const publicItineraryTextSchema = (maximum: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(maximum)
+    .refine(
+      (value) => !/[<>\u0000-\u001f\u007f]/.test(value),
+      "Unsafe public itinerary text is not allowed.",
+    );
+const publicLocationSchema = z
+  .object({
+    name: publicItineraryTextSchema(200),
+    timezone: ianaTimezoneSchema,
+    verificationStatus: verificationStatusSchema,
+  })
+  .strict();
+const publicReservationStatusSchema = reservationStatusSchema;
+const publicSharedItineraryItemSchema = z
+  .object({
+    key: itineraryIdSchema,
+    type: itineraryItemTypeSchema,
+    startTime: localTimeSchema.optional(),
+    endTime: localTimeSchema.optional(),
+    title: publicItineraryTextSchema(200),
+    description: publicItineraryTextSchema(1000).optional(),
+    location: publicLocationSchema.nullable().optional(),
+    reservationStatus: publicReservationStatusSchema,
+    dataStatus: verificationStatusSchema,
+  })
+  .strict();
+const publicTravelSegmentSchema = z
+  .object({
+    mode: travelModeSchema,
+    origin: publicLocationSchema,
+    destination: publicLocationSchema,
+    durationMinutes: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(2880)
+      .nullable()
+      .optional(),
+    bufferMinutes: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(720)
+      .nullable()
+      .optional(),
+    dataStatus: verificationStatusSchema,
+  })
+  .strict();
+const publicSharedItineraryDaySchema = z
+  .object({
+    date: isoDateSchema,
+    title: publicItineraryTextSchema(200),
+    summary: publicItineraryTextSchema(1000).optional(),
+    items: z.array(publicSharedItineraryItemSchema).max(40),
+    travelSegments: z.array(publicTravelSegmentSchema).max(40),
+    warnings: z.array(publicItineraryTextSchema(200)).max(24),
+  })
+  .strict();
+const publicStaySummarySchema = z
+  .object({
+    name: publicItineraryTextSchema(200),
+    area: publicItineraryTextSchema(200),
+    checkInDate: isoDateSchema,
+    checkOutDate: isoDateSchema,
+    location: publicLocationSchema.optional(),
+    reservationStatus: publicReservationStatusSchema,
+  })
+  .strict();
+const publicFoodSummarySchema = z
+  .object({
+    name: publicItineraryTextSchema(200),
+    mealWindow: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+    location: publicLocationSchema.optional(),
+    dietaryNote: z.literal("Dietary-friendly options are included.").optional(),
+    reservationStatus: publicReservationStatusSchema,
+  })
+  .strict();
+export const publicSharedItinerarySchema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    title: publicItineraryTextSchema(200),
+    destinationSummary: publicItineraryTextSchema(1000),
+    timezone: ianaTimezoneSchema,
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+    version: z.number().int().positive(),
+    publishedAt: timestampSchema,
+    validation: z
+      .object({ status: z.literal("pass"), passed: z.literal(true) })
+      .strict(),
+    days: z.array(publicSharedItineraryDaySchema).min(1).max(60),
+    lodging: z.array(publicStaySummarySchema).max(30),
+    food: z.array(publicFoodSummarySchema).max(100),
+    disclaimer: z.literal("No bookings were made by Trailie"),
+  })
+  .strict();
+export const publicShareMetadataSchema = z
+  .object({
+    mode: planShareModeSchema.exclude(["private"]),
+    expiresAt: timestampSchema.nullable(),
+    snapshotHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
 export const validationIssueSchema = z
   .object({
     code: z.string().regex(/^[a-z][a-z0-9_]{1,79}$/),
@@ -1332,6 +1448,20 @@ export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type ValidationWarning = z.infer<typeof validationWarningSchema>;
 export type ValidationReport = z.infer<typeof validationReportSchema>;
 export type TripPlanView = z.infer<typeof tripPlanViewSchema>;
+export type PlanShareMode = z.infer<typeof planShareModeSchema>;
+export type PlanShareStatus = z.infer<typeof planShareStatusSchema>;
+export type PublicSharedItinerary = z.infer<typeof publicSharedItinerarySchema>;
+export type PublicSharedItineraryDay = z.infer<
+  typeof publicSharedItineraryDaySchema
+>;
+export type PublicSharedItineraryItem = z.infer<
+  typeof publicSharedItineraryItemSchema
+>;
+export type PublicLocation = z.infer<typeof publicLocationSchema>;
+export type PublicTravelSegment = z.infer<typeof publicTravelSegmentSchema>;
+export type PublicStaySummary = z.infer<typeof publicStaySummarySchema>;
+export type PublicFoodSummary = z.infer<typeof publicFoodSummarySchema>;
+export type PublicShareMetadata = z.infer<typeof publicShareMetadataSchema>;
 export type PlanProgressEvent = z.infer<typeof planProgressEventSchema>;
 export type PlanChangeType = z.infer<typeof planChangeTypeSchema>;
 export type PlanChangeStatus = z.infer<typeof planChangeStatusSchema>;

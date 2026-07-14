@@ -7,3 +7,7 @@ The database enforces one `(room_id, version)` row. Publication locks rows, reje
 Published rows are immutable. Earlier versions retain itinerary JSON, plan hash, validation summary, timestamps, and source. Historical reads use membership-checked RPCs and never modify the room pointer. The UI labels source, requester, summary, validation status, and current version. Historical views are read-only; comparisons use the persisted structured diff rather than raw JSON.
 
 A request is stale if its base is no longer current or its hash, approval mode, or required membership changes. Approval and publication stop; users create a new request against the latest plan.
+
+## Phase 4B external pinning
+
+A share row stores `trip_plan_id`, `plan_version`, the plan hash at creation, and a hash of its immutable public snapshot. ICS and print routes accept an explicit numeric version and load that published record. Publishing Version N+1 cannot mutate, redirect, or reveal through a Version N link or export; `rooms.current_plan_version` is never a public-share target.
