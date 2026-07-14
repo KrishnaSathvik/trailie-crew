@@ -41,3 +41,11 @@ Strict structured output and streaming are combined through the current SDK. Bec
 ## Smoke test
 
 `pnpm test:openai:smoke` skips cleanly without `OPENAI_API_KEY`. With a key, it sends one tiny stored-disabled structured request to `OPENAI_MODEL_CONVERSATION` (default Terra), validates the parsed result, and prints no secret or user data. Expected cost is the provider charge for one very small request (roughly one short input and at most 80 output tokens). It does not run in normal tests or CI.
+
+## Phase 2B verification — 2026-07-13
+
+Official documentation confirms `gpt-5.6-luna` is the lightweight cost-sensitive/high-volume GPT-5.6 model, roughly corresponding to the earlier nano tier. Memory extraction uses the Responses API, strict `text.format` JSON Schema through the official Node SDK Zod helper, `reasoning.effort: "none"`, `store: false`, no tools, an 800-token output cap, `safety_identifier`, SDK timeout, and an abort signal. [Model](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [Structured Outputs](https://developers.openai.com/api/docs/guides/migrate-to-responses#6-update-structured-outputs-definitions), [GPT-5.6 reasoning](https://developers.openai.com/api/docs/guides/latest-model)
+
+The pinned SDK is `openai@6.46.0`. Compatibility is proven locally by typecheck and request-contract tests. Background mode is not used because it requires stored response state; Batch is not used because its file/24-hour lifecycle does not match per-message memory. The request instead runs synchronously inside a Next.js post-response worker. [Background](https://developers.openai.com/api/docs/guides/background), [Batch](https://developers.openai.com/api/docs/guides/batch), [retention](https://developers.openai.com/api/docs/guides/your-data#v1responses)
+
+Live memory smoke test: **not run; no live success claimed**.

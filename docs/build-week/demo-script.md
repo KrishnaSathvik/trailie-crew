@@ -19,3 +19,12 @@ For the repeatable demo and automated suite, only the external OpenAI provider i
 ## Deferred product demo
 
 Do not demonstrate itinerary generation, approval, travel research, maps, live prices/availability, memory extraction, autonomous agents, sharing, or exports. Those capabilities are not implemented in Phase 2A.
+
+## Phase 2B silent-memory beat
+
+1. Send “lol” and note that chat remains ordinary; the deterministic filter skips it.
+2. Send “I prefer hiking and I cannot travel before Friday.” Only the human message appears.
+3. Correct it with “Actually, I prefer kayaking.” Again, no Trailie response appears.
+4. Have another member say “Maybe Yosemite?” and explain that it remains a proposal.
+5. Send “We all decided on Yosemite” to demonstrate the conservative explicit-decision path.
+6. Emphasize that private inspection is test-only; the production UI deliberately exposes none of this memory yet.

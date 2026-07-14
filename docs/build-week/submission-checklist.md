@@ -35,3 +35,15 @@
 - [ ] Final validation commands pass
 - [x] Demo script reflects only implemented behavior through Phase 2A
 - [ ] Submission copy makes no unsupported claims
+
+## Phase 2B conversation memory
+
+- [x] Silent post-response extraction with deterministic prefilter
+- [x] `gpt-5.6-luna`, strict output, no tools, `store: false`, safety identifier
+- [x] Normalized immutable facts plus rebuildable private snapshot
+- [x] Conservative decision evidence and safe self-correction
+- [x] Forced RLS, minimum RPC grants, no browser memory reads
+- [x] One retry, claim idempotency, concurrency/output/context bounds
+- [x] Fake provider, unit/SQL/E2E silence coverage
+- [ ] Live OpenAI memory smoke test (not run; requires a real key)
+- [ ] Durable queue recovery (deferred beyond Build Week Phase 2B)

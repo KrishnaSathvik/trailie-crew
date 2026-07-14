@@ -7,6 +7,10 @@ import {
   getRoomMessagesInputSchema,
   getRoomMessagesResultSchema,
   joinTripInputSchema,
+  memoryFactTypeSchema,
+  memoryPatchSchema,
+  memorySubjectTypeSchema,
+  messageExtractionResultSchema,
   messageTypeSchema,
   participantRoleSchema,
   participantStatusSchema,
@@ -17,6 +21,8 @@ import {
   sendMessageInputSchema,
   toggleReactionInputSchema,
   typingEventSchema,
+  evidenceStrengthSchema,
+  extractionStatusSchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -81,6 +87,93 @@ describe("Phase 1A schemas", () => {
         createdAt: "2026-07-13T18:00:00.000Z",
       }),
     ).toMatchObject({ roomCode: "ABCD2345" });
+  });
+});
+
+describe("Phase 2B conversation-memory schemas", () => {
+  it("locks extraction, subject, evidence, and fact-type values", () => {
+    expect(extractionStatusSchema.options).toEqual([
+      "queued",
+      "running",
+      "completed",
+      "failed",
+      "skipped",
+    ]);
+    expect(memorySubjectTypeSchema.options).toEqual([
+      "participant",
+      "group",
+      "trip",
+    ]);
+    expect(evidenceStrengthSchema.options).toEqual([
+      "explicit",
+      "strong",
+      "tentative",
+    ]);
+    expect(memoryFactTypeSchema.options).toContain("group_decision");
+    expect(memoryFactTypeSchema.options).not.toContain("custom");
+  });
+
+  it("accepts the smallest strict patch and rejects generated database ids", () => {
+    const fact = {
+      factType: "activity_preference",
+      subjectType: "participant",
+      subjectParticipantId: uuid,
+      canonicalKey: "ignored-by-application",
+      value: { text: "hiking" },
+      status: "active",
+      confidence: 0.92,
+      evidenceStrength: "explicit",
+      sourceMessageId: uuid,
+    };
+    expect(
+      memoryPatchSchema.parse({ facts: [fact], supersessions: [] }),
+    ).toEqual({
+      facts: [fact],
+      supersessions: [],
+    });
+    expect(
+      memoryPatchSchema.safeParse({
+        facts: [{ ...fact, id: uuid }],
+        supersessions: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      messageExtractionResultSchema.parse({
+        status: "completed",
+        patch: { facts: [], supersessions: [] },
+      }),
+    ).toMatchObject({ status: "completed" });
+  });
+
+  it("requires participant subjects and caps patch size and confidence", () => {
+    const base = {
+      factType: "activity_preference",
+      subjectType: "participant",
+      canonicalKey: "activity_preference:hiking",
+      value: { text: "hiking" },
+      status: "active",
+      confidence: 0.8,
+      evidenceStrength: "explicit",
+      sourceMessageId: uuid,
+    };
+    expect(
+      memoryPatchSchema.safeParse({ facts: [base], supersessions: [] }).success,
+    ).toBe(false);
+    expect(
+      memoryPatchSchema.safeParse({
+        facts: [{ ...base, subjectParticipantId: uuid, confidence: 1.1 }],
+        supersessions: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      memoryPatchSchema.safeParse({
+        facts: Array.from({ length: 13 }, () => ({
+          ...base,
+          subjectParticipantId: uuid,
+        })),
+        supersessions: [],
+      }).success,
+    ).toBe(false);
   });
 });
 

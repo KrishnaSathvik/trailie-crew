@@ -19,6 +19,7 @@ import {
   mapToggleReactionResult,
 } from "@/lib/supabase/mappers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { scheduleMemoryExtraction } from "@/features/memory/scheduler";
 
 export type ChatActionResult<T> =
   { ok: true; data: T } | { ok: false; error: ChatErrorCode };
@@ -55,7 +56,9 @@ export async function sendMessageAction(
     if (error)
       return { ok: false, error: mapChatOperationError(error, "message") };
     try {
-      return { ok: true, data: mapRoomMessage(data) };
+      const message = mapRoomMessage(data);
+      scheduleMemoryExtraction(message.id);
+      return { ok: true, data: message };
     } catch {
       return { ok: false, error: "message_send_failed" };
     }

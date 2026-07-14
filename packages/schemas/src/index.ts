@@ -36,6 +36,47 @@ export const aiRunStatusSchema = z.enum([
   "failed",
   "cancelled",
 ]);
+export const extractionStatusSchema = z.enum([
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "skipped",
+]);
+export const memorySubjectTypeSchema = z.enum(["participant", "group", "trip"]);
+export const memoryFactTypeSchema = z.enum([
+  "destination_preference",
+  "destination_proposal",
+  "destination_constraint",
+  "date_preference",
+  "date_constraint",
+  "budget_preference",
+  "budget_constraint",
+  "transport_preference",
+  "lodging_preference",
+  "food_preference",
+  "accessibility_need",
+  "activity_preference",
+  "must_do",
+  "avoid",
+  "availability",
+  "traveler_origin",
+  "group_decision",
+  "rejected_option",
+  "open_question",
+  "general_constraint",
+]);
+export const memoryFactStatusSchema = z.enum([
+  "active",
+  "superseded",
+  "rejected",
+  "unresolved",
+]);
+export const evidenceStrengthSchema = z.enum([
+  "explicit",
+  "strong",
+  "tentative",
+]);
 export const trailieResponseTypeSchema = z.enum([
   "plain_answer",
   "comparison",
@@ -48,6 +89,134 @@ const tripNameSchema = z.string().trim().min(1).max(100);
 const displayNameSchema = z.string().trim().min(1).max(50);
 const roomCodeSchema = z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/);
 const timestampSchema = z.iso.datetime({ offset: true });
+const memoryTextSchema = z.string().trim().min(1).max(500);
+export const memoryFactValueSchema = z
+  .object({
+    text: memoryTextSchema.optional(),
+    question: memoryTextSchema.optional(),
+    startDate: z.string().trim().min(1).max(40).optional(),
+    endDate: z.string().trim().min(1).max(40).optional(),
+    amount: z.number().finite().nonnegative().optional(),
+    currency: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{3}$/)
+      .optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "A memory fact value cannot be empty.",
+  });
+
+export const extractedMemoryFactSchema = z
+  .object({
+    factType: memoryFactTypeSchema,
+    subjectType: memorySubjectTypeSchema,
+    subjectParticipantId: z.uuid().nullable().optional(),
+    canonicalKey: z.string().trim().min(1).max(160),
+    value: memoryFactValueSchema,
+    status: memoryFactStatusSchema,
+    confidence: z.number().finite().min(0).max(1),
+    evidenceStrength: evidenceStrengthSchema,
+    sourceMessageId: z.uuid(),
+    supersedesFactId: z.uuid().nullable().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.subjectType === "participant" && !value.subjectParticipantId) {
+      context.addIssue({
+        code: "custom",
+        path: ["subjectParticipantId"],
+        message: "Participant facts require a participant subject.",
+      });
+    }
+    if (
+      value.subjectType !== "participant" &&
+      value.subjectParticipantId != null
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["subjectParticipantId"],
+        message: "Group and trip facts cannot name a participant subject.",
+      });
+    }
+  });
+
+export const memorySupersessionSchema = z
+  .object({
+    factId: z.uuid(),
+    replacementFactIndex: z.number().int().min(0).max(11),
+  })
+  .strict();
+
+export const memoryPatchSchema = z
+  .object({
+    facts: z.array(extractedMemoryFactSchema).max(12),
+    supersessions: z.array(memorySupersessionSchema).max(12),
+  })
+  .strict();
+
+export const messageExtractionResultSchema = z.discriminatedUnion("status", [
+  z
+    .object({ status: z.literal("completed"), patch: memoryPatchSchema })
+    .strict(),
+  z
+    .object({
+      status: z.literal("skipped"),
+      skipReason: z.enum(["non_durable_chatter", "not_eligible"]),
+    })
+    .strict(),
+]);
+
+const projectedFactSchema = z
+  .object({
+    id: z.uuid(),
+    key: z.string().min(1).max(160),
+    value: memoryFactValueSchema,
+    sourceMessageIds: z.array(z.uuid()).min(1).max(20),
+  })
+  .strict();
+export const participantMemoryProfileSchema = z
+  .object({
+    displayName: displayNameSchema,
+    preferences: z.array(projectedFactSchema),
+    constraints: z.array(projectedFactSchema),
+    mustDos: z.array(projectedFactSchema),
+    avoids: z.array(projectedFactSchema),
+  })
+  .strict();
+export const sharedRoomContextSchema = z
+  .object({
+    destinationsUnderConsideration: z.array(projectedFactSchema),
+    dateWindows: z.array(projectedFactSchema),
+    budgetContext: z.array(projectedFactSchema),
+    transportContext: z.array(projectedFactSchema),
+    lodgingContext: z.array(projectedFactSchema),
+  })
+  .strict();
+export const confirmedDecisionSchema = projectedFactSchema
+  .extend({
+    confirmedAt: timestampSchema,
+  })
+  .strict();
+export const rejectedOptionSchema = projectedFactSchema;
+export const openQuestionSchema = projectedFactSchema
+  .extend({
+    question: memoryTextSchema,
+  })
+  .strict();
+export const roomMemorySnapshotSchema = z
+  .object({
+    roomId: z.uuid(),
+    memoryVersion: z.number().int().nonnegative(),
+    participantProfiles: z.record(z.uuid(), participantMemoryProfileSchema),
+    sharedContext: sharedRoomContextSchema,
+    confirmedDecisions: z.array(confirmedDecisionSchema),
+    rejectedOptions: z.array(rejectedOptionSchema),
+    openQuestions: z.array(openQuestionSchema),
+    updatedAt: timestampSchema,
+  })
+  .strict();
 
 export const trailieInvocationDecisionSchema = z.discriminatedUnion("invoked", [
   z.object({ invoked: z.literal(false) }).strict(),
@@ -311,3 +480,22 @@ export type TrailieStreamEvent = z.infer<typeof trailieStreamEventSchema>;
 export type AiInvocationStatus = z.infer<typeof aiInvocationStatusSchema>;
 export type AiRunStatus = z.infer<typeof aiRunStatusSchema>;
 export type ModelRouteDecision = z.infer<typeof modelRouteDecisionSchema>;
+export type ExtractionStatus = z.infer<typeof extractionStatusSchema>;
+export type MemorySubjectType = z.infer<typeof memorySubjectTypeSchema>;
+export type MemoryFactType = z.infer<typeof memoryFactTypeSchema>;
+export type MemoryFactStatus = z.infer<typeof memoryFactStatusSchema>;
+export type EvidenceStrength = z.infer<typeof evidenceStrengthSchema>;
+export type ExtractedMemoryFact = z.infer<typeof extractedMemoryFactSchema>;
+export type MemorySupersession = z.infer<typeof memorySupersessionSchema>;
+export type MemoryPatch = z.infer<typeof memoryPatchSchema>;
+export type MessageExtractionResult = z.infer<
+  typeof messageExtractionResultSchema
+>;
+export type ParticipantMemoryProfile = z.infer<
+  typeof participantMemoryProfileSchema
+>;
+export type SharedRoomContext = z.infer<typeof sharedRoomContextSchema>;
+export type ConfirmedDecision = z.infer<typeof confirmedDecisionSchema>;
+export type RejectedOption = z.infer<typeof rejectedOptionSchema>;
+export type OpenQuestion = z.infer<typeof openQuestionSchema>;
+export type RoomMemorySnapshot = z.infer<typeof roomMemorySnapshotSchema>;

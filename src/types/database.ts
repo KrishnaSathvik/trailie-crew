@@ -238,6 +238,46 @@ export type Database = {
         };
         Returns: Json;
       };
+      claim_message_extraction: {
+        Args: {
+          target_message_id: string;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+        };
+        Returns: Json;
+      };
+      get_message_extraction_context: {
+        Args: { target_message_id: string };
+        Returns: Json;
+      };
+      skip_message_extraction: {
+        Args: { target_message_id: string; skip_reason: string };
+        Returns: Json;
+      };
+      complete_message_extraction: {
+        Args: {
+          target_message_id: string;
+          proposed_patch: Json;
+          target_provider_response_id: string | null;
+          target_provider_request_id: string | null;
+          used_input_tokens: number | null;
+          used_output_tokens: number | null;
+          used_reasoning_tokens: number | null;
+          used_cached_input_tokens: number | null;
+          used_total_tokens: number | null;
+          measured_latency_ms: number;
+        };
+        Returns: Json;
+      };
+      fail_message_extraction: {
+        Args: { target_message_id: string; safe_error_code: string };
+        Returns: Json;
+      };
+      get_private_room_memory: {
+        Args: { target_room_id: string };
+        Returns: Json;
+      };
     };
     Enums: {
       approval_mode: ApprovalMode;

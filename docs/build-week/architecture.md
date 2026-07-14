@@ -97,3 +97,7 @@ Message and reaction writes use user-scoped Server Actions and `SECURITY DEFINER
 The streaming route rechecks the Auth user, participant, source message, room, reply target, and deterministic invocation before an RPC can create work. Private tables are never Data API-readable. The completion RPC locks the invocation, validates the active run, inserts one `message_type = trailie` row, records only operational usage, and commits both changes atomically.
 
 See [`database-security.md`](database-security.md) and [`realtime-chat.md`](realtime-chat.md) for schema, RPC, channel, RLS, reconciliation, pagination, and local-testing details.
+
+## Phase 2B: silent memory pipeline
+
+Human persistence remains the critical path. `sendMessageAction` schedules `after()` only after a successful database response. The background worker claims through a service-only RPC, deterministically filters chatter, loads bounded server-only context, calls the extraction provider, validates the proposed patch, and applies it atomically. Normalized facts are evidence history; `private.room_memory` is the rebuildable read projection. See [conversation-memory.md](conversation-memory.md).

@@ -23,3 +23,7 @@ Limits are ten AI invocations per user per room per ten minutes, one active invo
 ## Deferred
 
 Phase 2A does not extract memory, update `room_memory`, build itineraries, research travel data, call tools, create approvals, use maps, export content, run autonomous agents, or respond without an invocation.
+
+## Independent private extraction
+
+Phase 2B understanding is not a Trailie invocation. Every eligible human message may be privately processed whether or not it mentions Trailie. It produces no stream card, typing state, presence, or response message. Explicit Phase 2A invocation detection and focused answers remain unchanged.

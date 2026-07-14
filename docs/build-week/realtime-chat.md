@@ -35,3 +35,7 @@ Typing broadcasts are sent at most twice per second through the SDK's explicit H
 ## Trailie and deferred behavior
 
 Phase 2A persists focused Trailie answers only after deterministic explicit invocation and strict final validation. There are still no planning tools, uploads, editing/deletion, AI memory extraction, maps, itinerary generation, exports, autonomous agents, or moderation workflows.
+
+## Phase 2B silence invariant
+
+Memory processing does not publish Realtime broadcasts, presence, typing, or chat invalidations. Other members receive only the original human `chat_changed` behavior. The extraction worker does not import or call the focused-answer persistence path and cannot insert a `trailie` message through its RPCs.

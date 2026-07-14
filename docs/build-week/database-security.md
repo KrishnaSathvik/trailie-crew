@@ -89,3 +89,9 @@ Completion inserts the Trailie message and marks the run/invocation complete in 
 ## Implemented and planned
 
 Phase 2A adds deterministic Trailie invocation, private AI workflow/usage records, server-only OpenAI access, and one persisted focused response. It does not implement membership-management RPCs, planning, itinerary data, live tools, uploads, message editing/deletion, moderation, or production CAPTCHA/anonymous-user cleanup.
+
+## Phase 2B private memory
+
+`private.message_extractions` and `private.memory_facts` enable and force RLS. `anon`, `authenticated`, and `service_role` have no direct table privileges, including on `private.room_memory`. Service access is limited to explicit public RPC wrappers; private mutation/projection functions are `SECURITY DEFINER`, use `search_path = ''`, and are not executable by browser roles. The model never writes rows directly.
+
+The migration validates source-message/room/participant relationships, legal states, confidence, canonical fact types/keys, JSON value bounds, supersession compatibility, and idempotent transitions. Supabase's April 2026 explicit-grant change was considered: every new function grant is deliberate and no private table is exposed.

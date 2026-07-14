@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { scheduleMemoryExtraction } from "@/features/memory/scheduler";
 
 import {
   getRoomMessagesAction,
@@ -10,6 +11,9 @@ import {
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: vi.fn(),
+}));
+vi.mock("@/features/memory/scheduler", () => ({
+  scheduleMemoryExtraction: vi.fn(),
 }));
 
 const roomId = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -84,6 +88,7 @@ describe("chat Server Actions", () => {
       reply_to_message_id: null,
     });
     expect(result).toMatchObject({ ok: true, data: { body: "Hello crew" } });
+    expect(scheduleMemoryExtraction).toHaveBeenCalledWith(clientMessageId);
   });
 
   it("maps safe failures for reactions and missing membership", async () => {

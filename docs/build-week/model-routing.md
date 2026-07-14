@@ -13,3 +13,7 @@ The versioned focused prompt is `trailie-focused-v1`. It forbids itinerary gener
 ## Evaluation requirements
 
 Unit coverage proves default routing, the exact escalation threshold, and invalid configuration. Parser, provider, SQL, component, and real two-context E2E coverage prove silence, explicit invocation, safe provider failure, one retry, and duplicate suppression. Travel tools and itinerary routing remain deferred.
+
+## Phase 2B route
+
+Ordinary memory extraction always routes to `gpt-5.6-luna` with `reasoning.effort: "none"`. It never escalates to Terra or Sol. Validation failure prefers one bounded retry and then a private safe failure. Prompt version is `trailie-memory-v1`; schema version is `1`. Focused Phase 2A answers retain their existing Terra/Sol routing independently.
