@@ -10,6 +10,7 @@ import {
   getTripPlanAction,
 } from "@/features/itinerary/actions";
 import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
+import { RevisionExperience } from "@/features/revisions/components/revision-experience";
 import {
   createPlanningRequestAction,
   getPlanningRequestAction,
@@ -76,12 +77,15 @@ export function PlanExperience({
   }, [roomId]);
   useEffect(() => {
     const initial = window.setTimeout(() => void refresh(), 0);
-    const timer = window.setInterval(() => void refresh(), 1500);
+    const timer =
+      plan?.status === "published"
+        ? null
+        : window.setInterval(() => void refresh(), 1500);
     return () => {
       window.clearTimeout(initial);
-      window.clearInterval(timer);
+      if (timer !== null) window.clearInterval(timer);
     };
-  }, [refresh]);
+  }, [plan?.status, refresh]);
   async function start() {
     setStarting(true);
     setError(null);
@@ -177,6 +181,15 @@ export function PlanExperience({
       >
         Loading Plan…
       </div>
+    );
+  if (plan?.status === "published")
+    return (
+      <RevisionExperience
+        roomId={roomId}
+        participantId={participantId}
+        plan={plan}
+        onPlanPublished={refresh}
+      />
     );
   if (plan) return <ItineraryExperience plan={plan} />;
   if (!request && !starting)

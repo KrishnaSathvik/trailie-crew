@@ -1,5 +1,7 @@
 # OpenAI Integration
 
+Phase 4A uses Responses with strict Zod-backed Structured Outputs, `store: false`, explicit reasoning effort, abort timeouts, stable safety identifiers, and no model-selected tools. Prompts are `trailie-change-analysis-v1` and `trailie-itinerary-revision-v1`. Provider IDs and usage stay private.
+
 Verified on **July 13, 2026** against official OpenAI documentation and the official `openai/openai-node` repository.
 
 ## Verified selections

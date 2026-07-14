@@ -1,5 +1,7 @@
 # Validation System
 
+Revision candidates reuse every Phase 3B validator and private validation report. Phase 4A adds `trailie-change-boundary-v1`, verifying base hash/version, approved target application, preserved constraints/decisions/rejections, stable unaffected IDs, disclosed downstream shifts, and absence of plan-wide drift. One repair may resolve a conflict without expanding scope.
+
 Phase 3B implements deterministic itinerary validation before publication. The model supplies a proposed `Itinerary`; application code supplies the verdict.
 
 ## Pipeline

@@ -1,5 +1,7 @@
 # Itinerary Generation
 
+A revision always produces a complete candidate from the current published base; it never patches the base in place. Candidate content stays unpublished until full validation, boundary validation, and final confirmation complete.
+
 ## Approved-summary boundary
 
 Phase 3B starts only from `planning_requests.status = approved_for_generation`. The authenticated `create_itinerary_generation` RPC independently verifies participant ownership, active membership and room state, the current approved summary version, deterministic staleness, readiness, and blockers. It snapshots the immutable summary ID, version, and hash; browser-supplied itinerary content is never accepted.

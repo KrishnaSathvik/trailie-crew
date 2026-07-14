@@ -1,5 +1,9 @@
 # Architecture
 
+## Phase 4A revision boundary
+
+Published itineraries are immutable. `plan_change_requests` owns revision state; immutable analysis, versioned approvals, separate candidate confirmations, safe events, private runs, reused evidence/validation reports, and atomic publication surround it. Browser writes use verified RPCs only. Private room Broadcast carries invalidations and clients refetch safe projections.
+
 ## Repository shape
 
 The repository is a lightweight pnpm workspace. The Next.js application lives at the root; reusable domain contracts live in independently exported `packages/*` workspaces. No Turborepo or additional task runner is used.

@@ -1,5 +1,7 @@
 # Conversation memory (Phase 2B)
 
+Revision workers do not receive the full transcript. They consume the immutable published plan, approved summary, explicit request, approved analysis, and bounded verified evidence. Conversation memory cannot silently mutate or approve a revision.
+
 Verified and implemented on 2026-07-13.
 
 ## Product boundary

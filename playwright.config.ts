@@ -32,12 +32,14 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: "pnpm dev:local",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER
+    ? undefined
+    : {
+        command: "pnpm dev:local",
+        url: "http://127.0.0.1:3000",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
   projects: [
     {
       name: "chromium",

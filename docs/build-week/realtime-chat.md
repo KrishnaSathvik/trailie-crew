@@ -1,5 +1,7 @@
 # Realtime Crew Chat
 
+Revision state reuses the private `room:<uuid>` channel. The database broadcasts only `plan_change_changed` invalidations; clients refetch through RLS/RPC. No model, prompt, token, evidence, or raw validation payload is broadcast. Polling remains a recovery fallback.
+
 ## Persisted and transient events
 
 Messages, reactions, and participant membership/status are persisted in PostgreSQL. Messages and reactions are mutated only through authenticated RPCs. Database triggers publish minimal `chat_changed` notifications after commit so connected clients know which safe page to reconcile.

@@ -1,5 +1,7 @@
 # Travel Tools and Evidence
 
+Revision generation refreshes affected route/place/daylight/destination evidence through the existing server-only provider boundary. Unaffected evidence follows current freshness rules. Browsers never call privileged providers, and unknown live facts remain unknown.
+
 `@trailie/travel-tools` defines provider-neutral geocoding, routing, place-detail, destination-fact, and daylight contracts. Every result carries provider, tool name, credential-free request fingerprint, retrieval/expiry timestamps, status, normalized data, and an optional source reference.
 
 Private evidence rows are unique by plan, tool, and fingerprint. A verified unexpired match is reused; stale, unavailable, and failed results remain explicit and are never relabeled as live facts. Browser roles cannot read this table. Stored results contain no keys, authorization headers, raw provider responses, or copied prompts.

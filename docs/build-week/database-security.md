@@ -1,5 +1,9 @@
 # Database Security
 
+## Revision security
+
+Revision tables are RLS-protected room projections with browser DML denied. Private runs and boundary reports use forced RLS and no browser grants. Every revision `SECURITY DEFINER` function has `search_path = ''`, verifies current base/version/hash, authenticated participant ownership, approval version, and candidate identity, and returns safe errors. Publication row locks prevent spoofing, stale publication, duplicate versions, and races.
+
 ## Anonymous identity
 
 Trailie Crew uses Supabase anonymous sign-ins so a browser receives a real `auth.users` identity and authenticated JWT without collecting personal information. Authorization always derives from `auth.uid()` and participant membership. Display names, room codes, local-storage identifiers, and cookies without a valid Supabase identity are never authorization inputs.

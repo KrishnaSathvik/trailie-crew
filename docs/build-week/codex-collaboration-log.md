@@ -1,5 +1,9 @@
 # Codex Collaboration Log
 
+## 2026-07-13 — Phase 4A
+
+Started from clean `d9bce9c` on `main`. Implemented explicit immutable itinerary revisions, deterministic materiality/routing/diffs, two-stage crew review, reused full validation with bounded repair, stale-base protection, recovery claims, safe Realtime invalidation, and history/compare UI with test-first SQL/domain coverage. No commit or push was created.
+
 ## July 13, 2026 — Phase 0 bootstrap
 
 Human direction established the product boundaries, lightweight pnpm workspace, technology choices, visual constraints, and stop conditions. Codex translated those decisions into the repository foundation, internal package contracts, design tokens, a test-first landing shell, CI, and initial documentation.

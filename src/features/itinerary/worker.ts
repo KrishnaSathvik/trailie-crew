@@ -17,14 +17,17 @@ import {
   type NormalizedToolEvidence,
 } from "./validation/validate-itinerary";
 
-type Dependencies = {
+export type TravelEvidenceDependencies = {
+  repository: Pick<ItineraryRepository, "recordEvidence">;
+  travelProvider: TravelProvider;
+  now?: string;
+};
+type Dependencies = TravelEvidenceDependencies & {
   repository: ItineraryRepository;
   provider: ItineraryProvider;
-  travelProvider: TravelProvider;
   safetyIdentifier: string;
   model?: string;
   timeoutMs?: number;
-  now?: string;
 };
 
 function evidenceFromResult<T>(
@@ -44,11 +47,11 @@ function evidenceFromResult<T>(
   };
 }
 
-async function enrichWithTravelEvidence(
+export async function enrichWithTravelEvidence(
   tripPlanId: string,
   source: Itinerary,
   existing: NormalizedToolEvidence[],
-  dependencies: Dependencies,
+  dependencies: TravelEvidenceDependencies,
 ) {
   const itinerary = structuredClone(source);
   const collected = [...existing];

@@ -139,7 +139,15 @@ function Overview({ plan }: { plan: TripPlanView }) {
   );
 }
 
-function Days({ plan }: { plan: TripPlanView }) {
+function Days({
+  plan,
+  onChangeItem,
+  readOnly,
+}: {
+  plan: TripPlanView;
+  onChangeItem?: (itemId: string, title: string) => void;
+  readOnly?: boolean;
+}) {
   return (
     <div className="space-y-10">
       {plan.itinerary!.days.map((day) => (
@@ -177,6 +185,15 @@ function Days({ plan }: { plan: TripPlanView }) {
                     {costLabel(item.cost)}
                   </span>
                 </div>
+                {!readOnly && onChangeItem ? (
+                  <button
+                    type="button"
+                    onClick={() => onChangeItem(item.id, item.title)}
+                    className="border-border mt-4 min-h-10 rounded-md border px-3 text-xs font-semibold"
+                  >
+                    Change this
+                  </button>
+                ) : null}
               </li>
             ))}
           </ol>
@@ -305,7 +322,19 @@ function Validation({ plan }: { plan: TripPlanView }) {
   );
 }
 
-export function ItineraryExperience({ plan }: { plan: TripPlanView }) {
+export function ItineraryExperience({
+  plan,
+  onRequestChange,
+  onChangeItem,
+  onHistory,
+  readOnly = false,
+}: {
+  plan: TripPlanView;
+  onRequestChange?: () => void;
+  onChangeItem?: (itemId: string, title: string) => void;
+  onHistory?: () => void;
+  readOnly?: boolean;
+}) {
   const [view, setView] = useState<View>("Overview");
   if (plan.status === "blocked" || plan.status === "failed") {
     return (
@@ -345,9 +374,34 @@ export function ItineraryExperience({ plan }: { plan: TripPlanView }) {
               {plan.itinerary.destinationSummary}
             </p>
           </div>
-          <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
-            Validated before publishing
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {readOnly ? (
+              <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
+                Historical · read only
+              </span>
+            ) : null}
+            <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
+              Validated before publishing
+            </span>
+            {onHistory ? (
+              <button
+                type="button"
+                onClick={onHistory}
+                className="border-border min-h-10 rounded-md border px-3 text-xs font-semibold"
+              >
+                Version history
+              </button>
+            ) : null}
+            {!readOnly && onRequestChange ? (
+              <button
+                type="button"
+                onClick={onRequestChange}
+                className="bg-foreground text-background min-h-10 rounded-md px-3 text-xs font-semibold"
+              >
+                Request a Change
+              </button>
+            ) : null}
+          </div>
         </div>
         {repaired ? (
           <p className="border-foreground mt-5 border-l-2 pl-3 text-sm font-semibold">
@@ -377,7 +431,9 @@ export function ItineraryExperience({ plan }: { plan: TripPlanView }) {
       </header>
       <div className="mx-auto w-full max-w-5xl px-5 py-8 pb-28 sm:px-8 lg:pb-12">
         {view === "Overview" ? <Overview plan={plan} /> : null}
-        {view === "Day-by-day" ? <Days plan={plan} /> : null}
+        {view === "Day-by-day" ? (
+          <Days plan={plan} onChangeItem={onChangeItem} readOnly={readOnly} />
+        ) : null}
         {view === "Travel" ? <Travel plan={plan} /> : null}
         {view === "Stay" ? <Stay plan={plan} /> : null}
         {view === "Food" ? <Food plan={plan} /> : null}

@@ -1,5 +1,7 @@
 # Planning Summary and Approval
 
+Planning-summary approval authorizes Version 1 only. It never approves a later change. Each revision snapshots approval mode, requires fresh analysis approval, then separate final candidate confirmation.
+
 Phase 3A turns the crew's conversation into a reviewable planning basis. An active member explicitly selects **Build Our Itinerary**; this creates an idempotent planning request, not an itinerary. A server worker reconstructs the private memory snapshot, active normalized facts, active participants, bounded recent conversation, and prior revision notes into the immutable summary **Before I build the trip**.
 
 ## Lifecycle and versions

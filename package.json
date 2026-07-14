@@ -27,6 +27,7 @@
     "test:memory:smoke": "node scripts/memory-smoke.mjs",
     "test:planning:smoke": "node scripts/planning-smoke.mjs",
     "test:itinerary:smoke": "node scripts/itinerary-smoke.mjs",
+    "test:revision:smoke": "node scripts/revision-smoke.mjs",
     "test:travel-tools:smoke": "node scripts/travel-tools-smoke.mjs",
     "test:watch": "vitest",
     "supabase": "supabase"

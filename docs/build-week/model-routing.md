@@ -1,5 +1,9 @@
 # Model Routing
 
+## Revision routing
+
+Impact analysis routes deterministically to `gpt-5.6-terra` for bounded one-day changes and `gpt-5.6-sol` for multi-day, route-chain, lodging, traveler-logistics, critical, or confirmed-decision work. Complete candidate generation and its one bounded repair use `gpt-5.6-sol`. Models never choose routing or publication.
+
 ## Implemented Phase 2A policy
 
 Current official OpenAI guidance was verified on July 13, 2026. Focused answers default to explicit `gpt-5.6-terra`; rare deterministic escalation uses `gpt-5.6-sol`. See [`openai-integration.md`](openai-integration.md) for the sources, SDK, API fields, and exclusions.

@@ -1,5 +1,10 @@
 # Submission Checklist
 
+- [ ] Phase 4A SQL, unit, integration, and deterministic two-user E2E gates pass.
+- [ ] Version 1 remains readable and unchanged after Version 2.
+- [ ] Stale request, outsider, spoofing, duplicate publication, private leakage, and production fake controls are verified.
+- [ ] `pnpm test:revision:smoke` status is recorded; it is key-gated and excluded from CI.
+
 ## Foundation
 
 - [x] Standalone Trailie Crew repository

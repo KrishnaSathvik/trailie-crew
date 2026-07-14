@@ -1,5 +1,7 @@
 # Trailie Invocation
 
+Revision invocation is explicit. **Request a Change** and **Change this** call an application-owned action and secure RPC. Speculative ordinary chat remains conversation and cannot create a request. Analysis and generation run server-side after persisted claims.
+
 ## Silence by default
 
 Trailie answers only an explicit, deterministic application decision. No model decides whether to respond, and ordinary persisted crew messages make zero provider requests.

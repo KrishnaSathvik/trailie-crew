@@ -1,5 +1,7 @@
 # Trailie Crew
 
+Phase 4A supports explicit, crew-approved itinerary revisions with immutable room-level version history. See [itinerary revisions](docs/build-week/itinerary-revisions.md) and [plan versioning](docs/build-week/plan-versioning.md).
+
 > Plan trips together. Ask Trailie when you need help.
 
 Trailie Crew is a standalone collaborative AI trip-planning app being built for OpenAI Build Week 2026 in the **Apps for Your Life** category.

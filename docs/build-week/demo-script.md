@@ -1,5 +1,9 @@
 # Demo Script
 
+## Phase 4A
+
+Open Version 1, choose **Change this** on Glacier Point, request a later time, and show both users receiving impact analysis. Demonstrate one `all_active` approval is insufficient. After both approve, show validation repairing an overlap, the final diff, both confirmations, Version 2, unchanged read-only Version 1, and mobile comparison.
+
 ## Implemented Phase 2A demo
 
 1. Open two isolated browser contexts as Maya and Leo in the same Trip. Show the shared persisted chat, online crew state, and restrained monochrome UI.

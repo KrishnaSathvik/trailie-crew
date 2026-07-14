@@ -780,6 +780,289 @@ export const tripPlanViewSchema = z
   })
   .strict();
 
+export const planChangeTypeSchema = z.enum([
+  "add_item",
+  "remove_item",
+  "replace_item",
+  "move_item",
+  "reschedule_item",
+  "shorten_item",
+  "extend_item",
+  "change_route",
+  "change_lodging",
+  "change_food",
+  "rebalance_day",
+  "update_traveler_logistics",
+  "adjust_budget",
+  "general_revision",
+]);
+export const planChangeStatusSchema = z.enum([
+  "draft",
+  "analyzing",
+  "awaiting_review",
+  "changes_requested",
+  "approved",
+  "applying",
+  "validating",
+  "awaiting_confirmation",
+  "blocked",
+  "published",
+  "failed",
+  "cancelled",
+  "superseded",
+]);
+export const changeMaterialitySchema = z.enum([
+  "minor",
+  "material",
+  "critical",
+]);
+export const changeFeasibilitySchema = z.enum([
+  "feasible",
+  "needs_information",
+  "blocked",
+]);
+export const planChangeDecisionSchema = z.enum([
+  "approved",
+  "changes_requested",
+]);
+export const candidateConfirmationDecisionSchema = z.enum([
+  "confirmed",
+  "changes_requested",
+]);
+export const planDiffOperationSchema = z.enum([
+  "added",
+  "removed",
+  "moved",
+  "rescheduled",
+  "replaced",
+  "updated",
+  "unchanged_but_impacted",
+]);
+export const planChangeEventTypeSchema = z.enum([
+  "request_created",
+  "analysis_started",
+  "analysis_ready",
+  "changes_requested",
+  "approved",
+  "candidate_generation_started",
+  "candidate_validation_started",
+  "repair_started",
+  "candidate_ready",
+  "confirmation_changed",
+  "published",
+  "blocked",
+  "failed",
+  "cancelled",
+]);
+
+const safeRevisionText = (maximum: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(maximum)
+    .refine((value) => !/[<>]/.test(value), "HTML is not allowed.");
+const revisionTextList = z.array(safeRevisionText(500)).max(50);
+
+export const changeTargetSchema = z
+  .object({
+    itemId: itineraryIdSchema.nullable(),
+    dayId: itineraryIdSchema.nullable(),
+    summary: safeRevisionText(300).nullable(),
+  })
+  .strict();
+export const changeAffectedItemSchema = z
+  .object({
+    itemId: itineraryIdSchema,
+    dayId: itineraryIdSchema,
+    summary: safeRevisionText(500),
+    direct: z.boolean(),
+  })
+  .strict();
+export const changeConstraintImpactSchema = z
+  .object({
+    constraintId: itineraryIdSchema.nullable(),
+    summary: safeRevisionText(500),
+    severity: changeMaterialitySchema,
+  })
+  .strict();
+export const changeRouteImpactSchema = z
+  .object({
+    segmentId: itineraryIdSchema.nullable(),
+    summary: safeRevisionText(500),
+    evidenceRefreshRequired: z.boolean(),
+  })
+  .strict();
+export const changeBudgetImpactSchema = z
+  .object({
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    minimumDelta: z.number().finite().nullable(),
+    maximumDelta: z.number().finite().nullable(),
+    summary: safeRevisionText(500),
+  })
+  .strict();
+export const changeReservationImpactSchema = z
+  .object({
+    itemId: itineraryIdSchema.nullable(),
+    summary: safeRevisionText(500),
+    requiresAction: z.boolean(),
+  })
+  .strict();
+export const planChangeImpactSchema = z
+  .object({
+    schedule: revisionTextList,
+    routes: revisionTextList,
+    budget: revisionTextList,
+    reservations: revisionTextList,
+    lodging: revisionTextList,
+    food: revisionTextList,
+    travelerConstraints: revisionTextList,
+    confirmedDecisions: revisionTextList,
+  })
+  .strict();
+
+export const planChangeAnalysisSchema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    title: safeRevisionText(200),
+    requestSummary: safeRevisionText(1000),
+    requestedChange: z
+      .object({
+        type: planChangeTypeSchema,
+        targetItemIds: z.array(itineraryIdSchema).max(20),
+        normalizedInstruction: safeRevisionText(2000),
+      })
+      .strict(),
+    affectedDays: z.array(isoDateSchema).max(60),
+    affectedItems: z.array(changeAffectedItemSchema).max(100),
+    impacts: planChangeImpactSchema,
+    proposedApproach: revisionTextList,
+    preservedItems: revisionTextList,
+    risks: revisionTextList,
+    missingInformation: revisionTextList,
+    materiality: changeMaterialitySchema,
+    feasibility: changeFeasibilitySchema,
+    blockers: revisionTextList,
+    approvalSummary: safeRevisionText(500),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const targeted = ![
+      "add_item",
+      "general_revision",
+      "rebalance_day",
+    ].includes(value.requestedChange.type);
+    if (targeted && value.requestedChange.targetItemIds.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["requestedChange", "targetItemIds"],
+        message: "This change type requires a target item.",
+      });
+    }
+  });
+
+export const planChangeApprovalStateSchema = z
+  .object({
+    requiredParticipants: z.array(planningParticipantSchema).max(50),
+    approvedParticipants: z.array(planningParticipantSchema).max(50),
+    changeRequestedParticipants: z.array(planningParticipantSchema).max(50),
+    pendingParticipants: z.array(planningParticipantSchema).max(50),
+    isComplete: z.boolean(),
+    isStale: z.boolean(),
+    blockers: revisionTextList,
+  })
+  .strict();
+
+export const planVersionDiffItemSchema = z
+  .object({
+    itemId: itineraryIdSchema,
+    dayId: itineraryIdSchema,
+    date: isoDateSchema,
+    operation: planDiffOperationSchema,
+    beforeSummary: safeRevisionText(1000).nullable(),
+    afterSummary: safeRevisionText(1000).nullable(),
+    reason: safeRevisionText(500),
+    downstreamImpact: revisionTextList,
+    validationStatus: z.enum(["pass", "warning", "blocked"]),
+  })
+  .strict();
+export const planVersionDiffSchema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    baseVersion: z.number().int().positive(),
+    candidateVersion: z.number().int().positive(),
+    summary: safeRevisionText(1000),
+    changedDays: z.array(isoDateSchema).max(60),
+    items: z.array(planVersionDiffItemSchema).max(300),
+    routeChanges: revisionTextList,
+    budgetDelta: z
+      .object({
+        currency: z.string().regex(/^[A-Z]{3}$/),
+        amount: z.number().finite(),
+      })
+      .strict()
+      .nullable(),
+    warningsAdded: revisionTextList,
+    warningsResolved: revisionTextList,
+  })
+  .strict()
+  .refine((value) => value.candidateVersion === value.baseVersion + 1, {
+    message: "Candidate version must immediately follow the base version.",
+    path: ["candidateVersion"],
+  });
+
+export const planVersionSummarySchema = z
+  .object({
+    tripPlanId: z.uuid(),
+    version: z.number().int().positive(),
+    publishedAt: timestampSchema,
+    source: z.enum(["original_approved_summary", "change_request"]),
+    requestedBy: planningParticipantSchema.nullable(),
+    changeSummary: safeRevisionText(1000).nullable(),
+    validationStatus: validationStatusSchema,
+    isCurrent: z.boolean(),
+  })
+  .strict();
+export const planChangeEventSchema = z
+  .object({
+    id: z.uuid(),
+    changeRequestId: z.uuid(),
+    type: planChangeEventTypeSchema,
+    createdAt: timestampSchema,
+  })
+  .strict();
+export const planChangeRequestSchema = z
+  .object({
+    id: z.uuid(),
+    roomId: z.uuid(),
+    baseTripPlanId: z.uuid(),
+    basePlanVersion: z.number().int().positive(),
+    requestType: planChangeTypeSchema,
+    targetItemId: itineraryIdSchema.nullable(),
+    requestText: safeRevisionText(2000),
+    status: planChangeStatusSchema,
+    approvalMode: approvalModeSchema,
+    currentAnalysisVersion: z.number().int().nonnegative(),
+    approvedAnalysisVersion: z.number().int().positive().nullable(),
+    candidateTripPlanId: z.uuid().nullable(),
+    isStale: z.boolean(),
+    materiality: changeMaterialitySchema.nullable(),
+    feasibility: changeFeasibilitySchema.nullable(),
+    analysis: planChangeAnalysisSchema.nullable(),
+    analysisApprovalState: planChangeApprovalStateSchema.nullable(),
+    candidateConfirmationState: planChangeApprovalStateSchema.nullable(),
+    candidateDiff: planVersionDiffSchema.nullable(),
+    candidatePlan: tripPlanViewSchema.nullable(),
+    events: z.array(planChangeEventSchema).max(100),
+    errorCode: z.string().trim().min(1).max(80).nullable(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    approvedAt: timestampSchema.nullable(),
+    publishedAt: timestampSchema.nullable(),
+    cancelledAt: timestampSchema.nullable(),
+  })
+  .strict();
+
 export const modelRouteDecisionSchema = z
   .object({
     model: z.string().min(1).max(100),
@@ -1050,3 +1333,26 @@ export type ValidationWarning = z.infer<typeof validationWarningSchema>;
 export type ValidationReport = z.infer<typeof validationReportSchema>;
 export type TripPlanView = z.infer<typeof tripPlanViewSchema>;
 export type PlanProgressEvent = z.infer<typeof planProgressEventSchema>;
+export type PlanChangeType = z.infer<typeof planChangeTypeSchema>;
+export type PlanChangeStatus = z.infer<typeof planChangeStatusSchema>;
+export type ChangeMateriality = z.infer<typeof changeMaterialitySchema>;
+export type ChangeFeasibility = z.infer<typeof changeFeasibilitySchema>;
+export type ChangeTarget = z.infer<typeof changeTargetSchema>;
+export type PlanChangeImpact = z.infer<typeof planChangeImpactSchema>;
+export type ChangeAffectedItem = z.infer<typeof changeAffectedItemSchema>;
+export type ChangeConstraintImpact = z.infer<
+  typeof changeConstraintImpactSchema
+>;
+export type ChangeRouteImpact = z.infer<typeof changeRouteImpactSchema>;
+export type ChangeBudgetImpact = z.infer<typeof changeBudgetImpactSchema>;
+export type ChangeReservationImpact = z.infer<
+  typeof changeReservationImpactSchema
+>;
+export type PlanChangeAnalysis = z.infer<typeof planChangeAnalysisSchema>;
+export type PlanChangeApprovalState = z.infer<
+  typeof planChangeApprovalStateSchema
+>;
+export type PlanChangeRequest = z.infer<typeof planChangeRequestSchema>;
+export type PlanVersionSummary = z.infer<typeof planVersionSummarySchema>;
+export type PlanVersionDiff = z.infer<typeof planVersionDiffSchema>;
+export type PlanVersionDiffItem = z.infer<typeof planVersionDiffItemSchema>;

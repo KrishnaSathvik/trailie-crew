@@ -10,6 +10,10 @@ import type {
   PlanningReviewDecision,
   TripPlanStatus,
   ValidationStatus,
+  PlanChangeType,
+  PlanChangeStatus,
+  ChangeMateriality,
+  ChangeFeasibility,
 } from "@trailie/schemas";
 
 export type Json =
@@ -143,6 +147,9 @@ export type TripPlanRow = {
   validation_summary: Json | null;
   basis_summary_version: number;
   basis_summary_hash: string;
+  plan_hash: string | null;
+  change_request_id: string | null;
+  base_trip_plan_id: string | null;
   created_by_participant_id: string;
   created_by_user_id: string;
   generation_attempt_count: number;
@@ -152,6 +159,51 @@ export type TripPlanRow = {
   updated_at: string;
   published_at: string | null;
   failed_at: string | null;
+};
+export type PlanChangeRequestRow = {
+  id: string;
+  room_id: string;
+  base_trip_plan_id: string;
+  base_plan_version: number;
+  basis_plan_hash: string;
+  basis_membership_fingerprint: string;
+  requested_by_participant_id: string;
+  requested_by_user_id: string;
+  request_type: PlanChangeType;
+  target_item_id: string | null;
+  request_text: string;
+  normalized_request_text: string;
+  status: PlanChangeStatus;
+  approval_mode: ApprovalMode;
+  current_analysis_version: number;
+  approved_analysis_version: number | null;
+  candidate_trip_plan_id: string | null;
+  candidate_diff: Json | null;
+  idempotency_key: string;
+  analysis_attempt_count: number;
+  candidate_attempt_count: number;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  published_at: string | null;
+  cancelled_at: string | null;
+  error_code: string | null;
+};
+export type PlanChangeAnalysisRow = {
+  id: string;
+  change_request_id: string;
+  room_id: string;
+  version: number;
+  schema_version: string;
+  prompt_version: string;
+  model: string;
+  analysis_json: Json;
+  analysis_hash: string;
+  materiality: ChangeMateriality;
+  feasibility: ChangeFeasibility;
+  basis_plan_hash: string;
+  basis_plan_version: number;
+  created_at: string;
 };
 export type TripPlanEventRow = {
   id: string;
@@ -241,6 +293,8 @@ export type Database = {
       planning_approvals: TableDefinition<PlanningApprovalRow>;
       trip_plans: TableDefinition<TripPlanRow>;
       trip_plan_events: TableDefinition<TripPlanEventRow>;
+      plan_change_requests: TableDefinition<PlanChangeRequestRow>;
+      plan_change_analyses: TableDefinition<PlanChangeAnalysisRow>;
     };
     Views: {
       room_invite_metadata: {
@@ -519,6 +573,154 @@ export type Database = {
         Args: { batch_size?: number };
         Returns: string[];
       };
+      create_plan_change_request: {
+        Args: {
+          base_trip_plan_id: string;
+          participant_id: string;
+          request_type: string;
+          target_item_id?: string | null;
+          request_text: string;
+        };
+        Returns: Json;
+      };
+      review_plan_change: {
+        Args: {
+          target_change_request_id: string;
+          target_analysis_version: number;
+          target_participant_id: string;
+          target_decision: string;
+          note?: string | null;
+        };
+        Returns: Json;
+      };
+      confirm_plan_change_candidate: {
+        Args: {
+          target_change_request_id: string;
+          target_candidate_trip_plan_id: string;
+          target_participant_id: string;
+          target_decision: string;
+          note?: string | null;
+        };
+        Returns: Json;
+      };
+      cancel_plan_change_request: {
+        Args: {
+          target_change_request_id: string;
+          target_participant_id: string;
+        };
+        Returns: Json;
+      };
+      get_plan_change_request: {
+        Args: { target_room_id: string };
+        Returns: Json;
+      };
+      list_plan_versions: { Args: { target_room_id: string }; Returns: Json };
+      get_trip_plan_version: {
+        Args: { target_room_id: string; target_version: number };
+        Returns: Json;
+      };
+      compare_plan_versions: {
+        Args: {
+          target_room_id: string;
+          base_version: number;
+          candidate_version: number;
+        };
+        Returns: Json;
+      };
+      claim_change_analysis: {
+        Args: {
+          target_change_request_id: string;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+        };
+        Returns: Json;
+      };
+      complete_change_analysis: {
+        Args: {
+          target_change_request_id: string;
+          validated_analysis: Json;
+          target_materiality: string;
+          target_feasibility: string;
+          target_analysis_hash: string;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+        };
+        Returns: Json;
+      };
+      claim_candidate_generation: {
+        Args: { target_change_request_id: string };
+        Returns: Json;
+      };
+      attach_candidate_trip_plan: {
+        Args: {
+          target_change_request_id: string;
+          validated_itinerary: Json;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+        };
+        Returns: Json;
+      };
+      update_plan_change_candidate: {
+        Args: {
+          target_candidate_trip_plan_id: string;
+          validated_itinerary: Json;
+        };
+        Returns: undefined;
+      };
+      start_plan_change_repair: {
+        Args: { target_change_request_id: string };
+        Returns: Json;
+      };
+      block_plan_change: {
+        Args: { target_change_request_id: string; target_error_code: string };
+        Returns: undefined;
+      };
+      record_plan_change_run_usage: {
+        Args: {
+          target_change_request_id: string;
+          target_run_type: string;
+          target_provider_response_id: string | null;
+          target_provider_request_id: string | null;
+          target_input_tokens: number | null;
+          target_output_tokens: number | null;
+          target_reasoning_tokens: number | null;
+          target_cached_input_tokens: number | null;
+          target_total_tokens: number | null;
+          target_latency_ms: number;
+        };
+        Returns: undefined;
+      };
+      complete_plan_change_candidate: {
+        Args: {
+          target_change_request_id: string;
+          boundary_report: Json;
+          candidate_diff: Json;
+        };
+        Returns: Json;
+      };
+      complete_plan_change_publication: {
+        Args: { target_change_request_id: string };
+        Returns: Json;
+      };
+      get_plan_change_context: {
+        Args: { target_change_request_id: string };
+        Returns: Json;
+      };
+      fail_plan_change: {
+        Args: { target_change_request_id: string; target_error_code: string };
+        Returns: undefined;
+      };
+      list_recoverable_plan_changes: {
+        Args: { batch_size?: number };
+        Returns: string[];
+      };
+      list_recoverable_plan_change_publications: {
+        Args: { batch_size?: number };
+        Returns: string[];
+      };
     };
     Enums: {
       approval_mode: ApprovalMode;
@@ -531,6 +733,10 @@ export type Database = {
       planning_review_decision: PlanningReviewDecision;
       trip_plan_status: TripPlanStatus;
       itinerary_validation_status: ValidationStatus;
+      plan_change_type: PlanChangeType;
+      plan_change_status: PlanChangeStatus;
+      change_materiality: ChangeMateriality;
+      change_feasibility: ChangeFeasibility;
     };
     CompositeTypes: Record<never, never>;
   };

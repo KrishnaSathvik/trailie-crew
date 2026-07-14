@@ -34,6 +34,12 @@ import {
   validationReportSchema,
   tripPlanViewSchema,
   planProgressEventSchema,
+  planChangeTypeSchema,
+  planChangeStatusSchema,
+  changeMaterialitySchema,
+  changeFeasibilitySchema,
+  planChangeAnalysisSchema,
+  planVersionDiffSchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -98,6 +104,125 @@ describe("Phase 1A schemas", () => {
         createdAt: "2026-07-13T18:00:00.000Z",
       }),
     ).toMatchObject({ roomCode: "ABCD2345" });
+  });
+});
+
+describe("Phase 4A itinerary revision schemas", () => {
+  it("locks canonical request, state, materiality, and feasibility values", () => {
+    expect(planChangeTypeSchema.options).toEqual([
+      "add_item",
+      "remove_item",
+      "replace_item",
+      "move_item",
+      "reschedule_item",
+      "shorten_item",
+      "extend_item",
+      "change_route",
+      "change_lodging",
+      "change_food",
+      "rebalance_day",
+      "update_traveler_logistics",
+      "adjust_budget",
+      "general_revision",
+    ]);
+    expect(planChangeStatusSchema.options).toContain("awaiting_confirmation");
+    expect(changeMaterialitySchema.options).toEqual([
+      "minor",
+      "material",
+      "critical",
+    ]);
+    expect(changeFeasibilitySchema.options).toEqual([
+      "feasible",
+      "needs_information",
+      "blocked",
+    ]);
+  });
+
+  it("accepts a strict safe analysis and rejects private or arbitrary fields", () => {
+    const analysis = {
+      schemaVersion: "1",
+      title: "Move Glacier Point later",
+      requestSummary: "Move the sunset stop later on September 12.",
+      requestedChange: {
+        type: "move_item",
+        targetItemIds: ["item:sunset"],
+        normalizedInstruction: "Move Glacier Point later.",
+      },
+      affectedDays: ["2026-09-12"],
+      affectedItems: [
+        {
+          itemId: "item:sunset",
+          dayId: "day:2026-09-12",
+          summary: "Glacier Point sunset moves later.",
+          direct: true,
+        },
+      ],
+      impacts: {
+        schedule: ["Later start and end time"],
+        routes: ["Refresh the inbound driving segment"],
+        budget: [],
+        reservations: [],
+        lodging: [],
+        food: [],
+        travelerConstraints: [],
+        confirmedDecisions: ["Preserve Glacier Point sunset"],
+      },
+      proposedApproach: ["Shift the stop and its inbound route timing"],
+      preservedItems: ["All other days"],
+      risks: ["Reduced evening buffer"],
+      missingInformation: [],
+      materiality: "material",
+      feasibility: "feasible",
+      blockers: [],
+      approvalSummary: "All active crew members must approve.",
+    };
+    expect(planChangeAnalysisSchema.parse(analysis)).toEqual(analysis);
+    expect(
+      planChangeAnalysisSchema.safeParse({
+        ...analysis,
+        providerResponseId: "resp_1",
+      }).success,
+    ).toBe(false);
+    expect(
+      planChangeAnalysisSchema.safeParse({
+        ...analysis,
+        title: "<script>alert(1)</script>",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires target items for targeted request types and strict diff operations", () => {
+    const diff = {
+      schemaVersion: "1",
+      baseVersion: 1,
+      candidateVersion: 2,
+      summary: "One activity moved later.",
+      changedDays: ["2026-09-12"],
+      items: [
+        {
+          itemId: "item:sunset",
+          dayId: "day:2026-09-12",
+          date: "2026-09-12",
+          operation: "rescheduled",
+          beforeSummary: "17:30–19:00 Glacier Point sunset",
+          afterSummary: "18:00–19:30 Glacier Point sunset",
+          reason: "Requested by the crew",
+          downstreamImpact: ["Inbound drive shifts by 30 minutes"],
+          validationStatus: "pass",
+        },
+      ],
+      routeChanges: ["Inbound segment shifts by 30 minutes"],
+      budgetDelta: null,
+      warningsAdded: [],
+      warningsResolved: [],
+    };
+    expect(planVersionDiffSchema.parse(diff)).toEqual(diff);
+    expect(
+      planVersionDiffSchema.safeParse({
+        ...diff,
+        items: [{ ...diff.items[0], operation: "patched" }],
+      }).success,
+    ).toBe(false);
   });
 });
 
