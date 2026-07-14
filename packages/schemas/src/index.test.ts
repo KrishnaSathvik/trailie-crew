@@ -23,6 +23,11 @@ import {
   typingEventSchema,
   evidenceStrengthSchema,
   extractionStatusSchema,
+  planningApprovalStateSchema,
+  planningReadinessStatusSchema,
+  planningRequestStatusSchema,
+  planningReviewDecisionSchema,
+  planningSummarySchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -174,6 +179,99 @@ describe("Phase 2B conversation-memory schemas", () => {
         supersessions: [],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("Phase 3A planning schemas", () => {
+  const item = {
+    id: "confirmed:0",
+    label: "Destination",
+    detail: "Yosemite",
+    sourceMessageIds: [uuid],
+  };
+  const summary = {
+    schemaVersion: "1",
+    title: "Before I build the trip",
+    tripSnapshot: {
+      destinations: ["Yosemite"],
+      dateWindows: ["September 12–16"],
+      travelerCount: 2,
+      origins: [],
+      budget: [],
+      approvalMode: "all_active",
+    },
+    confirmedDecisions: [item],
+    travelerPreferences: [],
+    constraints: [],
+    proposals: [],
+    rejectedOptions: [],
+    conflicts: [],
+    openQuestions: [],
+    missingCriticalInformation: [],
+    nonAssumptions: [],
+    readiness: { status: "ready_for_review", blockers: [], warnings: [] },
+    evidence: {
+      memoryVersion: 2,
+      latestMessageId: uuid,
+      sourceMessageIds: [uuid],
+    },
+  };
+
+  it("locks lifecycle, readiness, and review enums", () => {
+    expect(planningRequestStatusSchema.options).toEqual([
+      "draft",
+      "generating_summary",
+      "awaiting_review",
+      "changes_requested",
+      "approved_for_generation",
+      "superseded",
+      "cancelled",
+      "failed",
+    ]);
+    expect(planningReadinessStatusSchema.options).toEqual([
+      "ready_for_review",
+      "needs_information",
+      "blocked",
+    ]);
+    expect(planningReviewDecisionSchema.options).toEqual([
+      "approved",
+      "changes_requested",
+    ]);
+  });
+
+  it("strictly parses the fixed public summary and rejects private fields", () => {
+    expect(planningSummarySchema.parse(summary).title).toBe(
+      "Before I build the trip",
+    );
+    expect(
+      planningSummarySchema.safeParse({ ...summary, confidence: 0.9 }).success,
+    ).toBe(false);
+    expect(
+      planningSummarySchema.safeParse({ ...summary, title: "Itinerary" })
+        .success,
+    ).toBe(false);
+    expect(
+      planningSummarySchema.safeParse({
+        ...summary,
+        confirmedDecisions: [{ ...item, html: "<b>x</b>" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("returns safe approval state without auth identities", () => {
+    const participant = { id: uuid, displayName: "Maya", role: "host" };
+    const parsed = planningApprovalStateSchema.parse({
+      approvalMode: "host_only",
+      summaryVersion: 1,
+      requiredParticipants: [participant],
+      approvedParticipants: [participant],
+      changeRequestedParticipants: [],
+      pendingParticipants: [],
+      isComplete: true,
+      isStale: false,
+      blockers: [],
+    });
+    expect(parsed).not.toHaveProperty("userId");
   });
 });
 

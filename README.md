@@ -96,10 +96,12 @@ Implemented through Phase 2A:
 - private forced-RLS invocation/run accounting, transactional idempotency, one safe retry, usage metadata, and rate controls
 - exact GPT-5.6 Terra/Sol model routing, HMAC safety identifiers, bounded untrusted context, and versioned focused prompt
 - strict safe response/stream schemas, server-only OpenAI provider, deterministic fake provider, and optional live smoke test
+- silent normalized conversation memory with stale-job recovery and no browser inspection route
+- explicit Build Our Itinerary action, immutable planning summaries, deterministic readiness, stale protection, and all-active/host-only approval
 
 Not yet implemented:
 
-- itinerary planning, approval, generation, validation, revisions, sharing, or export
+- itinerary generation, validation, sharing, or export
 - live travel-data providers or TrailVerse service integration
 
 ## Build Week timing
@@ -112,3 +114,5 @@ Codex collaboration decisions and Build Week development checkpoints are recorde
 Phase 2B adds invisible, private conversation understanding. Persisted human messages return immediately; eligible messages are processed after the response into normalized private facts and a rebuildable room snapshot. Extraction never creates chat output. See [conversation memory](docs/build-week/conversation-memory.md).
 
 Memory configuration uses `OPENAI_MEMORY_MODEL=gpt-5.6-luna`, prompt `trailie-memory-v1`, schema `1`, and a 20-second timeout. Local and E2E runs use the deterministic fake provider. Live smoke testing is opt-in and was not run for this phase.
+
+Phase 3A adds the approval-gated **Before I build the trip** workflow. Sol reconstructs a bounded review summary from private memory and recent conversation; application code owns readiness, staleness, and approval completion. `approved_for_generation` is the stopping point—no itinerary is generated. See [planning approval](docs/build-week/planning-approval.md).

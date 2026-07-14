@@ -1,0 +1,56 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { schedulePlanningSummary } from "./scheduler";
+import {
+  createPlanningRequestAction,
+  reviewPlanningSummaryAction,
+} from "./actions";
+
+vi.mock("@/lib/supabase/server", () => ({
+  createServerSupabaseClient: vi.fn(),
+}));
+vi.mock("./scheduler", () => ({ schedulePlanningSummary: vi.fn() }));
+const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
+function client(data: unknown, error: unknown = null) {
+  const rpc = vi.fn().mockResolvedValue({ data, error });
+  vi.mocked(createServerSupabaseClient).mockResolvedValue({
+    auth: {
+      getUser: vi
+        .fn()
+        .mockResolvedValue({ data: { user: { id } }, error: null }),
+    },
+    rpc,
+  } as never);
+  return rpc;
+}
+describe("planning actions", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it("creates idempotently and schedules only a newly created request", async () => {
+    const rpc = client({
+      id,
+      status: "draft",
+      currentSummaryVersion: 0,
+      created: true,
+    });
+    await expect(
+      createPlanningRequestAction({ roomId: id, participantId: id }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("create_planning_request", {
+      target_room_id: id,
+      participant_id: id,
+    });
+    expect(schedulePlanningSummary).toHaveBeenCalledWith(id);
+  });
+  it("requires a change note before opening the database", async () => {
+    await expect(
+      reviewPlanningSummaryAction({
+        planningRequestId: id,
+        summaryVersion: 1,
+        participantId: id,
+        decision: "changes_requested",
+        note: "",
+      }),
+    ).resolves.toEqual({ ok: false, error: "changes_note_required" });
+    expect(createServerSupabaseClient).not.toHaveBeenCalled();
+  });
+});

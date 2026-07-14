@@ -101,3 +101,9 @@ See [`database-security.md`](database-security.md) and [`realtime-chat.md`](real
 ## Phase 2B: silent memory pipeline
 
 Human persistence remains the critical path. `sendMessageAction` schedules `after()` only after a successful database response. The background worker claims through a service-only RPC, deterministically filters chatter, loads bounded server-only context, calls the extraction provider, validates the proposed patch, and applies it atomically. Normalized facts are evidence history; `private.room_memory` is the rebuildable read projection. See [conversation-memory.md](conversation-memory.md).
+
+## Phase 3A: approval-gated planning basis
+
+The Plan tab calls an authenticated create RPC and returns immediately. A post-response worker claims the request, reads a service-only bounded context, validates Sol's strict summary, replaces model readiness with deterministic application readiness, and transactionally inserts a new immutable version. The browser polls the safe room-scoped planning view; no private memory or operational run record crosses that boundary.
+
+Approvals and change requests use participant-owned RPCs. Database locks, one active request per room, version-scoped unique approvals, basis fingerprints, and immutable summary rows enforce concurrency and stale-version safety. A server-only recovery drain can reclaim draft/failed/stale-generating requests and abandoned Phase 2B extractions. See [planning-approval.md](planning-approval.md).

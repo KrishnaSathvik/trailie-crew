@@ -53,6 +53,25 @@ const openAIEnvSchema = z.object({
     .min(5_000)
     .max(60_000)
     .default(20_000),
+  OPENAI_PLANNING_MODEL: z.string().trim().min(1).default("gpt-5.6-sol"),
+  OPENAI_PLANNING_PROMPT_VERSION: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("trailie-planning-summary-v1"),
+  OPENAI_PLANNING_SCHEMA_VERSION: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("1"),
+  OPENAI_PLANNING_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(5_000)
+    .max(120_000)
+    .default(45_000),
   TRAILIE_AI_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
@@ -106,5 +125,9 @@ export function parseOpenAIEnv(source: EnvironmentSource) {
     memoryPromptVersion: values.OPENAI_MEMORY_PROMPT_VERSION,
     memorySchemaVersion: values.OPENAI_MEMORY_SCHEMA_VERSION,
     memoryTimeoutMs: values.OPENAI_MEMORY_TIMEOUT_MS,
+    planningModel: values.OPENAI_PLANNING_MODEL,
+    planningPromptVersion: values.OPENAI_PLANNING_PROMPT_VERSION,
+    planningSchemaVersion: values.OPENAI_PLANNING_SCHEMA_VERSION,
+    planningTimeoutMs: values.OPENAI_PLANNING_TIMEOUT_MS,
   } as const;
 }

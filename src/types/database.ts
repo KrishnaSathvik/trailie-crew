@@ -5,6 +5,9 @@ import type {
   ParticipantStatus,
   ReactionType,
   RoomStatus,
+  PlanningRequestStatus,
+  PlanningReadinessStatus,
+  PlanningReviewDecision,
 } from "@trailie/schemas";
 
 export type Json =
@@ -71,6 +74,57 @@ export type MessageReactionRow = {
   participant_id: string;
   reaction: ReactionType;
   created_at: string;
+};
+export type PlanningRequestRow = {
+  id: string;
+  room_id: string;
+  requested_by_participant_id: string;
+  requested_by_user_id: string;
+  status: PlanningRequestStatus;
+  approval_mode: ApprovalMode;
+  current_summary_version: number;
+  approved_summary_version: number | null;
+  basis_memory_version: number;
+  basis_latest_message_id: string | null;
+  basis_latest_message_created_at: string | null;
+  basis_participant_ids: string[];
+  basis_membership_fingerprint: string;
+  idempotency_key: string;
+  generation_attempt_count: number;
+  generation_error_code: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  cancelled_at: string | null;
+};
+export type PlanningSummaryRow = {
+  id: string;
+  planning_request_id: string;
+  room_id: string;
+  version: number;
+  schema_version: string;
+  prompt_version: string;
+  model: string;
+  summary_json: Json;
+  readiness_status: PlanningReadinessStatus;
+  summary_hash: string;
+  basis_memory_version: number;
+  basis_latest_message_id: string | null;
+  basis_latest_message_created_at: string | null;
+  basis_participant_ids: string[];
+  basis_membership_fingerprint: string;
+  created_at: string;
+};
+export type PlanningApprovalRow = {
+  id: string;
+  planning_request_id: string;
+  summary_version: number;
+  participant_id: string;
+  user_id: string;
+  decision: PlanningReviewDecision;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type DbRoomMessage = {
@@ -148,6 +202,9 @@ export type Database = {
       room_invites: TableDefinition<RoomInviteRow>;
       messages: TableDefinition<MessageRow>;
       message_reactions: TableDefinition<MessageReactionRow>;
+      planning_requests: TableDefinition<PlanningRequestRow>;
+      planning_summaries: TableDefinition<PlanningSummaryRow>;
+      planning_approvals: TableDefinition<PlanningApprovalRow>;
     };
     Views: {
       room_invite_metadata: {
@@ -278,6 +335,74 @@ export type Database = {
         Args: { target_room_id: string };
         Returns: Json;
       };
+      create_planning_request: {
+        Args: { target_room_id: string; participant_id: string };
+        Returns: Json;
+      };
+      get_planning_request: { Args: { target_room_id: string }; Returns: Json };
+      review_planning_summary: {
+        Args: {
+          target_request_id: string;
+          target_summary_version: number;
+          target_participant_id: string;
+          target_decision: string;
+          note?: string | null;
+        };
+        Returns: Json;
+      };
+      regenerate_planning_summary: {
+        Args: {
+          target_request_id: string;
+          target_summary_version: number;
+          participant_id: string;
+        };
+        Returns: Json;
+      };
+      claim_planning_summary_generation: {
+        Args: {
+          target_request_id: string;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+        };
+        Returns: Json;
+      };
+      get_planning_summary_context: {
+        Args: { target_request_id: string };
+        Returns: Json;
+      };
+      complete_planning_summary: {
+        Args: {
+          target_request_id: string;
+          validated_summary: Json;
+          readiness: string;
+          target_summary_hash: string;
+          target_provider_response_id: string | null;
+          target_provider_request_id: string | null;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+          target_input_tokens: number | null;
+          target_output_tokens: number | null;
+          target_reasoning_tokens: number | null;
+          target_cached_input_tokens: number | null;
+          target_total_tokens: number | null;
+          target_latency_ms: number;
+        };
+        Returns: Json;
+      };
+      fail_planning_summary: {
+        Args: { target_request_id: string; target_error_code: string };
+        Returns: undefined;
+      };
+      list_recoverable_planning_requests: {
+        Args: { batch_size?: number };
+        Returns: string[];
+      };
+      list_recoverable_message_extractions: {
+        Args: { batch_size?: number };
+        Returns: string[];
+      };
     };
     Enums: {
       approval_mode: ApprovalMode;
@@ -285,6 +410,9 @@ export type Database = {
       participant_role: ParticipantRole;
       participant_status: ParticipantStatus;
       message_type: MessageType;
+      planning_request_status: PlanningRequestStatus;
+      planning_readiness_status: PlanningReadinessStatus;
+      planning_review_decision: PlanningReviewDecision;
     };
     CompositeTypes: Record<never, never>;
   };

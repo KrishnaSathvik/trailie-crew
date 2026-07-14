@@ -15,11 +15,12 @@ import { CrewList } from "@/features/crew/components/crew-list";
 import type { TripShellData } from "@/features/crew/queries/trip-crew";
 import { InvitePanel } from "@/features/trips/components/invite-panel";
 import { ChatExperience } from "@/features/chat/components/chat-experience";
+import { PlanExperience } from "@/features/planning/components/plan-experience";
 
 const destinations = [
-  { label: "Chat", icon: MessageCircle, active: true },
-  { label: "Plan", icon: CalendarRange, active: false },
-  { label: "Map", icon: Map, active: false },
+  { label: "Chat", icon: MessageCircle, enabled: true },
+  { label: "Plan", icon: CalendarRange, enabled: true },
+  { label: "Map", icon: Map, enabled: false },
 ];
 
 export function TripShell({ data }: { data: TripShellData }) {
@@ -28,6 +29,7 @@ export function TripShell({ data }: { data: TripShellData }) {
     [],
   );
   const [peopleOpen, setPeopleOpen] = useState(false);
+  const [area, setArea] = useState<"Chat" | "Plan">("Chat");
   const handlePresenceChange = useCallback((participantIds: string[]) => {
     setOnlineParticipantIds(participantIds);
   }, []);
@@ -54,20 +56,30 @@ export function TripShell({ data }: { data: TripShellData }) {
           </p>
         </div>
         <nav aria-label="Trip sections" className="mt-12 space-y-1">
-          {destinations.map(({ label, icon: Icon, active }) => (
-            <div
-              key={label}
-              className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${active ? "bg-subtle font-semibold" : "text-muted-foreground"}`}
-            >
-              <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-              <span>{label}</span>
-              {!active ? (
-                <span className="ml-auto font-mono text-[0.5625rem] tracking-wider uppercase">
-                  Soon
-                </span>
-              ) : null}
-            </div>
-          ))}
+          {destinations.map(({ label, icon: Icon, enabled }) => {
+            const active = area === label;
+            return (
+              <button
+                type="button"
+                key={label}
+                onClick={() => enabled && setArea(label as "Chat" | "Plan")}
+                disabled={!enabled}
+                className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${active ? "bg-subtle font-semibold" : "text-muted-foreground"}`}
+              >
+                <Icon
+                  aria-hidden="true"
+                  className="size-4"
+                  strokeWidth={1.75}
+                />
+                <span>{label}</span>
+                {!enabled ? (
+                  <span className="ml-auto font-mono text-[0.5625rem] tracking-wider uppercase">
+                    Soon
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </nav>
         <div className="border-border mt-auto border-t pt-5">
           <p className="text-sm font-semibold">
@@ -89,11 +101,20 @@ export function TripShell({ data }: { data: TripShellData }) {
           </div>
           <div className="hidden items-center gap-2 lg:flex">
             <Route aria-hidden="true" className="size-4" strokeWidth={1.75} />
-            <p className="text-sm font-semibold">Shared conversation</p>
+            <p className="text-sm font-semibold">
+              {area === "Chat" ? "Shared conversation" : "Planning review"}
+            </p>
           </div>
           <ThemeToggle />
         </header>
-        <ChatExperience data={data} onPresenceChange={handlePresenceChange} />
+        {area === "Chat" ? (
+          <ChatExperience data={data} onPresenceChange={handlePresenceChange} />
+        ) : (
+          <PlanExperience
+            roomId={data.room.id}
+            participantId={data.currentParticipant.id}
+          />
+        )}
       </section>
 
       <aside className="border-border hidden border-l px-6 py-7 lg:block lg:min-h-dvh">
@@ -152,19 +173,26 @@ export function TripShell({ data }: { data: TripShellData }) {
       >
         {[
           ...destinations,
-          { label: "People", icon: UsersRound, active: false },
-        ].map(({ label, icon: Icon, active }) => (
-          <button
-            type="button"
-            key={label}
-            onClick={() => label === "People" && setPeopleOpen(true)}
-            disabled={label !== "Chat" && label !== "People"}
-            className={`flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] ${active ? "font-semibold" : "text-muted-foreground"}`}
-          >
-            <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-            <span>{label}</span>
-          </button>
-        ))}
+          { label: "People", icon: UsersRound, enabled: true },
+        ].map(({ label, icon: Icon, enabled }) => {
+          const active = area === label;
+          return (
+            <button
+              type="button"
+              key={label}
+              onClick={() =>
+                label === "People"
+                  ? setPeopleOpen(true)
+                  : enabled && setArea(label as "Chat" | "Plan")
+              }
+              disabled={!enabled}
+              className={`flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] ${active ? "font-semibold" : "text-muted-foreground"}`}
+            >
+              <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </nav>
     </main>
   );

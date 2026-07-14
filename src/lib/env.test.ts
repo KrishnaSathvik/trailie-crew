@@ -63,6 +63,10 @@ describe("OpenAI environment validation", () => {
       conversationModel: "gpt-5.6-terra",
       flagshipModel: "gpt-5.6-sol",
       promptVersion: "trailie-focused-v1",
+      planningModel: "gpt-5.6-sol",
+      planningPromptVersion: "trailie-planning-summary-v1",
+      planningSchemaVersion: "1",
+      planningTimeoutMs: 45_000,
     });
     expect(
       parseOpenAIEnv({ TRAILIE_AI_PROVIDER: "fake", NODE_ENV: "test" }),

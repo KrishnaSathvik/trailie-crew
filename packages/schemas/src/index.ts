@@ -280,6 +280,130 @@ export const trailieStreamEventSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
+export const planningRequestStatusSchema = z.enum([
+  "draft",
+  "generating_summary",
+  "awaiting_review",
+  "changes_requested",
+  "approved_for_generation",
+  "superseded",
+  "cancelled",
+  "failed",
+]);
+export const planningReadinessStatusSchema = z.enum([
+  "ready_for_review",
+  "needs_information",
+  "blocked",
+]);
+export const planningReviewDecisionSchema = z.enum([
+  "approved",
+  "changes_requested",
+]);
+const planningTextSchema = z.string().trim().min(1).max(500);
+const planningStringListSchema = z.array(planningTextSchema).max(24);
+
+export const planningSummaryItemSchema = z
+  .object({
+    id: z.string().regex(/^[a-z][a-z0-9:_-]{0,79}$/),
+    label: z.string().trim().min(1).max(100),
+    detail: planningTextSchema,
+    sourceMessageIds: z.array(z.uuid()).max(12),
+  })
+  .strict();
+export const planningSummarySectionSchema = z
+  .object({
+    title: z.string().trim().min(1).max(100),
+    items: z.array(planningSummaryItemSchema).max(24),
+  })
+  .strict();
+export const travelerPreferenceSummarySchema = planningSummaryItemSchema;
+export const constraintSummarySchema = planningSummaryItemSchema;
+export const proposedOptionSummarySchema = planningSummaryItemSchema;
+export const confirmedDecisionSummarySchema = planningSummaryItemSchema;
+export const conflictSummarySchema = planningSummaryItemSchema;
+export const openQuestionSummarySchema = planningSummaryItemSchema;
+export const missingInformationSummarySchema = planningSummaryItemSchema;
+
+export const planningSummarySchema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    title: z.literal("Before I build the trip"),
+    tripSnapshot: z
+      .object({
+        destinations: planningStringListSchema,
+        dateWindows: planningStringListSchema,
+        travelerCount: z.number().int().min(1).max(50),
+        origins: planningStringListSchema,
+        budget: planningStringListSchema,
+        approvalMode: approvalModeSchema,
+      })
+      .strict(),
+    confirmedDecisions: z.array(confirmedDecisionSummarySchema).max(24),
+    travelerPreferences: z.array(travelerPreferenceSummarySchema).max(50),
+    constraints: z.array(constraintSummarySchema).max(50),
+    proposals: z.array(proposedOptionSummarySchema).max(24),
+    rejectedOptions: z.array(planningSummaryItemSchema).max(24),
+    conflicts: z.array(conflictSummarySchema).max(24),
+    openQuestions: z.array(openQuestionSummarySchema).max(24),
+    missingCriticalInformation: z
+      .array(missingInformationSummarySchema)
+      .max(16),
+    nonAssumptions: z.array(planningSummaryItemSchema).max(16),
+    readiness: z
+      .object({
+        status: planningReadinessStatusSchema,
+        blockers: planningStringListSchema,
+        warnings: planningStringListSchema,
+      })
+      .strict(),
+    evidence: z
+      .object({
+        memoryVersion: z.number().int().positive(),
+        latestMessageId: z.uuid().nullable(),
+        sourceMessageIds: z.array(z.uuid()).max(50),
+      })
+      .strict(),
+  })
+  .strict();
+
+const planningParticipantSchema = z
+  .object({
+    id: z.uuid(),
+    displayName: displayNameSchema,
+    role: participantRoleSchema,
+  })
+  .strict();
+export const planningApprovalStateSchema = z
+  .object({
+    approvalMode: approvalModeSchema,
+    summaryVersion: z.number().int().positive(),
+    requiredParticipants: z.array(planningParticipantSchema).max(50),
+    approvedParticipants: z.array(planningParticipantSchema).max(50),
+    changeRequestedParticipants: z.array(planningParticipantSchema).max(50),
+    pendingParticipants: z.array(planningParticipantSchema).max(50),
+    isComplete: z.boolean(),
+    isStale: z.boolean(),
+    blockers: planningStringListSchema,
+  })
+  .strict();
+export const planningRequestViewSchema = z
+  .object({
+    id: z.uuid(),
+    roomId: z.uuid(),
+    status: planningRequestStatusSchema,
+    approvalMode: approvalModeSchema,
+    currentSummaryVersion: z.number().int().nonnegative(),
+    approvedSummaryVersion: z.number().int().positive().nullable(),
+    readinessStatus: planningReadinessStatusSchema.nullable(),
+    summary: planningSummarySchema.nullable(),
+    approvalState: planningApprovalStateSchema.nullable(),
+    generationErrorCode: z.string().max(80).nullable(),
+    isStale: z.boolean(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict();
+
 export const modelRouteDecisionSchema = z
   .object({
     model: z.string().min(1).max(100),
@@ -499,3 +623,30 @@ export type ConfirmedDecision = z.infer<typeof confirmedDecisionSchema>;
 export type RejectedOption = z.infer<typeof rejectedOptionSchema>;
 export type OpenQuestion = z.infer<typeof openQuestionSchema>;
 export type RoomMemorySnapshot = z.infer<typeof roomMemorySnapshotSchema>;
+export type PlanningRequestStatus = z.infer<typeof planningRequestStatusSchema>;
+export type PlanningReadinessStatus = z.infer<
+  typeof planningReadinessStatusSchema
+>;
+export type PlanningReviewDecision = z.infer<
+  typeof planningReviewDecisionSchema
+>;
+export type PlanningSummarySection = z.infer<
+  typeof planningSummarySectionSchema
+>;
+export type PlanningSummaryItem = z.infer<typeof planningSummaryItemSchema>;
+export type TravelerPreferenceSummary = z.infer<
+  typeof travelerPreferenceSummarySchema
+>;
+export type ConstraintSummary = z.infer<typeof constraintSummarySchema>;
+export type ProposedOptionSummary = z.infer<typeof proposedOptionSummarySchema>;
+export type ConfirmedDecisionSummary = z.infer<
+  typeof confirmedDecisionSummarySchema
+>;
+export type ConflictSummary = z.infer<typeof conflictSummarySchema>;
+export type OpenQuestionSummary = z.infer<typeof openQuestionSummarySchema>;
+export type MissingInformationSummary = z.infer<
+  typeof missingInformationSummarySchema
+>;
+export type PlanningSummary = z.infer<typeof planningSummarySchema>;
+export type PlanningApprovalState = z.infer<typeof planningApprovalStateSchema>;
+export type PlanningRequestView = z.infer<typeof planningRequestViewSchema>;

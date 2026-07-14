@@ -35,3 +35,7 @@ Tests began red for missing parser, router, context, safety, usage, provider, au
 ## 2026-07-13 — Phase 2B
 
 Started from clean `main` commit `c0e9f17`. Verified current official OpenAI model, Structured Outputs, reasoning, retention, background, Batch, and SDK guidance before implementation. Selected Luna/none/strict/store-false and Next.js `after()` with database claims. Implemented test-first schemas, eligibility, provider, validation, private migration/functions, worker/retry/concurrency, fake provider, protected test inspection, E2E, and documentation. No commit or push was made. GitHub CLI reauthentication reported success but a subsequent `gh auth status` still reported the local token invalid; Vercel CLI was upgraded to `56.1.0` through npm after pnpm lacked a global bin directory.
+
+## 2026-07-13 — Phase 3A
+
+Started from clean `main` commit `b0f1330`. Human direction locked the explicit trigger, immutable review summary, deterministic readiness/staleness, all-active and host-only approvals, Sol-only reconstruction, Phase 2B recovery, and the no-itinerary boundary. Codex reverified official OpenAI guidance, designed the lifecycle and data boundary, implemented schemas/RPCs/RLS/workers/Plan UI/fake-provider coverage, removed the production memory-inspection route, and added a server-only recovery drain. Focused tests began red for absent planning contracts and database objects; browser verification later exposed and fixed optimistic-send synchronization and a completed-summary UI flag that never reset. No commit or push was made.

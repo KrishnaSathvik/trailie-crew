@@ -25,6 +25,7 @@
     "test:e2e": "playwright test",
     "test:openai:smoke": "node scripts/openai-smoke.mjs",
     "test:memory:smoke": "node scripts/memory-smoke.mjs",
+    "test:planning:smoke": "node scripts/planning-smoke.mjs",
     "test:watch": "vitest",
     "supabase": "supabase"
   },

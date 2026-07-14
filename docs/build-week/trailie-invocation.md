@@ -27,3 +27,7 @@ Phase 2A does not extract memory, update `room_memory`, build itineraries, resea
 ## Independent private extraction
 
 Phase 2B understanding is not a Trailie invocation. Every eligible human message may be privately processed whether or not it mentions Trailie. It produces no stream card, typing state, presence, or response message. Explicit Phase 2A invocation detection and focused answers remain unchanged.
+
+## Phase 3A application action
+
+**Build Our Itinerary** is an explicit application action, but it does not reuse focused-answer chat persistence. It creates a planning request and review summary only. No synthetic user or Trailie message appears, and approval never triggers an itinerary provider in this phase.

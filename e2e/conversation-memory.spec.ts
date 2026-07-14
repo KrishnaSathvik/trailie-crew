@@ -1,11 +1,11 @@
-import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Browser,
-} from "@playwright/test";
+import { expect, test, type Browser } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 
-const secretHeaders = { "x-trailie-test-secret": "trailie-memory-e2e-secret" };
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!,
+  { auth: { persistSession: false, autoRefreshToken: false } },
+);
 
 async function createCrew(browser: Browser) {
   const hostContext = await browser.newContext({
@@ -32,12 +32,12 @@ async function createCrew(browser: Browser) {
   return { hostContext, host, memberContext, member, roomId };
 }
 
-async function inspect(request: APIRequestContext, roomId: string) {
-  const response = await request.get(`/api/test/memory/${roomId}`, {
-    headers: secretHeaders,
+async function inspect(roomId: string) {
+  const { data, error } = await admin.rpc("get_private_room_memory", {
+    target_room_id: roomId,
   });
-  expect(response.ok()).toBe(true);
-  return response.json() as Promise<{
+  expect(error).toBeNull();
+  return data as {
     snapshot: {
       memory_version: number;
       participant_profiles: Record<
@@ -61,7 +61,7 @@ async function inspect(request: APIRequestContext, roomId: string) {
       status: string;
       errorCode: string | null;
     }>;
-  }>;
+  };
 }
 
 async function send(page: import("@playwright/test").Page, text: string) {
@@ -70,6 +70,7 @@ async function send(page: import("@playwright/test").Page, text: string) {
   await expect(
     page.getByLabel("Trip conversation").getByText(text, { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("Sending…")).not.toBeVisible();
 }
 
 test("silent extraction builds private memory with corrections and conservative decisions", async ({
@@ -86,23 +87,15 @@ test("silent extraction builds private memory with corrections and conservative 
 
   await send(host, "lol");
   await expect
-    .poll(
-      async () =>
-        (await inspect(hostContext.request, roomId)).extractions.at(-1)?.status,
-    )
+    .poll(async () => (await inspect(roomId)).extractions.at(-1)?.status)
     .toBe("skipped");
-  expect(
-    (await inspect(hostContext.request, roomId)).snapshot.memory_version,
-  ).toBe(1);
+  expect((await inspect(roomId)).snapshot.memory_version).toBe(1);
 
   await send(host, "I prefer hiking and I cannot travel before Friday");
   await expect
-    .poll(
-      async () =>
-        (await inspect(hostContext.request, roomId)).snapshot.memory_version,
-    )
+    .poll(async () => (await inspect(roomId)).snapshot.memory_version)
     .toBe(2);
-  let memory = await inspect(hostContext.request, roomId);
+  let memory = await inspect(roomId);
   expect(memory.facts.filter((fact) => fact.status === "active")).toHaveLength(
     2,
   );
@@ -117,12 +110,9 @@ test("silent extraction builds private memory with corrections and conservative 
 
   await send(host, "Actually, I prefer kayaking");
   await expect
-    .poll(
-      async () =>
-        (await inspect(hostContext.request, roomId)).snapshot.memory_version,
-    )
+    .poll(async () => (await inspect(roomId)).snapshot.memory_version)
     .toBe(3);
-  memory = await inspect(hostContext.request, roomId);
+  memory = await inspect(roomId);
   expect(
     memory.facts.find((fact) => fact.value.text === "hiking")?.status,
   ).toBe("superseded");
@@ -132,54 +122,30 @@ test("silent extraction builds private memory with corrections and conservative 
 
   await send(member, "Maybe Yosemite?");
   await expect
-    .poll(
-      async () =>
-        (await inspect(hostContext.request, roomId)).snapshot.memory_version,
-    )
+    .poll(async () => (await inspect(roomId)).snapshot.memory_version)
     .toBe(4);
-  expect(
-    (await inspect(hostContext.request, roomId)).snapshot.confirmed_decisions,
-  ).toEqual([]);
+  expect((await inspect(roomId)).snapshot.confirmed_decisions).toEqual([]);
 
   await send(host, "We all decided on Yosemite");
   await expect
-    .poll(
-      async () =>
-        (await inspect(hostContext.request, roomId)).snapshot.memory_version,
-    )
+    .poll(async () => (await inspect(roomId)).snapshot.memory_version)
     .toBe(5);
-  memory = await inspect(hostContext.request, roomId);
+  memory = await inspect(roomId);
   expect(memory.snapshot.confirmed_decisions).toHaveLength(1);
 
   await send(host, "simulate extraction failure");
   await expect
-    .poll(
-      async () =>
-        (await inspect(hostContext.request, roomId)).extractions.at(-1)?.status,
-    )
+    .poll(async () => (await inspect(roomId)).extractions.at(-1)?.status)
     .toBe("failed");
-  memory = await inspect(hostContext.request, roomId);
+  memory = await inspect(roomId);
   expect(memory.snapshot.memory_version).toBe(5);
 
-  const completed = memory.extractions.find(
-    (item) => item.status === "completed",
-  )!;
-  const duplicate = await hostContext.request.post(
-    `/api/test/memory/${roomId}`,
-    {
-      headers: secretHeaders,
-      data: { messageId: completed.messageId },
-    },
-  );
-  expect(duplicate.ok()).toBe(true);
   expect(
-    (await inspect(hostContext.request, roomId)).snapshot.memory_version,
-  ).toBe(5);
-
-  const unauthenticatedInspection = await hostContext.request.get(
-    `/api/test/memory/${roomId}`,
-  );
-  expect(unauthenticatedInspection.status()).toBe(404);
+    new Set(
+      memory.facts.map((fact) => `${fact.source_message_id}:${fact.fact_type}`),
+    ).size,
+  ).toBe(memory.facts.length);
+  expect((await inspect(roomId)).snapshot.memory_version).toBe(5);
   await host.reload();
   await expect(
     host.getByText("Actually, I prefer kayaking", { exact: true }),

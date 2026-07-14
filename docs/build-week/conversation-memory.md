@@ -32,7 +32,7 @@ Live smoke status: **not run**. The deterministic fake provider is the normal lo
 7. Application validation normalizes keys/values, clamps confidence, rejects spoofed sources/subjects/supersessions, removes exact duplicates, and conservatively handles decisions.
 8. `complete_message_extraction` applies the patch and rebuilds the snapshot in one transaction.
 
-The in-process concurrency cap is two. Database row locking and one row per message prevent duplicate workers. `after()` is Build Week-appropriate and preserves send latency, but it is not a durable queue: a function termination after the response can leave unscheduled work. The normalized extraction row makes a future polling/queue drain straightforward. Local/E2E work can explicitly drain a message through the protected test-only route.
+The in-process concurrency cap is two. Database row locking and one row per message prevent duplicate workers. `after()` is Build Week-appropriate and preserves send latency, but it is not a durable queue. Phase 3A adds a server-only recovery drain that reclaims queued rows older than one minute and running leases older than five minutes, caps attempts at two, and skips completed/skipped work. Production hardening still needs durable cron/queue scheduling for that drain.
 
 ## Facts, evidence, and projection
 
@@ -46,12 +46,12 @@ The materialized snapshot contains participant preferences/constraints/must-dos/
 
 ## Privacy and silence
 
-Private tables force RLS, grant no table access to `anon`, `authenticated`, or `service_role`, and are reachable only through narrowly granted `SECURITY DEFINER` functions with `search_path = ''`. Browser Trip-shell queries do not include memory. The development/test inspection route requires `TRAILIE_TEST_MEMORY_SECRET`, returns 404 in production, and returns 404 without the secret.
+Private tables force RLS, grant no table access to `anon`, `authenticated`, or `service_role`, and are reachable only through narrowly granted `SECURITY DEFINER` functions with `search_path = ''`. Browser Trip-shell queries do not include memory. The former inspection route was removed from the application route tree. E2E uses a Node-side local Supabase service fixture; no browser or production endpoint exposes memory.
 
 No prompt, transcript duplicate, raw provider response, raw SQL/provider error, API key, HMAC input, or hidden reasoning is stored. Crew content is untrusted data and cannot override the extraction instructions.
 
 ## Testing
 
-Unit tests cover schemas, eligibility, context bounds, provider request fields, fake scenarios, validation, retries, and scheduling. pgTAP covers private access, claim concurrency, atomic completion, projection, versioning, and zero public/Trailie messages. E2E covers two users, deterministic skip, preference/constraint extraction, correction, proposal versus decision, provider failure, duplicate drain, refresh, mobile layout, no browser OpenAI request, and protected inspection.
+Unit tests cover schemas, eligibility, context bounds, provider request fields, fake scenarios, validation, retries, and scheduling. pgTAP covers private access, claim concurrency, atomic completion, projection, versioning, and zero public/Trailie messages. E2E covers two users, deterministic skip, preference/constraint extraction, correction, proposal versus decision, provider failure, duplicate drain, refresh, mobile layout, no browser OpenAI request, and Node-side private inspection.
 
-Deferred: durable queue recovery, historical reprocessing, planning-summary generation, approval workflows, and all downstream uses of private memory.
+Implemented downstream in Phase 3A: private memory can seed a reviewable planning summary and approval workflow. Deferred: durable production queue scheduling, historical reprocessing, and itinerary generation.

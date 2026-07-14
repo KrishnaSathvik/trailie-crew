@@ -1,8 +1,14 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { TripShell } from "./trip-shell";
 import { TransientInviteProvider } from "./transient-invite-provider";
+vi.mock("@/features/planning/actions", () => ({
+  getPlanningRequestAction: vi.fn().mockResolvedValue({ ok: true, data: null }),
+  createPlanningRequestAction: vi.fn(),
+  reviewPlanningSummaryAction: vi.fn(),
+  regeneratePlanningSummaryAction: vi.fn(),
+}));
 
 function renderShell(element: React.ReactNode) {
   return render(<TransientInviteProvider>{element}</TransientInviteProvider>);
@@ -78,6 +84,16 @@ describe("TripShell", () => {
     renderShell(<TripShell data={shell} />);
     expect(screen.getByText("Invite Your Crew")).toBeInTheDocument();
     expect(screen.getAllByText("ABCD2345").length).toBeGreaterThan(0);
+  });
+
+  it("opens Plan from navigation and returns to Chat", async () => {
+    renderShell(<TripShell data={shell} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Plan" })[0]);
+    expect(
+      await screen.findByRole("button", { name: "Build Our Itinerary" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getAllByRole("button", { name: "Chat" })[0]);
+    expect(screen.getByText("Start the conversation")).toBeVisible();
   });
 
   it("limits members to safe room-code information", () => {

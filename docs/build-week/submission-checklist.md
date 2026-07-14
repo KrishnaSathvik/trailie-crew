@@ -20,7 +20,7 @@
 - [x] Optimistic idempotent sends with explicit failure/retry reconciliation
 - [x] Silence-by-default Trailie invocation policy
 - [x] GPT-5.6 focused-answer orchestration verified against current OpenAI documentation
-- [ ] Explicit planning and approval workflow
+- [x] Explicit planning-summary and approval workflow (no itinerary generation)
 - [ ] Structured, validated, versioned itinerary revisions
 - [ ] Sharing and export
 - [ ] Honest source handling for live data
@@ -33,7 +33,7 @@
 - [x] Two-context focused-answer demo rehearsal with deterministic fake provider
 - [ ] Production deployment and environment review
 - [ ] Final validation commands pass
-- [x] Demo script reflects only implemented behavior through Phase 2A
+- [x] Demo script reflects only implemented behavior through Phase 3A
 - [ ] Submission copy makes no unsupported claims
 
 ## Phase 2B conversation memory
@@ -46,4 +46,16 @@
 - [x] One retry, claim idempotency, concurrency/output/context bounds
 - [x] Fake provider, unit/SQL/E2E silence coverage
 - [ ] Live OpenAI memory smoke test (not run; requires a real key)
-- [ ] Durable queue recovery (deferred beyond Build Week Phase 2B)
+- [x] Bounded recovery drain for abandoned extraction rows
+- [ ] Durable production queue/cron scheduling for recovery
+
+## Phase 3A planning approval
+
+- [x] Explicit Build Our Itinerary action on desktop and mobile Plan
+- [x] Immutable Before I build the trip summary versions
+- [x] Deterministic readiness and stale-basis protection
+- [x] `all_active` and `host_only` approval calculation
+- [x] Required review notes and version-scoped approval reset
+- [x] Sol strict output with fake-provider E2E
+- [x] No itinerary generation path or synthetic Trailie message
+- [ ] Live OpenAI planning smoke test (not run; requires a real key)

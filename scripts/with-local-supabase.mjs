@@ -46,8 +46,6 @@ const child = spawnSync(command, args, {
     SUPABASE_SECRET_KEY:
       process.env.SUPABASE_SECRET_KEY ?? localEnvironment.SECRET_KEY,
     TRAILIE_AI_PROVIDER: process.env.TRAILIE_AI_PROVIDER ?? "fake",
-    TRAILIE_TEST_MEMORY_SECRET:
-      process.env.TRAILIE_TEST_MEMORY_SECRET ?? "trailie-memory-e2e-secret",
   },
   stdio: "inherit",
 });

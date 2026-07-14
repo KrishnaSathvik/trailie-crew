@@ -17,3 +17,7 @@ Unit coverage proves default routing, the exact escalation threshold, and invali
 ## Phase 2B route
 
 Ordinary memory extraction always routes to `gpt-5.6-luna` with `reasoning.effort: "none"`. It never escalates to Terra or Sol. Validation failure prefers one bounded retry and then a private safe failure. Prompt version is `trailie-memory-v1`; schema version is `1`. Focused Phase 2A answers retain their existing Terra/Sol routing independently.
+
+## Phase 3A planning-summary route
+
+The explicit Build Our Itinerary action routes summary reconstruction directly to exact `gpt-5.6-sol`. It uses `reasoning.effort: "high"`, strict structured output, prompt `trailie-planning-summary-v1`, schema `1`, no tools, and no model-selected routing. The model proposes a review summary only; deterministic application code owns readiness, staleness, and approvals. One schema/provider repair retry is the maximum, and no itinerary model call exists in Phase 3A.

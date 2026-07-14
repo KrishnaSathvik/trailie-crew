@@ -95,3 +95,9 @@ Phase 2A adds deterministic Trailie invocation, private AI workflow/usage record
 `private.message_extractions` and `private.memory_facts` enable and force RLS. `anon`, `authenticated`, and `service_role` have no direct table privileges, including on `private.room_memory`. Service access is limited to explicit public RPC wrappers; private mutation/projection functions are `SECURITY DEFINER`, use `search_path = ''`, and are not executable by browser roles. The model never writes rows directly.
 
 The migration validates source-message/room/participant relationships, legal states, confidence, canonical fact types/keys, JSON value bounds, supersession compatibility, and idempotent transitions. Supabase's April 2026 explicit-grant change was considered: every new function grant is deliberate and no private table is exposed.
+
+## Phase 3A planning boundary
+
+Active members may SELECT their room's public planning requests, immutable summaries, approvals, and review events through RLS. They receive no direct DML grants. `create_planning_request`, `review_planning_summary`, and regeneration RPCs verify `auth.uid()`, participant ownership, active membership, room identity, version, readiness, and staleness. Browsers cannot execute claim, completion, failure, context, usage, or recovery functions.
+
+`private.planning_runs` forces RLS and stores only model/prompt/schema versions, provider IDs, latency, token counts, attempts, status, and safe error codes. Summary completion locks the request and inserts an immutable version atomically. No raw prompt/output, hidden reasoning, Auth identity, secret, memory snapshot, itinerary, or Trailie message is stored. The test-only memory route was deleted; E2E uses a Node-side local database fixture.

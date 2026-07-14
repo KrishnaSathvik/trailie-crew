@@ -39,3 +39,7 @@ Phase 2A persists focused Trailie answers only after deterministic explicit invo
 ## Phase 2B silence invariant
 
 Memory processing does not publish Realtime broadcasts, presence, typing, or chat invalidations. Other members receive only the original human `chat_changed` behavior. The extraction worker does not import or call the focused-answer persistence path and cannot insert a `trailie` message through its RPCs.
+
+## Phase 3A planning updates
+
+Planning state is public only to active room members and is refreshed through the safe planning RPC on a short poll. Payloads contain the review summary and display-safe approval participants, never memory facts, tokens, provider IDs, prompts, or raw errors. Summary generation creates no chat row, focused-answer invocation, Trailie presence, typing, or chat Broadcast; the existing conversation path remains unchanged.

@@ -28,3 +28,15 @@ Do not demonstrate itinerary generation, approval, travel research, maps, live p
 4. Have another member say “Maybe Yosemite?” and explain that it remains a proposal.
 5. Send “We all decided on Yosemite” to demonstrate the conservative explicit-decision path.
 6. Emphasize that private inspection is test-only; the production UI deliberately exposes none of this memory yet.
+
+## Phase 3A approval moment
+
+1. From Maya's desktop Plan area, select **Build Our Itinerary** and show the honest organizing state.
+2. Reveal **Before I build the trip** with confirmed decisions, individual preferences, constraints, proposals, conflicts, open questions, missing information, and non-assumptions kept distinct.
+3. Approve as Maya under `all_active`; show that the request remains pending for Alex.
+4. Approve as Alex in the second context. Show **Summary approved** and the explicit statement that itinerary generation has not started.
+5. Send a new material preference in Chat. Return to Plan and show the stale warning and blocked approval.
+6. Regenerate to immutable Version 2 and show prior approvals do not carry forward.
+7. Demonstrate a required change note and the host-only variant, then resize the functional Plan tab to 390×844.
+
+The local provider is deterministic, while Auth, PostgreSQL, RLS, RPCs, private memory, polling, and both browser sessions remain real. Do not demonstrate an itinerary; Phase 3A stops at `approved_for_generation`.
