@@ -28,11 +28,17 @@ export function buildPlanningSummaryRequest(input: {
     store: false,
   };
 }
-function mapped(error: unknown) {
+export function mapPlanningProviderError(error: unknown) {
   if (error instanceof PlanningProviderError) return error;
   if (error instanceof OpenAI.RateLimitError)
     return new PlanningProviderError("model_rate_limited", true);
-  if (error instanceof OpenAI.APIConnectionTimeoutError)
+  if (
+    error instanceof OpenAI.APIConnectionTimeoutError ||
+    (typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      (error.name === "TimeoutError" || error.name === "AbortError"))
+  )
     return new PlanningProviderError("model_timeout", true);
   if (
     error instanceof OpenAI.BadRequestError ||
@@ -69,7 +75,7 @@ export function createOpenAIPlanningSummaryProvider(configuration: {
           usage: extractUsage(response.usage),
         };
       } catch (error) {
-        throw mapped(error);
+        throw mapPlanningProviderError(error);
       }
     },
   };

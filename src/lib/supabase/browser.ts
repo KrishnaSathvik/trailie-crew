@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
-import { parsePublicSupabaseEnv } from "@/lib/env";
+import { parsePublicSupabaseEnv } from "@/lib/env-public";
 import type { Database } from "@/types/database";
 
 export function createBrowserSupabaseClient() {

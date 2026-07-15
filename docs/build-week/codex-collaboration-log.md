@@ -1,5 +1,9 @@
 # Codex Collaboration Log
 
+## 2026-07-14 — Phase 5A Preview hardening and hosted acceptance
+
+Phase 4C was reverified, committed as `3561309`, and pushed before hosted work. Codex upgraded Vercel CLI to 56.2.0; created the isolated, Vercel-Authentication-protected `trailie-crew-preview` project and custom `hosted-acceptance` environment; left Git integration, custom domains, Production variables, and Production deployment absent; linked the dedicated hosted Supabase project; applied and verified all migrations/RLS/grants; and completed a protected two-user hosted flow. Test-first hardening split public/server environment validation, added an AI disable switch, recursive log redaction, protected bounded recovery, a distributed cooldown, measured-safe planning timeout/classification, provider-unavailable itinerary warnings, and privacy-safe share heading fallbacks. Hosted Realtime, real OpenAI, immutable Versions 1/2, historical sharing/ICS/print/revocation, and recovery passed. CAPTCHA, live Mapbox, automated scheduling, automatic backup/restore, provider budget-console proof, and production operations remain unresolved; the verdict is Preview ready with controlled conditions, not production-ready.
+
 ## 2026-07-14 — Live OpenAI hardening
 
 After Phase 4B was committed as `72fe749`, the five credentialed OpenAI smoke scripts passed without skips for focused answers, memory, planning, itinerary generation, and revisions. A real two-browser local trip then exercised silence-by-default chat, a streamed and persisted Terra answer, Luna preference correction/supersession, a Sol planning summary, two-user approval, Sol itinerary publication, Terra revision analysis, a Sol candidate, and two-user Version 2 publication.

@@ -338,9 +338,40 @@ describe("deterministic itinerary validation", () => {
       plan,
       evidence({ status: "stale", expiresAt: "2026-07-12T18:00:00.000Z" }),
     );
-    expect(report.issues.map((issue) => issue.code)).toEqual(
+    expect(
+      [...report.issues, ...report.warnings].map((issue) => issue.code),
+    ).toEqual(
       expect.arrayContaining(["missing_coordinates", "evidence_stale"]),
     );
+  });
+
+  it("keeps an itinerary usable when the optional travel provider is unavailable", () => {
+    const plan = itinerary();
+    plan.days[0].items[0].location = {
+      ...location,
+      latitude: null,
+      longitude: null,
+      verificationStatus: "unknown",
+    };
+    plan.days[0].travelSegments[0].verificationStatus = "unknown";
+    const report = validate(plan, evidence({ status: "unavailable" }));
+
+    expect(report.status).toBe("pass");
+    expect(report.issues).toEqual([]);
+    expect(report.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_coordinates",
+          severity: "medium",
+        }),
+        expect.objectContaining({
+          code: "route_unavailable",
+          severity: "medium",
+        }),
+      ]),
+    );
+    expect(report.passedChecks).not.toContain("coordinates");
+    expect(report.passedChecks).not.toContain("route_duration");
   });
 
   it("surfaces closure and reservation evidence", () => {

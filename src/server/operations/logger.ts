@@ -1,0 +1,64 @@
+import "server-only";
+
+type OperationalMetadata = Record<string, unknown>;
+
+const forbiddenKeys = new Set([
+  "apikey",
+  "authorization",
+  "authheader",
+  "body",
+  "chatmessage",
+  "cookie",
+  "cookies",
+  "hiddenreasoning",
+  "memory",
+  "message",
+  "messages",
+  "payload",
+  "prompt",
+  "providerpayload",
+  "rawprompt",
+  "reasoning",
+  "refreshtoken",
+  "sharetoken",
+  "token",
+]);
+
+function normalizedKey(key: string) {
+  return key.toLowerCase().replaceAll(/[^a-z0-9]/g, "");
+}
+
+function sanitize(value: unknown, key = "", parentKey = ""): unknown {
+  if (
+    forbiddenKeys.has(normalizedKey(key)) &&
+    !(normalizedKey(parentKey) === "counts" && typeof value === "number")
+  )
+    return "[REDACTED]";
+  if (Array.isArray(value)) return value.map((item) => sanitize(item, "", key));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        sanitize(entryValue, entryKey, key),
+      ]),
+    );
+  }
+  if (["string", "number", "boolean"].includes(typeof value) || value === null)
+    return value;
+  return undefined;
+}
+
+export function createCorrelationId() {
+  return crypto.randomUUID();
+}
+
+export function logOperation(event: string, metadata: OperationalMetadata) {
+  const safeMetadata = sanitize(metadata) as OperationalMetadata;
+  console.info(
+    JSON.stringify({
+      timestamp: new Date().toISOString(),
+      ...safeMetadata,
+      event,
+    }),
+  );
+}

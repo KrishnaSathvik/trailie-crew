@@ -3,6 +3,9 @@ import { z } from "zod";
 import { TripShell } from "@/features/trips/components/trip-shell";
 import { getTripShell } from "@/features/trips/queries/get-trip-shell";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 function UnavailableTrip() {
   return (
     <main className="bg-background text-foreground flex min-h-dvh items-center justify-center px-6">

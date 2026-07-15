@@ -216,11 +216,11 @@ export function validateItinerary(input: Input): ValidationReport {
         routeEvidence.status === "unavailable" ||
         routeEvidence.status === "failed"
       ) {
-        issues.push(
+        warnings.push(
           issue(
             "route_unavailable",
-            "high",
-            "A required route could not be verified.",
+            "medium",
+            "Route timing is unavailable and remains unverified.",
             [segment.id],
             false,
             segment.evidenceRefs,
@@ -314,11 +314,11 @@ export function validateItinerary(input: Input): ValidationReport {
       item.location &&
       (item.location.latitude === null || item.location.longitude === null)
     ) {
-      issues.push(
+      warnings.push(
         issue(
           "missing_coordinates",
-          "high",
-          `${item.title} does not have verified coordinates.`,
+          "medium",
+          `${item.title} has no verified coordinates and remains unverified.`,
           [item.id],
           false,
         ),
@@ -514,7 +514,9 @@ export function validateItinerary(input: Input): ValidationReport {
       : blocking.every((entry) => entry.repairable)
         ? "needs_revision"
         : "blocked";
-  const failedCodes = new Set(issues.map((entry) => entry.code));
+  const failedCodes = new Set(
+    [...issues, ...warnings].map((entry) => entry.code),
+  );
   const checks = [
     "itinerary_schema",
     "referential_integrity",

@@ -192,3 +192,9 @@ Final `git status --short --branch` is clean relative to the starting branch exc
 2. **Local product quality: `pass`.** Formatting, lint, typecheck, production build, 318 unit/component assertions, 380 pgTAP assertions, schema/security checks, and all 11 real-stack Chromium scenarios pass. This is local evidence only; live provider and hosted quality are covered by the next verdicts.
 3. **Vercel Preview readiness: `ready_with_conditions`.** Proceed only after the Preview blocker list is addressed in a non-production environment; do not expose an unrestricted anonymous Preview.
 4. **Production readiness: `not_ready`.** Durable recovery, abuse/cost controls, lifecycle/privacy/legal operations, observability, backup/restore, accessibility, load, and hosted/live acceptance are blocking.
+
+## Phase 5A release update
+
+The dedicated protected custom Preview environment and non-production hosted Supabase project completed controlled acceptance. Cleared Preview blockers include hosted migrations/RLS/grants, scoped environment configuration, server/client env separation, structured redacted logs, real hosted OpenAI/Realtime workflow verification, explicit runtime ceilings, manual protected recovery, public header/cache behavior, and historical sharing/exports. Local final gates are 333 unit/component assertions, 391 pgTAP assertions, and 12 passing Playwright scenarios with the hosted-only spec skipped locally.
+
+The Preview verdict is **`ready_with_conditions`**: Vercel Authentication must remain enabled; CAPTCHA and unrestricted anonymous exposure are not accepted; Mapbox remains unavailable; OpenAI usage-alert ownership is not independently verified; recovery is manual; Supabase Free has no automatic backup/PITR; and the full manual accessibility matrix is incomplete. Production remains **`not_ready`** and was not deployed.

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildPlanningSummaryRequest } from "./openai-provider";
+import {
+  buildPlanningSummaryRequest,
+  mapPlanningProviderError,
+} from "./openai-provider";
 
 describe("planning OpenAI request", () => {
   it("uses verified Sol structured output without tools or storage", () => {
@@ -14,5 +17,11 @@ describe("planning OpenAI request", () => {
     expect(request.max_output_tokens).toBe(3000);
     expect(request).not.toHaveProperty("tools");
     expect(request.text.format.type).toBe("json_schema");
+  });
+
+  it("classifies an AbortSignal deadline as a retryable timeout", () => {
+    expect(
+      mapPlanningProviderError(new DOMException("Timed out", "TimeoutError")),
+    ).toMatchObject({ code: "model_timeout", retryable: true });
   });
 });

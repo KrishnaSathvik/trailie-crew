@@ -1,0 +1,39 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+
+async function expectNoSeriousAxeViolations(page: Page, label: string) {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  const violations = results.violations.filter(({ impact }) =>
+    ["critical", "serious"].includes(impact ?? ""),
+  );
+  expect(
+    violations.map(({ id, impact, nodes }) => ({
+      id,
+      impact,
+      targets: nodes.flatMap(({ target }) => target),
+    })),
+    `${label} has critical or serious accessibility violations`,
+  ).toEqual([]);
+}
+
+test("landing, entry, and authenticated chat have no serious axe findings", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expectNoSeriousAxeViolations(page, "landing");
+
+  await page.goto("/trips/create");
+  await expectNoSeriousAxeViolations(page, "create Trip");
+
+  await page.goto("/join");
+  await expectNoSeriousAxeViolations(page, "join Trip");
+
+  await page.goto("/trips/create");
+  await page.getByLabel("Trip name").fill("Accessible Preview Trip");
+  await page.getByLabel("Your display name").fill("Maya");
+  await page.getByRole("button", { name: "Create Trip" }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+  await expectNoSeriousAxeViolations(page, "authenticated chat");
+});

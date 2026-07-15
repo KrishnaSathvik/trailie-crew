@@ -94,3 +94,7 @@ Readiness labels mean:
 ## Verdict
 
 **Feature completeness: `complete_for_current_scope`.** The current Build Week workflow is connected and locally verified. This verdict excludes intentionally deferred booking, live provider breadth, public collaboration modes, and the operational hardening required for production.
+
+## Phase 5A hosted update
+
+The controlled hosted scenario verified create/join, private Realtime collaboration, focused AI, memory correction, two-user planning approval, repaired and validated Version 1, approved/confirmed Version 2, historical Version 1 sharing, ICS, print, revocation, refresh persistence, and manual protected recovery. Public cache/robot/referrer controls were checked against the hosted URL. The readiness label remains `complete_for_current_scope`; hosted evidence does not upgrade CAPTCHA, automated recovery, Mapbox, lifecycle, backup/restore, observability, accessibility, or legal operations to production-ready.

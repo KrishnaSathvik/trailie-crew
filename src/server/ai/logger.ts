@@ -1,5 +1,7 @@
 import "server-only";
 
+import { logOperation } from "@/server/operations/logger";
+
 type SafeAiLog = {
   invocationId?: string;
   runId?: string;
@@ -12,5 +14,14 @@ type SafeAiLog = {
 };
 
 export function logAiEvent(event: string, metadata: SafeAiLog) {
-  console.info(JSON.stringify({ scope: "trailie_ai", event, ...metadata }));
+  logOperation(`trailie_ai.${event}`, {
+    correlationId: metadata.invocationId ?? metadata.runId ?? "unavailable",
+    status: metadata.status ?? event,
+    errorCode: metadata.errorCode ?? null,
+    latencyMs: metadata.latencyMs,
+    model: metadata.model,
+    promptVersion: metadata.promptVersion,
+    runId: metadata.runId,
+    retryCount: metadata.retryCount,
+  });
 }

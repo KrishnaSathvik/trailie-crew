@@ -6,7 +6,7 @@ import {
   createUnavailableTravelProvider,
   type FakeTravelScenario,
 } from "@trailie/travel-tools";
-import { parseOpenAIEnv } from "@/lib/env";
+import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import { createOpenAIRevisionProvider } from "./openai-provider";
@@ -30,7 +30,7 @@ async function withSlot(task: () => Promise<void>) {
 }
 
 export async function drainPlanChange(id: string) {
-  const env = parseOpenAIEnv(process.env);
+  const env = requireAiGeneration(parseOpenAIEnv(process.env));
   const provider =
     env.provider === "fake"
       ? createFakeRevisionProvider()

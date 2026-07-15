@@ -2,6 +2,8 @@
 
 Phase 4B supports host-managed, version-pinned public links plus authenticated calendar and print/PDF exports for immutable published itineraries. See [sharing](docs/build-week/sharing.md), [exports](docs/build-week/exports.md), and [public privacy](docs/build-week/public-privacy.md).
 
+Phase 5A hosted acceptance is complete with controlled conditions. A dedicated Vercel custom Preview environment is backed by a non-production hosted Supabase project; the two-user Realtime/OpenAI/planning/itinerary/revision/share/export path passed after measured timeout, provider-unavailable, and public-redaction fixes. Vercel Authentication remains required because CAPTCHA is not configured, Mapbox evidence remains unavailable, and Production has not been deployed. This repository does not claim production readiness. See [Preview acceptance](docs/build-week/preview-acceptance.md), [deployment](docs/build-week/deployment.md), and [operations](docs/build-week/operations.md).
+
 > Plan trips together. Ask Trailie when you need help.
 
 Trailie Crew is a standalone collaborative AI trip-planning app being built for OpenAI Build Week 2026 in the **Apps for Your Life** category.
@@ -42,6 +44,8 @@ pnpm exec supabase start
 ```
 
 For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and Playwright map the local public/secret keys into child-process memory and select the deterministic fake AI provider. Real OpenAI requests require the server-only variables shown in `.env.example`. Never commit them or expose a secret through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329`, enables anonymous sign-ins, and starts Realtime.
+
+Set `AI_GENERATION_ENABLED=false` to stop all model-backed generation before provider construction while leaving ordinary crew chat available. The protected recovery route and every hosted variable are operational boundaries documented in [`docs/build-week/environment-variables.md`](docs/build-week/environment-variables.md); do not expose its bearer secret to a browser.
 
 Reset and test the local database, then run the app:
 

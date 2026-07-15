@@ -88,28 +88,28 @@ Confidence is for the check's implemented semantics, not general travel correctn
 
 ## Requested mutation-style cases
 
-| Case                                      | Coverage                                                            | Result / gap                                        |
-| ----------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------- |
-| Overlapping events                        | direct unit mutation                                                | Detected                                            |
-| Impossible travel time                    | direct unit + repaired E2E                                          | Detected and repairable                             |
-| Wrong timezone                            | unit mutation                                                       | Detected; multi-zone design gap remains             |
-| Invalid date                              | strict schema coverage, not a named validator mutation              | Weak; add explicit invalid calendar/range/DST tests |
-| Activity before arrival / after departure | direct unit                                                         | Detected globally                                   |
-| Excessive driving                         | direct unit                                                         | Detected at 360-minute configured ceiling           |
-| Closed place                              | fake evidence unit                                                  | Detected                                            |
-| Missing reservation                       | fake evidence unit                                                  | Detected as required note, not actual booking       |
-| Inaccessible schedule                     | no representative deterministic mutation                            | Missing                                             |
-| Dietary conflict                          | no representative deterministic mutation                            | Missing                                             |
-| Exceeded budget                           | direct unit                                                         | Detected for parseable USD daily totals             |
-| Missing coordinates                       | direct unit                                                         | Detected                                            |
-| Stale route                               | direct unit and audit-discovered E2E failure                        | Detected; fake default-clock regression fixed       |
-| Duplicate activity                        | direct unit                                                         | Detected by normalized title                        |
-| Empty itinerary                           | schema requires days, but explicit empty-plan mutation is not named | Partial                                             |
-| Empty day                                 | direct unit                                                         | Detected                                            |
-| Free-time-only day                        | direct unit                                                         | Detected                                            |
-| Rejected destination                      | direct rejected-option unit                                         | Detected lexically                                  |
-| Missing confirmed must-do                 | direct unit                                                         | Detected lexically                                  |
-| Unrelated revision drift                  | destination/date/unrelated-day boundary mutations                   | Detected for tested fields                          |
+| Case                                      | Coverage                                                            | Result / gap                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Overlapping events                        | direct unit mutation                                                | Detected                                                                                          |
+| Impossible travel time                    | direct unit + repaired E2E                                          | Detected and repairable                                                                           |
+| Wrong timezone                            | unit mutation                                                       | Detected; multi-zone design gap remains                                                           |
+| Invalid date                              | strict schema coverage, not a named validator mutation              | Weak; add explicit invalid calendar/range/DST tests                                               |
+| Activity before arrival / after departure | direct unit                                                         | Detected globally                                                                                 |
+| Excessive driving                         | direct unit                                                         | Detected at 360-minute configured ceiling                                                         |
+| Closed place                              | fake evidence unit                                                  | Detected                                                                                          |
+| Missing reservation                       | fake evidence unit                                                  | Detected as required note, not actual booking                                                     |
+| Inaccessible schedule                     | no representative deterministic mutation                            | Missing                                                                                           |
+| Dietary conflict                          | no representative deterministic mutation                            | Missing                                                                                           |
+| Exceeded budget                           | direct unit                                                         | Detected for parseable USD daily totals                                                           |
+| Missing coordinates                       | direct unit and hosted provider-unavailable case                    | Labeled unverified warning when optional provider is unavailable; still not presented as verified |
+| Stale route                               | direct unit and audit-discovered E2E failure                        | Detected; fake default-clock regression fixed                                                     |
+| Duplicate activity                        | direct unit                                                         | Detected by normalized title                                                                      |
+| Empty itinerary                           | schema requires days, but explicit empty-plan mutation is not named | Partial                                                                                           |
+| Empty day                                 | direct unit                                                         | Detected                                                                                          |
+| Free-time-only day                        | direct unit                                                         | Detected                                                                                          |
+| Rejected destination                      | direct rejected-option unit                                         | Detected lexically                                                                                |
+| Missing confirmed must-do                 | direct unit                                                         | Detected lexically                                                                                |
+| Unrelated revision drift                  | destination/date/unrelated-day boundary mutations                   | Detected for tested fields                                                                        |
 
 ## Privacy and public accuracy
 
@@ -128,3 +128,7 @@ Residual risk remains because deterministic regular expressions are not a formal
 ## Verdict
 
 **Accuracy and trustworthiness: conditional for Preview, insufficient for unrestricted production.** Implemented evidence and publication boundaries are conservative and fail closed, but live provider breadth, travel-specific validator depth, provenance UX, and evaluated model/provider accuracy remain incomplete.
+
+### Phase 5A hosted accuracy evidence
+
+With Mapbox absent and no fake provider configured, generated route/coordinate facts remained unknown. Missing optional-provider evidence is now a medium unverified warning instead of a non-repairable publication block; overlaps and duplicates still require deterministic repair. A real hosted Version 1 required one repair and published only after validation `pass`. Traveler-name redaction removed a model-generated title and summary; generic privacy-safe headings now preserve public usability without restoring private names. Historical Version 1 stayed pinned after Version 2 and disappeared immediately after revocation.

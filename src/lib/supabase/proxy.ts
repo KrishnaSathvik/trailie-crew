@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { parsePublicSupabaseEnv } from "@/lib/env";
+import { parsePublicSupabaseEnv } from "@/lib/env-public";
+import { createCorrelationId, logOperation } from "@/server/operations/logger";
 import type { Database } from "@/types/database";
 
 export async function refreshSupabaseSession(request: NextRequest) {
@@ -30,6 +31,14 @@ export async function refreshSupabaseSession(request: NextRequest) {
     },
   );
 
-  await client.auth.getClaims();
+  try {
+    await client.auth.getClaims();
+  } catch {
+    logOperation("auth.session_refresh_failed", {
+      correlationId: createCorrelationId(),
+      status: "signed_out",
+      errorCode: "auth_session_invalid",
+    });
+  }
   return response;
 }

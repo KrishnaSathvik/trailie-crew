@@ -6,7 +6,7 @@ import {
 
 import { authorizeTrailieSource } from "@/features/trailie/invocation/authorize-source";
 import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
-import { parseOpenAIEnv } from "@/lib/env";
+import { parseOpenAIEnv } from "@/server/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assembleFocusedContext } from "@/server/ai/context";
 import { logAiEvent } from "@/server/ai/logger";
@@ -21,6 +21,7 @@ import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const inputSchema = z
   .object({
@@ -133,6 +134,8 @@ export async function POST(request: Request) {
   } catch {
     return jsonError("openai_authentication_failed", 503);
   }
+  if (!environment.generationEnabled)
+    return jsonError("ai_generation_disabled", 503);
 
   const { data: invocationData, error: invocationError } = await admin.rpc(
     "create_ai_invocation",

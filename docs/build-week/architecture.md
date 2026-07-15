@@ -108,6 +108,16 @@ The streaming route rechecks the Auth user, participant, source message, room, r
 
 See [`database-security.md`](database-security.md) and [`realtime-chat.md`](realtime-chat.md) for schema, RPC, channel, RLS, reconciliation, pagination, and local-testing details.
 
+## Phase 5A Preview runtime boundary
+
+Browser code imports only `src/lib/env-public.ts`; server secrets, provider settings, the AI emergency switch, and recovery authentication live in `src/server/env.ts`. Production browser chunks must not contain the server schema or secret identifiers. All model drains call the server-only emergency guard before constructing a provider.
+
+Focused streaming uses a Node.js route with a 60-second ceiling. The authenticated Trip route declares Node.js and a 300-second ceiling for Server Actions and their `after()` work; Next.js keeps `after()` work inside the route's configured platform lifetime. The internal recovery Node.js route also has a 300-second ceiling and handles at most one candidate from each job category concurrently.
+
+Recovery remains database-led: service-only list/claim RPCs identify stale work, attempt/state guards prevent terminal reprocessing, and a private forced-RLS execution ledger provides a distributed cooldown. `POST /api/internal/recovery` adds constant-time bearer authentication, no-store safe-count responses, structured redacted logs, and no browser/CORS surface. Preview invokes it manually because Vercel Cron targets Production deployments only.
+
+The selected Vercel project uses Pro Fluid Compute in `iad1`, matching these configured ceilings. Hosted acceptance measured planning at 46.671 seconds, itinerary generation at 160.316 seconds, its one repair at 80.633 seconds, revision analysis at 12.050 seconds, and candidate generation at 60.674 seconds. The planning deadline was raised from 45 to 90 seconds after two exact deadline aborts. Manual recovery is accepted only for this supervised Preview; durable automated execution remains production work.
+
 ## Phase 2B: silent memory pipeline
 
 Human persistence remains the critical path. `sendMessageAction` schedules `after()` only after a successful database response. The background worker claims through a service-only RPC, deterministically filters chatter, loads bounded server-only context, calls the extraction provider, validates the proposed patch, and applies it atomically. Normalized facts are evidence history; `private.room_memory` is the rebuildable read projection. See [conversation-memory.md](conversation-memory.md).

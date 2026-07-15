@@ -67,3 +67,9 @@ The local provider is deterministic, while Auth, PostgreSQL, RLS, RPCs, private 
 6. Refresh and show the same immutable version in both crew contexts; resize to 390×844 and confirm the Plan tab and subnavigation remain usable.
 
 Only model and travel providers are faked locally. Auth, PostgreSQL, RLS, progress state, validation, repair state, and publication are real.
+
+## Phase 5A protected Preview demo
+
+Use only the Vercel Authentication-protected Preview and the dedicated non-production Supabase project. Demonstrate the accepted two-user path from ordinary silent chat through focused Trailie, memory correction, approved planning summary, published Version 1, bounded revision to Version 2, historical Version 1 sharing, ICS, print/Save as PDF, and immediate share revocation. Keep private test message content and tokens out of screenshots and logs.
+
+Call out the controlled conditions: Mapbox evidence is unavailable rather than verified, CAPTCHA is not configured, recovery is manually invoked through the protected endpoint, and the Supabase Free project has no automatic backup/PITR. Do not describe this Preview as a Production deployment or an unrestricted public launch.

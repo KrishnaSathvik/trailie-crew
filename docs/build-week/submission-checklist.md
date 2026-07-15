@@ -39,7 +39,27 @@
 - [ ] Production deployment and environment review
 - [x] Phase 4C local validation commands pass; hosted acceptance and credentialed provider checks remain separate gates.
 - [x] Demo script reflects implemented behavior through Phase 4B
-- [ ] Submission copy makes no unsupported claims
+- [x] Submission copy makes no unsupported production, booking, availability, or live-provider claims
+
+## Phase 5A controlled Preview
+
+- [x] Phase 4C audit baseline committed and pushed (`3561309`)
+- [x] Vercel CLI 56.2.0 and dedicated `trailie-crew-preview` project
+- [x] Next.js/pnpm/Node configuration and Pro Fluid Compute compatibility verified
+- [x] Vercel Authentication protects deployment URLs; no custom domain or Git-triggered Production deployment
+- [x] Browser/server environment schemas split; local production bundle contains no server env schema identifiers
+- [x] Structured log contract and forbidden-field redaction tests
+- [x] Server-only AI generation emergency switch and provider-construction guard
+- [x] Protected bounded recovery route plus distributed service-only cooldown
+- [x] Anonymous-user lifecycle and forward-fix deployment runbooks documented
+- [x] Axe critical/serious checks pass for landing, create, join, and authenticated chat
+- [x] Dedicated hosted Supabase project authenticated, configured, migrated, and catalog-verified
+- [x] Preview-only environment variables configured; Production remains empty
+- [ ] OpenAI usage alert/budget ownership verified
+- [x] Hosted recovery, Realtime, OpenAI, sharing, export, header/cache, and controlled scenario acceptance
+- [x] Mapbox absent; explicit unavailable-evidence Preview condition confirmed
+- [x] Free-plan backup limitation verified; manual pre-acceptance schema/data dumps recorded
+- [x] Final verdict: Preview ready with controlled conditions; Production remains undeployed
 
 ## Phase 2B conversation memory
 

@@ -327,6 +327,10 @@ export type Database = {
       };
     };
     Functions: {
+      claim_recovery_execution: {
+        Args: { min_interval_seconds?: number };
+        Returns: boolean;
+      };
       create_trip: {
         Args: {
           trip_name: string;

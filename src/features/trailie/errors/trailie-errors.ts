@@ -4,6 +4,8 @@ export const trailieErrorMessages = {
   invocation_failed:
     "Trailie could not answer just now. You can retry without resending your message.",
   invocation_cancelled: "Trailie stopped answering.",
+  ai_generation_disabled:
+    "Trailie is temporarily paused. Crew chat is still available.",
   openai_authentication_failed:
     "Trailie is temporarily unavailable because its service is not configured.",
   openai_rate_limited:

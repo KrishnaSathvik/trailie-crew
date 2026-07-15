@@ -57,6 +57,28 @@ describe("public share repository", () => {
     });
   });
 
+  it("uses privacy-safe labels when redaction removes required headings", async () => {
+    const redacted = { ...itinerary } as Partial<typeof itinerary>;
+    delete redacted.title;
+    delete redacted.destinationSummary;
+    rpc.mockResolvedValue({
+      data: {
+        itinerary: redacted,
+        snapshotHash: "b".repeat(64),
+        mode: "public_link",
+        expiresAt: null,
+      },
+      error: null,
+    });
+
+    await expect(verifyPlanShareToken("B".repeat(43))).resolves.toMatchObject({
+      itinerary: {
+        title: "Shared trip itinerary",
+        destinationSummary: "Trip details shared by the host.",
+      },
+    });
+  });
+
   it.each(["short", "+".repeat(43)])(
     "collapses malformed token %s to unavailable without a query",
     async (token) => {

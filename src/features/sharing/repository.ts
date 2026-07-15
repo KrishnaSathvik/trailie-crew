@@ -18,6 +18,33 @@ const verificationSchema = z
   })
   .strict();
 
+function withRequiredPublicHeadings(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const envelope = value as Record<string, unknown>;
+  if (
+    !envelope.itinerary ||
+    typeof envelope.itinerary !== "object" ||
+    Array.isArray(envelope.itinerary)
+  )
+    return value;
+  const itinerary = envelope.itinerary as Record<string, unknown>;
+  return {
+    ...envelope,
+    itinerary: {
+      ...itinerary,
+      title:
+        typeof itinerary.title === "string" && itinerary.title.trim()
+          ? itinerary.title
+          : "Shared trip itinerary",
+      destinationSummary:
+        typeof itinerary.destinationSummary === "string" &&
+        itinerary.destinationSummary.trim()
+          ? itinerary.destinationSummary
+          : "Trip details shared by the host.",
+    },
+  };
+}
+
 export async function verifyPlanShareToken(token: string) {
   let tokenHash: string;
   try {
@@ -30,6 +57,6 @@ export async function verifyPlanShareToken(token: string) {
     target_token_hash: tokenHash,
   });
   if (error || data === null) return null;
-  const result = verificationSchema.safeParse(data);
+  const result = verificationSchema.safeParse(withRequiredPublicHeadings(data));
   return result.success ? result.data : null;
 }

@@ -94,6 +94,12 @@ Completion inserts the Trailie message and marks the run/invocation complete in 
 
 Phase 2A adds deterministic Trailie invocation, private AI workflow/usage records, server-only OpenAI access, and one persisted focused response. It does not implement membership-management RPCs, planning, itinerary data, live tools, uploads, message editing/deletion, moderation, or production CAPTCHA/anonymous-user cleanup.
 
+## Phase 5A recovery execution boundary
+
+`private.recovery_executions` is a forced-RLS ledger with no direct grants. The empty-search-path `public.claim_recovery_execution(integer)` wrapper is executable only by `service_role` and atomically enforces a bounded 10-second distributed cooldown across serverless instances. Anonymous and authenticated browser roles cannot read the ledger or claim execution. The protected application route then lists at most one candidate from each existing recovery RPC and relies on each workflow's row lock, lease age, terminal-state exclusion, and attempt cap before doing work.
+
+The Phase 5A pgTAP suite verifies the private ledger, forced RLS, browser denial, service-only RPC grant, first claim, and duplicate cooldown rejection. Hosted catalog checks confirmed RLS on all application tables, forced RLS on private tables, expected grants, empty definer search paths, and private Realtime policies. A protected hosted drill returned 401 for missing/wrong credentials, 200 with safe zero counts for a correct no-work invocation, and 429 for an immediate duplicate.
+
 ## Phase 2B private memory
 
 `private.message_extractions` and `private.memory_facts` enable and force RLS. `anon`, `authenticated`, and `service_role` have no direct table privileges, including on `private.room_memory`. Service access is limited to explicit public RPC wrappers; private mutation/projection functions are `SECURITY DEFINER`, use `search_path = ''`, and are not executable by browser roles. The model never writes rows directly.

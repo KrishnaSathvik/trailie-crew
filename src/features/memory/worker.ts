@@ -1,6 +1,6 @@
 import "server-only";
 
-import { parseOpenAIEnv } from "@/lib/env";
+import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { classifyMemoryEligibility } from "./eligibility";
 import { createOpenAIMemoryExtractionProvider } from "./openai-provider";
@@ -100,7 +100,7 @@ export async function processMemoryExtraction(
 }
 
 export async function drainMemoryExtraction(messageId: string) {
-  const environment = parseOpenAIEnv(process.env);
+  const environment = requireAiGeneration(parseOpenAIEnv(process.env));
   const provider =
     environment.provider === "fake"
       ? createFakeMemoryExtractionProvider()

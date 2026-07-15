@@ -1,14 +1,7 @@
 import "server-only";
 import { after } from "next/server";
-import { parseOpenAIEnv } from "@/lib/env";
+import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
-import { createAdminSupabaseClient } from "@/server/supabase/admin";
-import { drainMemoryExtraction } from "@/features/memory/worker";
-import { drainItineraryGeneration } from "@/features/itinerary/scheduler";
-import {
-  drainPlanChange,
-  publishPlanChange,
-} from "@/features/revisions/scheduler";
 import { createOpenAIPlanningSummaryProvider } from "./openai-provider";
 import { createFakePlanningSummaryProvider } from "./provider";
 import { createPlanningRepository } from "./repository";
@@ -29,7 +22,7 @@ async function withSlot(task: () => Promise<void>) {
   }
 }
 export async function drainPlanningSummary(id: string) {
-  const env = parseOpenAIEnv(process.env);
+  const env = requireAiGeneration(parseOpenAIEnv(process.env));
   const provider =
     env.provider === "fake"
       ? createFakePlanningSummaryProvider()
@@ -54,39 +47,4 @@ export async function drainPlanningSummary(id: string) {
 }
 export function schedulePlanningSummary(id: string) {
   after(() => withSlot(() => drainPlanningSummary(id)).catch(() => undefined));
-}
-export async function recoverAbandonedWork() {
-  const admin = createAdminSupabaseClient();
-  const [
-    { data: planning },
-    { data: memory },
-    { data: itinerary },
-    { data: revisions },
-    { data: revisionPublications },
-  ] = await Promise.all([
-    admin.rpc("list_recoverable_planning_requests", { batch_size: 10 }),
-    admin.rpc("list_recoverable_message_extractions", { batch_size: 20 }),
-    admin.rpc("list_recoverable_itinerary_generations", { batch_size: 10 }),
-    admin.rpc("list_recoverable_plan_changes", { batch_size: 10 }),
-    admin.rpc("list_recoverable_plan_change_publications", {
-      batch_size: 10,
-    }),
-  ]);
-  for (const id of (planning ?? []) as string[])
-    await withSlot(() => drainPlanningSummary(id));
-  for (const id of (memory ?? []) as string[])
-    await withSlot(() => drainMemoryExtraction(id));
-  for (const id of (itinerary ?? []) as string[])
-    await withSlot(() => drainItineraryGeneration(id));
-  for (const id of (revisions ?? []) as string[])
-    await withSlot(() => drainPlanChange(id));
-  for (const id of (revisionPublications ?? []) as string[])
-    await withSlot(() => publishPlanChange(id));
-  return {
-    planning: (planning ?? []).length,
-    memory: (memory ?? []).length,
-    itinerary: (itinerary ?? []).length,
-    revisions: (revisions ?? []).length,
-    revisionPublications: (revisionPublications ?? []).length,
-  };
 }

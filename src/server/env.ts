@@ -1,28 +1,22 @@
+import "server-only";
+
 import { z } from "zod";
 
-const publicSupabaseEnvSchema = z
-  .object({
-    NEXT_PUBLIC_SUPABASE_URL: z.url(),
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(20),
-  })
-  .superRefine((value, context) => {
-    if (value.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.startsWith("sb_secret_")) {
-      context.addIssue({
-        code: "custom",
-        path: ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
-        message:
-          "A Supabase secret key must never be exposed through NEXT_PUBLIC_*.",
-      });
-    }
-  });
-
-const serverSupabaseEnvSchema = publicSupabaseEnvSchema.and(
-  z.object({ SUPABASE_SECRET_KEY: z.string().min(20) }),
-);
+import { parsePublicSupabaseEnv } from "@/lib/env-public";
 
 type EnvironmentSource = Record<string, string | undefined>;
 
+const serverSupabaseEnvSchema = z.object({
+  SUPABASE_SECRET_KEY: z.string().min(20),
+});
+
+const enabledSchema = z
+  .enum(["true", "false"])
+  .default("true")
+  .transform((value) => value === "true");
+
 const openAIEnvSchema = z.object({
+  AI_GENERATION_ENABLED: enabledSchema,
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL_CONVERSATION: z.string().trim().min(1).default("gpt-5.6-terra"),
   OPENAI_MODEL_FLAGSHIP: z.string().trim().min(1).default("gpt-5.6-sol"),
@@ -71,7 +65,7 @@ const openAIEnvSchema = z.object({
     .int()
     .min(5_000)
     .max(120_000)
-    .default(45_000),
+    .default(90_000),
   OPENAI_ITINERARY_MODEL: z.string().trim().min(1).default("gpt-5.6-sol"),
   OPENAI_ITINERARY_PROMPT_VERSION: z
     .string()
@@ -101,42 +95,33 @@ const openAIEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
 
-export function parsePublicSupabaseEnv(source: EnvironmentSource) {
-  const values = publicSupabaseEnvSchema.parse(source);
-
-  return {
-    url: values.NEXT_PUBLIC_SUPABASE_URL,
-    publishableKey: values.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  };
-}
+const recoveryEnvSchema = z.object({
+  RECOVERY_SECRET: z.string().min(32),
+});
 
 export function parseServerSupabaseEnv(source: EnvironmentSource) {
+  const publicValues = parsePublicSupabaseEnv(source);
   const values = serverSupabaseEnvSchema.parse(source);
-
-  if (
-    values.SUPABASE_SECRET_KEY === values.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  ) {
+  if (values.SUPABASE_SECRET_KEY === publicValues.publishableKey) {
     throw new Error(
       "SUPABASE_SECRET_KEY must differ from the browser publishable key.",
     );
   }
-
-  return {
-    url: values.NEXT_PUBLIC_SUPABASE_URL,
-    publishableKey: values.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    secretKey: values.SUPABASE_SECRET_KEY,
-  };
+  return { ...publicValues, secretKey: values.SUPABASE_SECRET_KEY };
 }
 
 export function parseOpenAIEnv(source: EnvironmentSource) {
   const values = openAIEnvSchema.parse(source);
-  if (values.TRAILIE_AI_PROVIDER === "fake") {
-    if (values.NODE_ENV === "production")
-      throw new Error("The fake AI provider is disabled in production.");
-  } else if (!values.OPENAI_API_KEY || !values.OPENAI_SAFETY_HMAC_SECRET) {
+  if (values.TRAILIE_AI_PROVIDER === "fake" && values.NODE_ENV === "production")
+    throw new Error("The fake AI provider is disabled in production.");
+  if (
+    values.AI_GENERATION_ENABLED &&
+    values.TRAILIE_AI_PROVIDER === "openai" &&
+    (!values.OPENAI_API_KEY || !values.OPENAI_SAFETY_HMAC_SECRET)
+  )
     throw new Error("OpenAI server configuration is incomplete.");
-  }
   return {
+    generationEnabled: values.AI_GENERATION_ENABLED,
     provider: values.TRAILIE_AI_PROVIDER,
     apiKey: values.OPENAI_API_KEY ?? null,
     conversationModel: values.OPENAI_MODEL_CONVERSATION,
@@ -144,7 +129,7 @@ export function parseOpenAIEnv(source: EnvironmentSource) {
     promptVersion: values.OPENAI_PROMPT_VERSION,
     safetyHmacSecret:
       values.OPENAI_SAFETY_HMAC_SECRET ??
-      "fake-provider-development-only-secret",
+      "generation-disabled-or-fake-provider-secret",
     timeoutMs: values.OPENAI_TIMEOUT_MS,
     memoryModel: values.OPENAI_MEMORY_MODEL,
     memoryPromptVersion: values.OPENAI_MEMORY_PROMPT_VERSION,
@@ -160,4 +145,23 @@ export function parseOpenAIEnv(source: EnvironmentSource) {
     itineraryValidatorVersion: values.ITINERARY_VALIDATOR_VERSION,
     itineraryTimeoutMs: values.OPENAI_ITINERARY_TIMEOUT_MS,
   } as const;
+}
+
+export class AiGenerationDisabledError extends Error {
+  constructor() {
+    super("ai_generation_disabled");
+    this.name = "AiGenerationDisabledError";
+  }
+}
+
+export function requireAiGeneration(
+  environment: ReturnType<typeof parseOpenAIEnv>,
+) {
+  if (!environment.generationEnabled) throw new AiGenerationDisabledError();
+  return environment;
+}
+
+export function parseRecoveryEnv(source: EnvironmentSource) {
+  const values = recoveryEnvSchema.parse(source);
+  return { secret: values.RECOVERY_SECRET };
 }
