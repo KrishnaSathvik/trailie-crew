@@ -90,6 +90,7 @@ export function ChatExperience({
     body: string;
     status: "answering" | "failed";
     errorCode: TrailieErrorCode | null;
+    retryable: boolean;
   } | null>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<
@@ -368,6 +369,7 @@ export function ChatExperience({
       body: "",
       status: "answering",
       errorCode: null,
+      retryable: false,
     });
     try {
       for await (const event of invokeTrailieStream({
@@ -391,8 +393,10 @@ export function ChatExperience({
             current
               ? {
                   ...current,
+                  body: "",
                   status: "failed",
                   errorCode: event.code as TrailieErrorCode,
+                  retryable: event.retryable,
                 }
               : null,
           );
@@ -408,6 +412,7 @@ export function ChatExperience({
                 ...current,
                 status: "failed",
                 errorCode: "invocation_failed",
+                retryable: true,
               }
             : null,
         );
@@ -562,6 +567,7 @@ export function ChatExperience({
             body={trailieAnswer.body}
             status={trailieAnswer.status}
             errorCode={trailieAnswer.errorCode}
+            retryable={trailieAnswer.retryable}
             onCancel={() => trailieAbortRef.current?.abort()}
             onRetry={() => enqueueTrailie(trailieAnswer.source)}
           />

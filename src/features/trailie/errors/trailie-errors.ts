@@ -24,6 +24,20 @@ export const trailieErrorMessages = {
   openai_unavailable: "Trailie is temporarily unavailable. Please try again.",
   invalid_model_response:
     "Trailie could not produce a safe answer. Please try again.",
+  model_timeout:
+    "Trailie took longer than the safe deadline. You can retry this request.",
+  model_rate_limited:
+    "Trailie’s provider is temporarily rate limited. You can retry shortly.",
+  model_unavailable:
+    "Trailie’s provider is temporarily unavailable. You can retry shortly.",
+  invalid_model_output:
+    "Trailie did not produce a response that passed validation.",
+  workflow_deadline_exceeded:
+    "Trailie reached the workflow deadline without publishing partial work.",
+  retry_exhausted:
+    "Trailie reached the safe retry limit. Chat and existing plans remain available.",
+  recovery_required:
+    "Trailie saved this request for recovery. Chat remains available while recovery continues.",
   context_unavailable: "Trailie could not load the conversation context.",
   permission_denied: "You do not have access to invoke Trailie here.",
   membership_required: "Active Trip membership is required.",

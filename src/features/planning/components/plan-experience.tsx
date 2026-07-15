@@ -297,14 +297,26 @@ export function PlanExperience({
           The summary could not be prepared.
         </h1>
         <p className="text-muted-foreground mt-3">
-          {request.generationErrorCode === "ai_disabled"
-            ? "New AI generation is temporarily paused. Chat and prior plans remain available."
-            : request.generationErrorCode?.includes("ai_limit_reached") ||
-                request.generationErrorCode === "provider_budget_unavailable"
-              ? "The current generation allowance is unavailable or has been reached. Chat and prior plans remain available."
-              : "Chat and private memory are unchanged. You can retry safely."}
+          {request.generationErrorCode === "recovery_required"
+            ? "The validated summary was saved for automatic recovery. Chat and prior plans remain available; no action is required now."
+            : request.generationErrorCode === "workflow_deadline_exceeded"
+              ? "The summary reached its total deadline and stopped without publishing partial work. Chat and prior plans remain available."
+              : request.generationErrorCode === "retry_exhausted"
+                ? "The summary reached its safe retry limit. Chat and prior plans remain available."
+                : request.generationErrorCode === "ai_disabled"
+                  ? "New AI generation is temporarily paused. Chat and prior plans remain available."
+                  : request.generationErrorCode?.includes("ai_limit_reached") ||
+                      request.generationErrorCode ===
+                        "provider_budget_unavailable"
+                    ? "The current generation allowance is unavailable or has been reached. Chat and prior plans remain available."
+                    : "Chat and private memory are unchanged. You can retry safely."}
         </p>
-        {!request.generationErrorCode?.includes("ai_limit_reached") &&
+        {![
+          "recovery_required",
+          "workflow_deadline_exceeded",
+          "retry_exhausted",
+        ].includes(request.generationErrorCode ?? "") &&
+        !request.generationErrorCode?.includes("ai_limit_reached") &&
         request.generationErrorCode !== "ai_disabled" &&
         request.generationErrorCode !== "provider_budget_unavailable" ? (
           <button

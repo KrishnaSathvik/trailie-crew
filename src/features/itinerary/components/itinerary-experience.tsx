@@ -33,6 +33,18 @@ const quotaCopy: Record<string, string> = {
     "Trailie’s daily generation capacity has been reached.",
   provider_budget_unavailable:
     "Generation is temporarily unavailable because the provider budget cannot be reserved.",
+  model_timeout:
+    "The provider exceeded the safe deadline. No partial itinerary was published; a retry is safe.",
+  model_rate_limited:
+    "The provider is temporarily rate limited. No partial itinerary was published; retry shortly.",
+  model_unavailable:
+    "The provider is temporarily unavailable. No partial itinerary was published; a retry is safe.",
+  recovery_required:
+    "The validated work was saved for automatic recovery. Chat and published plans remain available while recovery continues.",
+  retry_exhausted:
+    "The itinerary reached its safe retry limit. Chat and published plans remain available.",
+  workflow_deadline_exceeded:
+    "The workflow reached its total deadline and stopped without publishing partial work.",
 };
 
 function costLabel(cost: CostEstimate) {

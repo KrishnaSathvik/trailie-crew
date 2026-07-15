@@ -24,7 +24,10 @@ import { createCorrelationId, logOperation } from "@/server/operations/logger";
 import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
 import type { ProviderAttemptExecutionResult } from "@/server/ai/provider-attempts";
-import { ProviderFailure } from "@/server/ai/reliability-policy";
+import {
+  ProviderFailure,
+  runProviderOperation,
+} from "@/server/ai/reliability-policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -265,37 +268,46 @@ export async function POST(request: Request) {
           leaseMs: environment.reliabilityPolicy.recoveryLeaseMs,
           execute: async ({ attemptId }) => {
             const providerStartedAt = Date.now();
-            const result = await runWithAiQuota(
-              {
-                userId: authData.user.id,
-                roomId: parsed.data.roomId,
-                workflow: "focused_answer",
-                model: route.model,
-                estimatedTokens: 4_000,
-                reservationId: attemptId,
+            const providerOperation = await runProviderOperation({
+              policy: environment.reliabilityPolicy,
+              stage: "focusedProvider",
+              signal: request.signal,
+              operation: async ({ signal }) => {
+                const bufferedDeltas: string[] = [];
+                const result = await runWithAiQuota(
+                  {
+                    userId: authData.user.id,
+                    roomId: parsed.data.roomId,
+                    workflow: "focused_answer",
+                    model: route.model,
+                    estimatedTokens: 4_000,
+                    reservationId: attemptId,
+                  },
+                  async () => {
+                    const providerStream = await providerFor(
+                      environment,
+                    ).stream({
+                      operationKey: invocationId,
+                      request: decision.normalizedRequest,
+                      context: context.text,
+                      model: route.model,
+                      safetyIdentifier: createSafetyIdentifier(
+                        authData.user.id,
+                        environment.safetyHmacSecret,
+                      ),
+                      signal,
+                    });
+                    for await (const delta of providerStream.textDeltas)
+                      bufferedDeltas.push(delta);
+                    return providerStream.completed;
+                  },
+                );
+                return { result, bufferedDeltas };
               },
-              async () => {
-                const providerStream = await providerFor(environment).stream({
-                  operationKey: invocationId,
-                  request: decision.normalizedRequest,
-                  context: context.text,
-                  model: route.model,
-                  safetyIdentifier: createSafetyIdentifier(
-                    authData.user.id,
-                    environment.safetyHmacSecret,
-                  ),
-                  signal: AbortSignal.any([
-                    request.signal,
-                    AbortSignal.timeout(
-                      environment.reliabilityPolicy.timeoutsMs.focusedProvider,
-                    ),
-                  ]),
-                });
-                for await (const delta of providerStream.textDeltas)
-                  emit({ type: "text_delta", delta });
-                return providerStream.completed;
-              },
-            );
+            });
+            for (const delta of providerOperation.value.bufferedDeltas)
+              emit({ type: "text_delta", delta });
+            const result = providerOperation.value.result;
             const envelope = trailieResponseEnvelopeSchema.parse({
               schemaVersion: "1",
               ...result.answer,
@@ -309,7 +321,7 @@ export async function POST(request: Request) {
               usage: result.usage,
               providerDurationMs: Date.now() - providerStartedAt,
               totalDurationMs: Date.now() - startedAt,
-              retryCount: Number(invocation.retry_count ?? 0),
+              retryCount: providerOperation.retryCount,
               repairCount: 0,
             } satisfies ProviderAttemptExecutionResult<Envelope>;
           },
@@ -346,19 +358,15 @@ export async function POST(request: Request) {
           latencyMs: outcome.result.totalDurationMs,
         });
       } catch (error) {
-        const failure =
-          error instanceof AiQuotaError
+        const failure = request.signal.aborted
+          ? new TrailieProviderError("invocation_cancelled", false)
+          : error instanceof AiQuotaError
             ? new TrailieProviderError(error.code as never, false)
             : error instanceof TrailieProviderError
               ? error
               : error instanceof ProviderFailure
                 ? new TrailieProviderError(error.code as never, error.retryable)
-                : new TrailieProviderError(
-                    request.signal.aborted
-                      ? "invocation_cancelled"
-                      : "openai_unavailable",
-                    true,
-                  );
+                : new TrailieProviderError("openai_unavailable", true);
         await admin.rpc("fail_ai_run", {
           target_invocation_id: invocationId,
           target_run_id: runId,

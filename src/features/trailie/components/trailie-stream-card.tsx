@@ -9,12 +9,14 @@ export function TrailieStreamCard({
   body,
   status,
   errorCode,
+  retryable,
   onCancel,
   onRetry,
 }: {
   body: string;
   status: "answering" | "failed";
   errorCode: TrailieErrorCode | null;
+  retryable: boolean;
   onCancel: () => void;
   onRetry: () => void;
 }) {
@@ -55,13 +57,15 @@ export function TrailieStreamCard({
           <p role="alert">
             {trailieErrorMessages[errorCode ?? "invocation_failed"]}
           </p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="focus-visible:ring-ring mt-2 text-xs font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
-          >
-            Retry Trailie
-          </button>
+          {retryable ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="focus-visible:ring-ring mt-2 text-xs font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Retry Trailie
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

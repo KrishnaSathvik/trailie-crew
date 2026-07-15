@@ -2,6 +2,7 @@ import { parseCleanupEnv } from "@/server/env";
 import { runDefaultAnonymousCleanup } from "@/server/lifecycle/cleanup";
 import { createCorrelationId, logOperation } from "@/server/operations/logger";
 import { recoveryRequestIsAuthorized } from "@/server/recovery/auth";
+import { tryDeliverOperationalAlert } from "@/server/operations/alerts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -60,6 +61,13 @@ async function handle(request: Request, scheduled: boolean) {
     const overlap =
       error instanceof Error && error.message === "cleanup_already_running";
     logOperation("cleanup.failed", {
+      correlationId,
+      workflow: "anonymous_cleanup",
+      status: "error",
+      errorCode: overlap ? "cleanup_already_running" : "cleanup_unavailable",
+      latencyMs: Date.now() - startedAt,
+    });
+    await tryDeliverOperationalAlert("cleanup.failed", {
       correlationId,
       workflow: "anonymous_cleanup",
       status: "error",

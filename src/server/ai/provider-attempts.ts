@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ProviderUsage } from "@/server/ai/provider";
+import { tryDeliverOperationalAlert } from "@/server/operations/alerts";
 import {
   classifyProviderFailure,
   providerFailureCodes,
@@ -152,6 +153,11 @@ export function createDurableProviderAttemptController<T>(
             operationalCode,
             false,
           );
+          await tryDeliverOperationalAlert("quota.rejected", {
+            workflow: input.workflow,
+            status: "rejected",
+            errorCode: operationalCode,
+          });
           throw error;
         }
         const failure = classifyProviderFailure(error);
@@ -161,6 +167,11 @@ export function createDurableProviderAttemptController<T>(
           failure.code,
           failure.retryable,
         );
+        await tryDeliverOperationalAlert("provider.failed", {
+          workflow: input.workflow,
+          status: "error",
+          errorCode: failure.code,
+        });
         throw failure;
       }
     },

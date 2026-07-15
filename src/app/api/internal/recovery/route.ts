@@ -1,5 +1,6 @@
 import { parseRecoveryEnv } from "@/server/env";
 import { createCorrelationId, logOperation } from "@/server/operations/logger";
+import { tryDeliverOperationalAlert } from "@/server/operations/alerts";
 import { recoveryRequestIsAuthorized } from "@/server/recovery/auth";
 import {
   RecoveryRateLimitedError,
@@ -51,13 +52,23 @@ async function handle(request: Request) {
       (sum, count) => sum + count,
       0,
     );
-    if (counts.remainingEligible > 0 || failedCount > 0)
+    if (counts.remainingEligible > 0 || failedCount > 0) {
       logOperation("recovery.stale_jobs_remaining", {
         correlationId,
         status: "warning",
         staleJobCount: counts.remainingEligible,
         failedCount,
       });
+      await tryDeliverOperationalAlert("recovery.stale_jobs_remaining", {
+        correlationId,
+        workflow: "recovery",
+        status: "warning",
+        counts: {
+          remainingEligible: counts.remainingEligible,
+          failed: failedCount,
+        },
+      });
+    }
     logOperation("recovery.completed", {
       correlationId,
       status: "ok",
@@ -83,6 +94,13 @@ async function handle(request: Request) {
     }
     logOperation("recovery.failed", {
       correlationId,
+      status: "error",
+      errorCode: "recovery_unavailable",
+      latencyMs: Date.now() - startedAt,
+    });
+    await tryDeliverOperationalAlert("recovery.failed", {
+      correlationId,
+      workflow: "recovery",
       status: "error",
       errorCode: "recovery_unavailable",
       latencyMs: Date.now() - startedAt,

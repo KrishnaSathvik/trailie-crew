@@ -47,6 +47,21 @@ const progress: Partial<Record<PlanChangeRequest["status"], string>> = {
   failed: "The revision stopped safely",
 };
 
+const revisionFailureCopy: Record<string, string> = {
+  recovery_required:
+    "Validated work was saved for automatic recovery. The published plan remains unchanged while recovery continues.",
+  model_timeout:
+    "The provider exceeded its safe deadline. The published plan remains unchanged.",
+  model_unavailable:
+    "The provider is temporarily unavailable. The published plan remains unchanged.",
+  model_rate_limited:
+    "The provider is temporarily rate limited. The published plan remains unchanged.",
+  retry_exhausted:
+    "This request reached its safe retry limit. The published plan remains unchanged.",
+  workflow_deadline_exceeded:
+    "This request reached its total deadline and stopped without publishing partial work.",
+};
+
 function ApprovalList({
   state,
 }: {
@@ -209,6 +224,12 @@ function ReviewPanel({
       <p className="mt-5 font-semibold">
         {progress[request.status] ?? request.status.replaceAll("_", " ")}
       </p>
+      {request.status === "failed" ? (
+        <p className="text-muted-foreground mt-2 text-sm" role="status">
+          {revisionFailureCopy[request.errorCode ?? ""] ??
+            "The revision stopped safely. The published plan remains available and unchanged."}
+        </p>
+      ) : null}
       {analysis ? (
         <>
           <p className="text-muted-foreground mt-2 leading-6">
