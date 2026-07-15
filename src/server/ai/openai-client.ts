@@ -10,7 +10,9 @@ export function createOpenAIClient(configuration: {
   return new OpenAI({
     apiKey: configuration.apiKey,
     timeout: configuration.timeoutMs,
-    maxRetries: configuration.maxRetries ?? 2,
+    // Workflow retries are durable and observable. Hidden SDK retries would
+    // multiply attempts and can double-reserve quota or exceed the deadline.
+    maxRetries: 0,
     logLevel: "off",
   });
 }
