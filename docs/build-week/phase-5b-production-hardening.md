@@ -27,7 +27,9 @@ Private CAPTCHA, quota, lifecycle, and deletion tables force RLS and grant no br
 
 ## Evidence
 
-Phase-specific pgTAP: 46 assertions pass. The fresh local gate passes 12 database files / 437 assertions, 85 unit/component files / 371 tests, and 16 local E2E scenarios with the protected-hosted scenario skipped by design. Formatting, lint, TypeScript, optimized build, schema lint, security/performance advisor invocation, diff/secret/client-bundle scans, and the supported npm production dependency audit also pass. Hosted evidence and the exact commit are recorded only after protected-Preview verification.
+Phase-specific pgTAP: 46 assertions pass. The fresh local gate passes 12 database files / 437 assertions, 85 unit/component files / 371 tests, and 16 local E2E scenarios with the protected-hosted scenario skipped by design. Formatting, lint, TypeScript, optimized build, schema lint, security/performance advisor invocation, diff/secret/client-bundle scans, and the supported npm production dependency audit also pass.
+
+Commit `e997af4` is pushed to `origin/main`. Its migration is applied to the linked Preview Supabase project and the matching application is deployed only to protected custom Preview as `dpl_8c8GsghofQDoM5fueDZy5nsRmBN9`. The focused hosted Phase 5B drill passes four disposable lifecycle/security scenarios plus trust/health route smokes. The temporary automation bypass was revoked and the deployment again returns the Vercel SSO redirect to unauthenticated requests.
 
 ## Remaining Production blockers
 
@@ -37,6 +39,6 @@ Phase-specific pgTAP: 46 assertions pass. The fresh local gate passes 12 databas
 - Selected paid Supabase Production plan, automatic backup/PITR evidence, isolated restore drill, and approved RPO/RTO.
 - Professional privacy/terms/support review and private security-reporting channel.
 - Complete dated VoiceOver, 200%/400% zoom, contrast, and assistive-technology acceptance.
-- Limited-public load/abuse exercise and exact protected-Preview lifecycle/CAPTCHA acceptance.
+- Limited-public load/abuse exercise and real-provider reliability acceptance; the focused protected-Preview lifecycle/controlled-CAPTCHA drill passes, but real Turnstile on a final public domain remains unverified.
 
 Verdict remains **not Production ready** until these external and manual requirements are cleared. The implementation materially reduces the blocker set but does not justify unrestricted public access.

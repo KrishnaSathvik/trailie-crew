@@ -1,5 +1,30 @@
 import { createClient } from "@supabase/supabase-js";
-import { expect, test, type Browser } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Browser,
+  type BrowserContext,
+} from "@playwright/test";
+
+const hosted = process.env.HOSTED_ACCEPTANCE === "1";
+const hostedBaseUrl = process.env.HOSTED_BASE_URL;
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+
+async function appContext(browser: Browser): Promise<BrowserContext> {
+  const context = hosted
+    ? await browser.newContext({ baseURL: hostedBaseUrl })
+    : await browser.newContext();
+  if (hosted) {
+    const response = await context.request.get(hostedBaseUrl!, {
+      headers: {
+        "x-vercel-protection-bypass": bypassSecret!,
+        "x-vercel-set-bypass-cookie": "true",
+      },
+    });
+    expect(response.status()).toBe(200);
+  }
+  return context;
+}
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +33,7 @@ const admin = createClient(
 );
 
 async function createCrew(browser: Browser, name: string) {
-  const hostContext = await browser.newContext();
+  const hostContext = await appContext(browser);
   const host = await hostContext.newPage();
   await host.goto("/trips/create");
   await expect(
@@ -21,7 +46,7 @@ async function createCrew(browser: Browser, name: string) {
   const roomUrl = host.url();
   const roomId = new URL(roomUrl).pathname.split("/").at(-1)!;
   const invite = await host.getByLabel("One-time invitation URL").inputValue();
-  const memberContext = await browser.newContext();
+  const memberContext = await appContext(browser);
   const member = await memberContext.newPage();
   await member.goto(invite);
   await expect(
@@ -144,14 +169,29 @@ test("protected recovery and cleanup dry-run expose safe counts only", async ({
     "local-recovery-secret-must-be-at-least-32-characters";
   const cleanupSecret =
     process.env.CLEANUP_SECRET ??
+    process.env.RECOVERY_SECRET ??
     "local-cleanup-secret-must-be-at-least-32-characters";
-  const recovery = await request.post("/api/internal/recovery", {
-    headers: { authorization: `Bearer ${recoverySecret}` },
-  });
+  const routeHeaders: Record<string, string> = {
+    authorization: `Bearer ${recoverySecret}`,
+  };
+  if (hosted) routeHeaders["x-vercel-protection-bypass"] = bypassSecret!;
+  const recoveryPath = "/api/internal/recovery";
+  const recovery = await request.post(
+    hosted ? new URL(recoveryPath, hostedBaseUrl).href : recoveryPath,
+    {
+      headers: routeHeaders,
+    },
+  );
   expect([200, 429]).toContain(recovery.status());
+  const cleanupPath = "/api/internal/anonymous-cleanup?dryRun=true";
   const cleanup = await request.post(
-    "/api/internal/anonymous-cleanup?dryRun=true",
-    { headers: { authorization: `Bearer ${cleanupSecret}` } },
+    hosted ? new URL(cleanupPath, hostedBaseUrl).href : cleanupPath,
+    {
+      headers: {
+        ...routeHeaders,
+        authorization: `Bearer ${cleanupSecret}`,
+      },
+    },
   );
   expect([200, 429]).toContain(cleanup.status());
   const body = await cleanup.json();

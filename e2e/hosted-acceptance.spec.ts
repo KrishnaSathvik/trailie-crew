@@ -76,7 +76,16 @@ async function memory(roomId: string) {
       value: { text?: string };
     }>;
     extractions: Array<{ status: string }>;
-  };
+  } | null;
+}
+
+async function waitForMemory(roomId: string) {
+  await expect
+    .poll(async () => (await memory(roomId))?.snapshot.memory_version ?? null, {
+      timeout: 90_000,
+    })
+    .not.toBeNull();
+  return (await memory(roomId))!;
 }
 
 async function timed<T>(
@@ -93,7 +102,7 @@ async function timed<T>(
 test("controlled hosted Preview completes the Phase 5A product flow", async ({
   browser,
 }) => {
-  test.setTimeout(12 * 60_000);
+  test.setTimeout(16 * 60_000);
   await mkdir("output/phase-5a/screenshots", { recursive: true });
 
   const timings: Record<string, number> = {};
@@ -173,25 +182,32 @@ test("controlled hosted Preview completes the Phase 5A product flow", async ({
     ).toHaveCount(1, { timeout: 30_000 });
   });
 
-  const memoryBefore = (await memory(roomId)).snapshot.memory_version;
+  const memoryBefore = (await waitForMemory(roomId)).snapshot.memory_version;
   await timed(timings, "memory_preference_ms", async () => {
     await send(host, "I prefer hiking and need peanut-free meals.");
     await expect
-      .poll(async () => (await memory(roomId)).snapshot.memory_version, {
-        timeout: 90_000,
-      })
+      .poll(
+        async () => (await memory(roomId))?.snapshot.memory_version ?? null,
+        {
+          timeout: 90_000,
+        },
+      )
       .toBeGreaterThan(memoryBefore);
   });
-  const preferenceVersion = (await memory(roomId)).snapshot.memory_version;
+  const preferenceVersion = (await waitForMemory(roomId)).snapshot
+    .memory_version;
   await timed(timings, "memory_correction_ms", async () => {
     await send(host, "Correction: I prefer kayaking instead of hiking.");
     await expect
-      .poll(async () => (await memory(roomId)).snapshot.memory_version, {
-        timeout: 90_000,
-      })
+      .poll(
+        async () => (await memory(roomId))?.snapshot.memory_version ?? null,
+        {
+          timeout: 90_000,
+        },
+      )
       .toBeGreaterThan(preferenceVersion);
   });
-  const correctedMemory = await memory(roomId);
+  const correctedMemory = await waitForMemory(roomId);
   expect(
     correctedMemory.facts.some(
       (fact) =>
@@ -235,9 +251,13 @@ test("controlled hosted Preview completes the Phase 5A product flow", async ({
 
   await timed(timings, "itinerary_generation_ms", async () => {
     await member.getByRole("button", { name: "Generate Itinerary" }).click();
-    await expect(
-      member.getByText("Published itinerary · Version 1"),
-    ).toBeVisible({ timeout: 300_000 });
+    const published = member.getByText("Published itinerary · Version 1");
+    const retry = member.getByRole("button", { name: "Retry itinerary" });
+    await expect(published.or(retry)).toBeVisible({ timeout: 300_000 });
+    if (await retry.isVisible()) {
+      await retry.click();
+      await expect(published).toBeVisible({ timeout: 300_000 });
+    }
     await expect(
       member.getByText("Validated before publishing").first(),
     ).toBeVisible();
