@@ -90,6 +90,14 @@ describe("revision worker", () => {
     context.request.approvedAnalysisVersion = 1;
     context.analysis = approvedMoveAnalysis();
     const completeCandidate = vi.fn();
+    const run = vi.fn(async (input) => {
+      const result = await input.execute({
+        attemptId: "5c000000-0000-4000-8000-000000000003",
+        leaseOwner: "5c000000-0000-4000-8000-000000000004",
+      });
+      await input.apply(result.value, result);
+      return { status: "applied", recovered: false, result };
+    });
     const repository = {
       loadContext: vi.fn().mockResolvedValue(context),
       claimAnalysis: vi.fn(),
@@ -169,8 +177,18 @@ describe("revision worker", () => {
       },
       travelProvider: travelProvider as never,
       safetyIdentifier: "safe",
+      candidateAttempts: { run } as never,
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
       now: "2026-07-13T19:00:00.000Z",
     });
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: "revision_candidate",
+        operationKey: "request:candidate:1",
+        attempt: 1,
+        model: "gpt-5.6-sol",
+      }),
+    );
     expect(repository.recordValidation).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ status: "pass" }),
@@ -220,5 +238,58 @@ describe("revision worker", () => {
       "model_timeout",
     );
     expect(repository.completeAnalysis).not.toHaveBeenCalled();
+  });
+
+  it("stages verified change analysis before the review-ready transition", async () => {
+    const repository = {
+      loadContext: vi.fn().mockResolvedValue(analysisContext()),
+      claimAnalysis: vi.fn().mockResolvedValue({ claimed: true }),
+      completeAnalysis: vi.fn(),
+      claimCandidate: vi.fn(),
+      attachCandidate: vi.fn(),
+      recordEvidence: vi.fn(),
+      updateCandidate: vi.fn(),
+      recordValidation: vi.fn(),
+      startRepair: vi.fn(),
+      recordRunUsage: vi.fn(),
+      completeCandidate: vi.fn(),
+      block: vi.fn(),
+      fail: vi.fn(),
+    };
+    const run = vi.fn(async (input) => {
+      const result = await input.execute({
+        attemptId: "5c000000-0000-4000-8000-000000000001",
+        leaseOwner: "5c000000-0000-4000-8000-000000000002",
+      });
+      await input.apply(result.value, result);
+      return { status: "applied", recovered: false, result };
+    });
+    await processPlanChange("request-durable", {
+      repository,
+      provider: {
+        analyze: vi.fn().mockResolvedValue({
+          analysis: approvedMoveAnalysis(),
+          responseId: "response",
+          requestId: "request",
+          usage: {},
+        }),
+        generate: vi.fn(),
+        repair: vi.fn(),
+      },
+      travelProvider: {} as never,
+      safetyIdentifier: "safe",
+      analysisAttempts: { run } as never,
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: "revision_analysis",
+        operationKey: "request-durable:analysis:1",
+        attempt: 1,
+        model: "gpt-5.6-terra",
+      }),
+    );
+    expect(repository.completeAnalysis).toHaveBeenCalledOnce();
   });
 });

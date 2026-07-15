@@ -32,10 +32,13 @@ type QuotaMetadata = AiQuotaSubject & {
   workflow: AiWorkflow;
   model: string;
   estimatedTokens: number;
+  reservationId?: string;
 };
 
+type QuotaReservationMetadata = Omit<QuotaMetadata, "reservationId">;
+
 type QuotaDependencies = {
-  reserve: (id: string, metadata: QuotaMetadata) => Promise<void>;
+  reserve: (id: string, metadata: QuotaReservationMetadata) => Promise<void>;
   reconcile: (
     id: string,
     actualTokens: number,
@@ -55,9 +58,10 @@ export function createAiQuotaController(dependencies: QuotaDependencies) {
       metadata: QuotaMetadata,
       operation: () => Promise<T>,
     ) {
-      const id = dependencies.createId();
+      const { reservationId, ...reservationMetadata } = metadata;
+      const id = reservationId ?? dependencies.createId();
       try {
-        await dependencies.reserve(id, metadata);
+        await dependencies.reserve(id, reservationMetadata);
       } catch (error) {
         throw new AiQuotaError(
           quotaCode(error) ?? "provider_budget_unavailable",

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { planningSummarySchema, type PlanningSummary } from "@trailie/schemas";
 import { computePlanningReadiness } from "./readiness";
 import { buildPlanningContext } from "./context";
 import {
@@ -18,6 +19,10 @@ import {
   remainingProviderTimeout,
   type WorkflowReliabilityPolicy,
 } from "@/server/ai/reliability-policy";
+import {
+  type DurableProviderAttemptController,
+  type ProviderAttemptExecutionResult,
+} from "@/server/ai/provider-attempts";
 
 type Dependencies = {
   repository: PlanningRepository;
@@ -31,6 +36,7 @@ type Dependencies = {
     sleep: (milliseconds: number) => Promise<void>;
     random?: () => number;
   };
+  providerAttempts?: DurableProviderAttemptController<PlanningSummary>;
 };
 const sleep = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -60,60 +66,96 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
             ),
           ),
         });
-      const result = deps.quotaSubject
-        ? await runWithAiQuota(
-            {
-              ...deps.quotaSubject,
-              workflow: "planning_summary",
-              model: deps.model ?? "gpt-5.6-sol",
-              estimatedTokens: 8_000,
-            },
-            summarize,
-          )
-        : await summarize();
-      const readiness = computePlanningReadiness({
-        destinations: result.summary.tripSnapshot.destinations,
-        destinationUnresolved: result.summary.proposals.some((i) =>
-          /destination/i.test(`${i.label} ${i.detail}`),
-        ),
-        dateWindows: result.summary.tripSnapshot.dateWindows,
-        flexibleDates: result.summary.tripSnapshot.dateWindows.some((v) =>
-          /flexible/i.test(v),
-        ),
-        activeTravelerCount: context.participants.length,
-        hardConstraints: result.summary.constraints.map((i) => i.detail),
-        conflicts: result.summary.conflicts.map((i) => ({
-          detail: i.detail,
-          schedulingImpossible: /impossible|no overlap|contradict/i.test(
-            i.detail,
+      const execute = async (reservationId?: string) => {
+        const providerStartedAt = Date.now();
+        const result = deps.quotaSubject
+          ? await runWithAiQuota(
+              {
+                ...deps.quotaSubject,
+                workflow: "planning_summary",
+                model: deps.model ?? "gpt-5.6-sol",
+                estimatedTokens: 8_000,
+                ...(reservationId ? { reservationId } : {}),
+              },
+              summarize,
+            )
+          : await summarize();
+        const providerDurationMs = Date.now() - providerStartedAt;
+        const readiness = computePlanningReadiness({
+          destinations: result.summary.tripSnapshot.destinations,
+          destinationUnresolved: result.summary.proposals.some((i) =>
+            /destination/i.test(`${i.label} ${i.detail}`),
           ),
-        })),
-        optionalMissing: result.summary.readiness.warnings,
-      });
-      const summary = {
-        ...result.summary,
-        tripSnapshot: {
-          ...result.summary.tripSnapshot,
-          travelerCount: context.participants.length,
-          approvalMode: context.approvalMode,
-        },
-        readiness,
-        evidence: {
-          ...result.summary.evidence,
-          memoryVersion: context.memoryVersion,
-        },
+          dateWindows: result.summary.tripSnapshot.dateWindows,
+          flexibleDates: result.summary.tripSnapshot.dateWindows.some((v) =>
+            /flexible/i.test(v),
+          ),
+          activeTravelerCount: context.participants.length,
+          hardConstraints: result.summary.constraints.map((i) => i.detail),
+          conflicts: result.summary.conflicts.map((i) => ({
+            detail: i.detail,
+            schedulingImpossible: /impossible|no overlap|contradict/i.test(
+              i.detail,
+            ),
+          })),
+          optionalMissing: result.summary.readiness.warnings,
+        });
+        const summary = planningSummarySchema.parse({
+          ...result.summary,
+          tripSnapshot: {
+            ...result.summary.tripSnapshot,
+            travelerCount: context.participants.length,
+            approvalMode: context.approvalMode,
+          },
+          readiness,
+          evidence: {
+            ...result.summary.evidence,
+            memoryVersion: context.memoryVersion,
+          },
+        });
+        return {
+          value: summary,
+          responseId: result.responseId,
+          requestId: result.requestId,
+          usage: result.usage,
+          providerDurationMs,
+          totalDurationMs: Date.now() - started,
+          retryCount: Math.max(claim.attemptCount - 1, 0),
+          repairCount: 0,
+        } satisfies ProviderAttemptExecutionResult<PlanningSummary>;
       };
-      const hash = createHash("sha256")
-        .update(JSON.stringify(summary))
-        .digest("hex");
-      await deps.repository.complete(
-        id,
-        summary,
-        readiness.status,
-        hash,
-        result,
-        Date.now() - started,
-      );
+      const apply = (
+        summary: PlanningSummary,
+        result: ProviderAttemptExecutionResult<PlanningSummary>,
+      ) => {
+        const hash = createHash("sha256")
+          .update(JSON.stringify(summary))
+          .digest("hex");
+        return deps.repository.complete(
+          id,
+          summary,
+          summary.readiness.status,
+          hash,
+          { summary, ...result },
+          result.totalDurationMs,
+        );
+      };
+      if (deps.providerAttempts) {
+        const outcome = await deps.providerAttempts.run({
+          workflow: "planning_summary",
+          operationKey: `${id}:summary:${claim.summaryVersion}`,
+          attempt: claim.attemptCount,
+          model: deps.model ?? "gpt-5.6-sol",
+          leaseMs: policy.recoveryLeaseMs,
+          execute: ({ attemptId }) => execute(attemptId),
+          parse: (value) => planningSummarySchema.parse(value),
+          apply,
+        });
+        if (outcome.status !== "applied") return;
+      } else {
+        const result = await execute();
+        await apply(result.value, result);
+      }
       return;
     } catch (error) {
       const failure =

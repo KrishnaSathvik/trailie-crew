@@ -216,4 +216,41 @@ describe("itinerary worker", () => {
     expect(calls.failed).toEqual(["model_timeout"]);
     expect(calls.reports).toEqual([]);
   });
+
+  it("stages generation and the bounded repair through distinct durable attempts", async () => {
+    const { repo, calls } = repository();
+    const run = vi.fn(async (input) => {
+      const result = await input.execute({
+        attemptId: `5c000000-0000-4000-8000-00000000000${run.mock.calls.length}`,
+        leaseOwner: "5c000000-0000-4000-8000-000000000009",
+      });
+      await input.apply(result.value, result);
+      return { status: "applied", recovered: false, result };
+    });
+    await processItineraryGeneration("plan-durable", {
+      repository: repo,
+      provider: createFakeItineraryProvider(),
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      providerAttempts: { run } as never,
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        workflow: "itinerary_generation",
+        operationKey: "plan-durable:generate",
+      }),
+    );
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        workflow: "itinerary_repair",
+        operationKey: "plan-durable:repair",
+      }),
+    );
+    expect(calls.published).toBe(1);
+  });
 });

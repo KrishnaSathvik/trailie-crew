@@ -21,6 +21,10 @@ import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { AiQuotaError, runWithAiQuota } from "@/server/ai/quota";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import { createCorrelationId, logOperation } from "@/server/operations/logger";
+import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
+import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
+import type { ProviderAttemptExecutionResult } from "@/server/ai/provider-attempts";
+import { ProviderFailure } from "@/server/ai/reliability-policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -173,8 +177,6 @@ export async function POST(request: Request) {
   const invocationId = asString(invocation.id);
   if (!invocationId) return jsonError("invocation_failed", 500);
 
-  if (invocation.status === "running")
-    return jsonError("invocation_already_running", 409);
   if (invocation.status === "completed")
     return jsonError("retry_not_allowed", 409);
 
@@ -233,7 +235,13 @@ export async function POST(request: Request) {
   });
   if (runError) return jsonError("retry_not_allowed", 409);
   const runId = asString(asRecord(runData).run_id);
-  if (!runId) return jsonError("invocation_already_running", 409);
+  if (!runId)
+    return jsonError(
+      asRecord(runData).status === "completed"
+        ? "retry_not_allowed"
+        : "invocation_already_running",
+      409,
+    );
 
   const encoder = new TextEncoder();
   const startedAt = Date.now();
@@ -245,65 +253,97 @@ export async function POST(request: Request) {
       };
       emit({ type: "invocation_started", invocationId });
       try {
-        const result = await runWithAiQuota(
-          {
-            userId: authData.user.id,
-            roomId: parsed.data.roomId,
-            workflow: "focused_answer",
-            model: route.model,
-            estimatedTokens: 4_000,
-          },
-          async () => {
-            const providerStream = await providerFor(environment).stream({
-              operationKey: invocationId,
-              request: decision.normalizedRequest,
-              context: context.text,
-              model: route.model,
-              safetyIdentifier: createSafetyIdentifier(
-                authData.user.id,
-                environment.safetyHmacSecret,
-              ),
-              signal: AbortSignal.any([
-                request.signal,
-                AbortSignal.timeout(
-                  environment.reliabilityPolicy.timeoutsMs.focusedProvider,
-                ),
-              ]),
-            });
-            for await (const delta of providerStream.textDeltas)
-              emit({ type: "text_delta", delta });
-            return providerStream.completed;
-          },
+        type Envelope = z.infer<typeof trailieResponseEnvelopeSchema>;
+        const attempts = createDurableProviderAttemptController<Envelope>(
+          createProviderAttemptRepository<Envelope>(),
         );
-        const envelope = trailieResponseEnvelopeSchema.parse({
-          schemaVersion: "1",
-          ...result.answer,
-          sourceMessageId: parsed.data.sourceMessageId,
-          status: "completed",
+        const outcome = await attempts.run({
+          workflow: "focused_answer",
+          operationKey: `focused:${invocationId}`,
+          attempt: Math.min(Number(invocation.retry_count ?? 0) + 1, 3),
+          model: route.model,
+          leaseMs: environment.reliabilityPolicy.recoveryLeaseMs,
+          execute: async ({ attemptId }) => {
+            const providerStartedAt = Date.now();
+            const result = await runWithAiQuota(
+              {
+                userId: authData.user.id,
+                roomId: parsed.data.roomId,
+                workflow: "focused_answer",
+                model: route.model,
+                estimatedTokens: 4_000,
+                reservationId: attemptId,
+              },
+              async () => {
+                const providerStream = await providerFor(environment).stream({
+                  operationKey: invocationId,
+                  request: decision.normalizedRequest,
+                  context: context.text,
+                  model: route.model,
+                  safetyIdentifier: createSafetyIdentifier(
+                    authData.user.id,
+                    environment.safetyHmacSecret,
+                  ),
+                  signal: AbortSignal.any([
+                    request.signal,
+                    AbortSignal.timeout(
+                      environment.reliabilityPolicy.timeoutsMs.focusedProvider,
+                    ),
+                  ]),
+                });
+                for await (const delta of providerStream.textDeltas)
+                  emit({ type: "text_delta", delta });
+                return providerStream.completed;
+              },
+            );
+            const envelope = trailieResponseEnvelopeSchema.parse({
+              schemaVersion: "1",
+              ...result.answer,
+              sourceMessageId: parsed.data.sourceMessageId,
+              status: "completed",
+            });
+            return {
+              value: envelope,
+              responseId: result.responseId,
+              requestId: result.requestId,
+              usage: result.usage,
+              providerDurationMs: Date.now() - providerStartedAt,
+              totalDurationMs: Date.now() - startedAt,
+              retryCount: Number(invocation.retry_count ?? 0),
+              repairCount: 0,
+            } satisfies ProviderAttemptExecutionResult<Envelope>;
+          },
+          parse: (value) => trailieResponseEnvelopeSchema.parse(value),
+          apply: async (envelope, result) => {
+            const { error: completeError } = await admin.rpc(
+              "complete_ai_run",
+              {
+                target_invocation_id: invocationId,
+                target_run_id: runId,
+                response_body: envelope.body,
+                provider_response_id: result.responseId,
+                provider_request_id: result.requestId,
+                used_input_tokens: result.usage.inputTokens,
+                used_output_tokens: result.usage.outputTokens,
+                used_reasoning_tokens: result.usage.reasoningTokens,
+                used_cached_input_tokens: result.usage.cachedInputTokens,
+                used_total_tokens: result.usage.totalTokens,
+                measured_latency_ms: result.totalDurationMs,
+              },
+            );
+            if (completeError)
+              throw new TrailieProviderError("openai_unavailable", true);
+          },
         });
-        const latencyMs = Date.now() - startedAt;
-        const { error: completeError } = await admin.rpc("complete_ai_run", {
-          target_invocation_id: invocationId,
-          target_run_id: runId,
-          response_body: envelope.body,
-          provider_response_id: result.responseId,
-          provider_request_id: result.requestId,
-          used_input_tokens: result.usage.inputTokens,
-          used_output_tokens: result.usage.outputTokens,
-          used_reasoning_tokens: result.usage.reasoningTokens,
-          used_cached_input_tokens: result.usage.cachedInputTokens,
-          used_total_tokens: result.usage.totalTokens,
-          measured_latency_ms: latencyMs,
-        });
-        if (completeError)
+        if (outcome.status !== "applied")
           throw new TrailieProviderError("openai_unavailable", true);
-        emit({ type: "response_completed", response: envelope });
+        emit({ type: "response_completed", response: outcome.result.value });
         logAiEvent("completed", {
           invocationId,
           runId,
           model: route.model,
           promptVersion: environment.promptVersion,
-          latencyMs,
+          latencyMs: outcome.result.totalDurationMs,
         });
       } catch (error) {
         const failure =
@@ -311,12 +351,14 @@ export async function POST(request: Request) {
             ? new TrailieProviderError(error.code as never, false)
             : error instanceof TrailieProviderError
               ? error
-              : new TrailieProviderError(
-                  request.signal.aborted
-                    ? "invocation_cancelled"
-                    : "openai_unavailable",
-                  true,
-                );
+              : error instanceof ProviderFailure
+                ? new TrailieProviderError(error.code as never, error.retryable)
+                : new TrailieProviderError(
+                    request.signal.aborted
+                      ? "invocation_cancelled"
+                      : "openai_unavailable",
+                    true,
+                  );
         await admin.rpc("fail_ai_run", {
           target_invocation_id: invocationId,
           target_run_id: runId,

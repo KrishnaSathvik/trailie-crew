@@ -241,4 +241,15 @@ describe("workflow reliability policy", () => {
     ).rejects.toMatchObject({ code: "recovery_required" });
     expect(operation).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["openai_timeout", "model_timeout"],
+    ["openai_rate_limited", "model_rate_limited"],
+    ["invalid_model_response", "invalid_model_output"],
+    ["openai_unavailable", "model_unavailable"],
+  ])("normalizes legacy provider code %s to %s", (source, expected) => {
+    expect(classifyProviderFailure({ code: source })).toMatchObject({
+      code: expected,
+    });
+  });
 });

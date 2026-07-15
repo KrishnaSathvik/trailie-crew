@@ -11,7 +11,7 @@ function dependencies() {
   return {
     reserve: vi.fn().mockResolvedValue(undefined),
     reconcile: vi.fn().mockResolvedValue(undefined),
-    createId: () => "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a4",
+    createId: vi.fn(() => "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a4"),
   };
 }
 
@@ -101,5 +101,25 @@ describe("AI quota controller", () => {
       ),
     ).rejects.toEqual(new AiQuotaError("room_ai_limit_reached"));
     expect(provider).not.toHaveBeenCalled();
+  });
+
+  it("reuses the durable attempt id as the reservation id", async () => {
+    const deps = dependencies();
+    const controller = createAiQuotaController(deps);
+    await controller.run(
+      {
+        ...subject,
+        workflow: "planning_summary",
+        model: "model",
+        estimatedTokens: 100,
+        reservationId: "5c000000-0000-4000-8000-000000000001",
+      },
+      async () => ({ usage: { totalTokens: 80 } }),
+    );
+    expect(deps.reserve).toHaveBeenCalledWith(
+      "5c000000-0000-4000-8000-000000000001",
+      expect.objectContaining({ workflow: "planning_summary" }),
+    );
+    expect(deps.createId).not.toHaveBeenCalled();
   });
 });

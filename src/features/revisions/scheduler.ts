@@ -11,6 +11,9 @@ import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import { resolveAiQuotaSubject } from "@/server/ai/quota";
 import { generationProviderSwitches } from "@/server/operations/provider-switches";
+import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
+import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
+import type { Itinerary, PlanChangeAnalysis } from "@trailie/schemas";
 import { createOpenAIRevisionProvider } from "./openai-provider";
 import { createFakeRevisionProvider } from "./provider";
 import { createRevisionRepository } from "./repository";
@@ -66,6 +69,12 @@ export async function drainPlanChange(id: string) {
     ),
     quotaSubject,
     reliabilityPolicy: env.reliabilityPolicy,
+    analysisAttempts: createDurableProviderAttemptController(
+      createProviderAttemptRepository<PlanChangeAnalysis>(),
+    ),
+    candidateAttempts: createDurableProviderAttemptController(
+      createProviderAttemptRepository<Itinerary>(),
+    ),
   });
 }
 

@@ -9,6 +9,9 @@ import {
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { resolveAiQuotaSubject } from "@/server/ai/quota";
+import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
+import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
+import type { Itinerary } from "@trailie/schemas";
 import { generationProviderSwitches } from "@/server/operations/provider-switches";
 import { createOpenAIItineraryProvider } from "./openai-provider";
 import { createFakeItineraryProvider } from "./provider";
@@ -74,6 +77,9 @@ export async function drainItineraryGeneration(id: string) {
     model: env.itineraryModel,
     quotaSubject,
     reliabilityPolicy: env.reliabilityPolicy,
+    providerAttempts: createDurableProviderAttemptController(
+      createProviderAttemptRepository<Itinerary>(),
+    ),
   });
 }
 

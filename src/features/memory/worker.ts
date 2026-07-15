@@ -1,5 +1,7 @@
 import "server-only";
 
+import { memoryPatchSchema, type MemoryPatch } from "@trailie/schemas";
+
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import {
@@ -22,6 +24,12 @@ import {
   remainingProviderTimeout,
   type WorkflowReliabilityPolicy,
 } from "@/server/ai/reliability-policy";
+import {
+  createDurableProviderAttemptController,
+  type DurableProviderAttemptController,
+  type ProviderAttemptExecutionResult,
+} from "@/server/ai/provider-attempts";
+import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
 
 type Dependencies = {
   repository: MemoryRepository;
@@ -35,6 +43,7 @@ type Dependencies = {
     sleep: (milliseconds: number) => Promise<void>;
     random?: () => number;
   };
+  providerAttempts?: DurableProviderAttemptController<MemoryPatch>;
 };
 
 const sleep = (milliseconds: number) =>
@@ -103,33 +112,68 @@ export async function processMemoryExtraction(
           activeFacts: context.activeFacts,
           signal,
         });
-      const result = dependencies.quotaSubject
-        ? await runWithAiQuota(
-            {
-              ...dependencies.quotaSubject,
-              workflow: "memory_extraction",
-              model: dependencies.model ?? "gpt-5.6-luna",
-              estimatedTokens: 3_000,
-            },
-            extract,
-          )
-        : await extract();
-      const patch = validateMemoryPatch(result.patch, {
-        roomId: context.roomId,
-        sourceMessageId: context.sourceMessage.id,
-        sourceParticipantId: context.sourceParticipant.id,
-        approvalMode: context.approvalMode,
-        sourceBody: context.sourceMessage.body,
-        sourceParticipantRole: context.sourceParticipant.role,
-        participants: context.participantIds,
-        activeFacts: context.activeFacts as never,
-      });
-      await dependencies.repository.complete(
-        messageId,
-        patch,
-        result,
-        Date.now() - startedAt,
-      );
+      const execute = async (reservationId?: string) => {
+        const providerStartedAt = Date.now();
+        const result = dependencies.quotaSubject
+          ? await runWithAiQuota(
+              {
+                ...dependencies.quotaSubject,
+                workflow: "memory_extraction",
+                model: dependencies.model ?? "gpt-5.6-luna",
+                estimatedTokens: 3_000,
+                ...(reservationId ? { reservationId } : {}),
+              },
+              extract,
+            )
+          : await extract();
+        const providerDurationMs = Date.now() - providerStartedAt;
+        const patch = validateMemoryPatch(result.patch, {
+          roomId: context.roomId,
+          sourceMessageId: context.sourceMessage.id,
+          sourceParticipantId: context.sourceParticipant.id,
+          approvalMode: context.approvalMode,
+          sourceBody: context.sourceMessage.body,
+          sourceParticipantRole: context.sourceParticipant.role,
+          participants: context.participantIds,
+          activeFacts: context.activeFacts as never,
+        });
+        return {
+          value: patch,
+          responseId: result.responseId,
+          requestId: result.requestId,
+          usage: result.usage,
+          providerDurationMs,
+          totalDurationMs: Date.now() - startedAt,
+          retryCount: Math.max(claim.attemptCount - 1, 0),
+          repairCount: 0,
+        } satisfies ProviderAttemptExecutionResult<MemoryPatch>;
+      };
+      const apply = (
+        patch: MemoryPatch,
+        result: ProviderAttemptExecutionResult<MemoryPatch>,
+      ) =>
+        dependencies.repository.complete(
+          messageId,
+          patch,
+          { patch, ...result },
+          result.totalDurationMs,
+        );
+      if (dependencies.providerAttempts) {
+        const outcome = await dependencies.providerAttempts.run({
+          workflow: "memory_extraction",
+          operationKey: `memory:${messageId}`,
+          attempt: claim.attemptCount,
+          model: dependencies.model ?? "gpt-5.6-luna",
+          leaseMs: policy.recoveryLeaseMs,
+          execute: ({ attemptId }) => execute(attemptId),
+          parse: (value) => memoryPatchSchema.parse(value),
+          apply,
+        });
+        if (outcome.status !== "applied") return;
+      } else {
+        const result = await execute();
+        await apply(result.value, result);
+      }
       return;
     } catch (error) {
       const failure = safeFailure(error);
@@ -187,5 +231,8 @@ export async function drainMemoryExtraction(messageId: string) {
     model: environment.memoryModel,
     quotaSubject,
     reliabilityPolicy: environment.reliabilityPolicy,
+    providerAttempts: createDurableProviderAttemptController(
+      createProviderAttemptRepository<MemoryPatch>(),
+    ),
   });
 }

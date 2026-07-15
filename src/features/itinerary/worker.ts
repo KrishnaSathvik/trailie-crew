@@ -7,7 +7,11 @@ import {
 } from "@trailie/travel-tools";
 import { itinerarySchema, type Itinerary } from "@trailie/schemas";
 import { buildItineraryContext, buildItineraryRepairContext } from "./context";
-import { ItineraryProviderError, type ItineraryProvider } from "./provider";
+import {
+  ItineraryProviderError,
+  type ItineraryProvider,
+  type ItineraryProviderOutput,
+} from "./provider";
 import {
   AiQuotaError,
   runWithAiQuota,
@@ -27,6 +31,10 @@ import {
   remainingProviderTimeout,
   type WorkflowReliabilityPolicy,
 } from "@/server/ai/reliability-policy";
+import {
+  type DurableProviderAttemptController,
+  type ProviderAttemptExecutionResult,
+} from "@/server/ai/provider-attempts";
 
 export type TravelEvidenceDependencies = {
   repository: Pick<ItineraryRepository, "recordEvidence">;
@@ -41,12 +49,14 @@ type Dependencies = TravelEvidenceDependencies & {
   timeoutMs?: number;
   quotaSubject?: AiQuotaSubject;
   reliabilityPolicy?: WorkflowReliabilityPolicy;
+  providerAttempts?: DurableProviderAttemptController<Itinerary>;
 };
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
   dependencies: Dependencies,
   workflow: "itinerary_generation" | "itinerary_repair",
   operation: () => Promise<T>,
+  reservationId?: string,
 ) {
   return dependencies.quotaSubject
     ? runWithAiQuota(
@@ -55,6 +65,7 @@ function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
           workflow,
           model: dependencies.model ?? "gpt-5.6-sol",
           estimatedTokens: workflow === "itinerary_repair" ? 8_000 : 12_000,
+          ...(reservationId ? { reservationId } : {}),
         },
         operation,
       )
@@ -265,6 +276,81 @@ export async function processItineraryGeneration(
   const policy =
     dependencies.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
   const workflowStartedAt = Date.now();
+  async function executeProvider(input: {
+    workflow: "itinerary_generation" | "itinerary_repair";
+    operationKey: string;
+    attempt: number;
+    repairCount: number;
+    execute(signal: AbortSignal): Promise<ItineraryProviderOutput>;
+  }) {
+    const execute = async (reservationId?: string) => {
+      const providerStartedAt = Date.now();
+      const output = await callProvider(
+        dependencies,
+        input.workflow,
+        () =>
+          input.execute(
+            AbortSignal.timeout(
+              Math.min(
+                dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+                remainingProviderTimeout(
+                  policy,
+                  input.workflow === "itinerary_repair"
+                    ? "itineraryRepair"
+                    : "itineraryGeneration",
+                  workflowStartedAt,
+                ),
+              ),
+            ),
+          ),
+        reservationId,
+      );
+      return {
+        value: output.itinerary,
+        responseId: output.responseId,
+        requestId: output.requestId,
+        usage: output.usage,
+        providerDurationMs: Date.now() - providerStartedAt,
+        totalDurationMs: Date.now() - workflowStartedAt,
+        retryCount: Math.max(input.attempt - 1, 0),
+        repairCount: input.repairCount,
+      } satisfies ProviderAttemptExecutionResult<Itinerary>;
+    };
+    const apply = (
+      itinerary: Itinerary,
+      result: ProviderAttemptExecutionResult<Itinerary>,
+    ) =>
+      dependencies.repository.recordDraft(id, itinerary, {
+        itinerary,
+        ...result,
+      });
+    if (!dependencies.providerAttempts) {
+      const result = await execute();
+      await apply(result.value, result);
+      return {
+        ownedElsewhere: false,
+        output: { itinerary: result.value, ...result },
+      };
+    }
+    const outcome = await dependencies.providerAttempts.run({
+      workflow: input.workflow,
+      operationKey: input.operationKey,
+      attempt: input.attempt,
+      model: dependencies.model ?? "gpt-5.6-sol",
+      leaseMs: policy.recoveryLeaseMs,
+      execute: ({ attemptId }) => execute(attemptId),
+      parse: (value) => itinerarySchema.parse(value),
+      apply,
+    });
+    if (outcome.status === "owned_elsewhere")
+      return { ownedElsewhere: true, output: null };
+    if (outcome.status === "already_applied")
+      return { ownedElsewhere: false, output: null };
+    return {
+      ownedElsewhere: false,
+      output: { itinerary: outcome.result.value, ...outcome.result },
+    };
+  }
   try {
     const firstClaim = await dependencies.repository.claim(id);
     if (!firstClaim.claimed || !firstClaim.stage) return;
@@ -274,55 +360,53 @@ export async function processItineraryGeneration(
       if (!context.draft || !context.latestValidation) return;
       const repairDraft = context.draft;
       const repairValidation = context.latestValidation;
-      output = await callProvider(dependencies, "itinerary_repair", () =>
-        dependencies.provider.repair({
-          operationKey: `${id}:repair`,
-          model: dependencies.model ?? "gpt-5.6-sol",
-          safetyIdentifier: dependencies.safetyIdentifier,
-          context: buildItineraryRepairContext({
-            approvedSummary: context.approvedSummary,
-            draft: repairDraft,
-            validation: repairValidation,
-            evidence: context.evidence,
+      const execution = await executeProvider({
+        workflow: "itinerary_repair",
+        operationKey: `${id}:repair`,
+        attempt: firstClaim.attemptCount,
+        repairCount: 1,
+        execute: (signal) =>
+          dependencies.provider.repair({
+            operationKey: `${id}:repair`,
+            model: dependencies.model ?? "gpt-5.6-sol",
+            safetyIdentifier: dependencies.safetyIdentifier,
+            context: buildItineraryRepairContext({
+              approvedSummary: context.approvedSummary,
+              draft: repairDraft,
+              validation: repairValidation,
+              evidence: context.evidence,
+            }),
+            signal,
           }),
-          signal: AbortSignal.timeout(
-            Math.min(
-              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
-              remainingProviderTimeout(
-                policy,
-                "itineraryRepair",
-                workflowStartedAt,
-              ),
-            ),
-          ),
-        }),
-      );
+      });
+      if (execution.ownedElsewhere) return;
+      output = execution.output;
     } else if (firstClaim.stage === "validate" && context.draft) {
       output = null;
     } else {
-      output = await callProvider(dependencies, "itinerary_generation", () =>
-        dependencies.provider.generate({
-          operationKey: `${id}:generate`,
-          model: dependencies.model ?? "gpt-5.6-sol",
-          safetyIdentifier: dependencies.safetyIdentifier,
-          context: buildItineraryContext(context),
-          signal: AbortSignal.timeout(
-            Math.min(
-              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
-              remainingProviderTimeout(
-                policy,
-                "itineraryGeneration",
-                workflowStartedAt,
-              ),
-            ),
-          ),
-        }),
-      );
+      const execution = await executeProvider({
+        workflow: "itinerary_generation",
+        operationKey: `${id}:generate`,
+        attempt: firstClaim.attemptCount,
+        repairCount: 0,
+        execute: (signal) =>
+          dependencies.provider.generate({
+            operationKey: `${id}:generate`,
+            model: dependencies.model ?? "gpt-5.6-sol",
+            safetyIdentifier: dependencies.safetyIdentifier,
+            context: buildItineraryContext(context),
+            signal,
+          }),
+      });
+      if (execution.ownedElsewhere) return;
+      output = execution.output;
+    }
+    if (!output && !context.draft) {
+      context = await dependencies.repository.loadContext(id);
     }
     let draft = output?.itinerary ?? context.draft;
     if (!draft)
       throw new ItineraryProviderError("invalid_itinerary_response", false);
-    if (output) await dependencies.repository.recordDraft(id, draft, output);
     let result = await validateAndRecord(
       id,
       context,
@@ -344,31 +428,28 @@ export async function processItineraryGeneration(
     const repairClaim = await dependencies.repository.claim(id);
     if (!repairClaim.claimed) return;
     context = await dependencies.repository.loadContext(id);
-    const repaired = await callProvider(dependencies, "itinerary_repair", () =>
-      dependencies.provider.repair({
-        operationKey: `${id}:repair`,
-        model: dependencies.model ?? "gpt-5.6-sol",
-        safetyIdentifier: dependencies.safetyIdentifier,
-        context: buildItineraryRepairContext({
-          approvedSummary: context.approvedSummary,
-          draft: result.itinerary,
-          validation: result.report,
-          evidence: result.evidence,
+    const repairExecution = await executeProvider({
+      workflow: "itinerary_repair",
+      operationKey: `${id}:repair`,
+      attempt: repairClaim.attemptCount,
+      repairCount: 1,
+      execute: (signal) =>
+        dependencies.provider.repair({
+          operationKey: `${id}:repair`,
+          model: dependencies.model ?? "gpt-5.6-sol",
+          safetyIdentifier: dependencies.safetyIdentifier,
+          context: buildItineraryRepairContext({
+            approvedSummary: context.approvedSummary,
+            draft: result.itinerary,
+            validation: result.report,
+            evidence: result.evidence,
+          }),
+          signal,
         }),
-        signal: AbortSignal.timeout(
-          Math.min(
-            dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
-            remainingProviderTimeout(
-              policy,
-              "itineraryRepair",
-              workflowStartedAt,
-            ),
-          ),
-        ),
-      }),
-    );
+    });
+    if (repairExecution.ownedElsewhere || !repairExecution.output) return;
+    const repaired = repairExecution.output;
     draft = repaired.itinerary;
-    await dependencies.repository.recordDraft(id, draft, repaired);
     result = await validateAndRecord(
       id,
       context,

@@ -21,6 +21,7 @@ export type RecoveryCategory = (typeof recoveryCategories)[number];
 type RecoveryCounts = Record<RecoveryCategory, number>;
 
 export type RecoveryDependencies = {
+  prepare(): Promise<void>;
   list(category: RecoveryCategory, batchSize: number): Promise<string[]>;
   drain(category: RecoveryCategory, id: string): Promise<void>;
 };
@@ -46,6 +47,7 @@ export async function runRecovery(
 ) {
   const batchSize = Math.min(Math.max(options.batchSize, 1), 5);
   const maxJobs = Math.min(Math.max(options.maxJobs, 1), 5);
+  await dependencies.prepare();
   const listed = await Promise.all(
     recoveryCategories.map(async (category) => ({
       category,
@@ -101,6 +103,10 @@ const rpcByCategory = {
 export function createDefaultRecoveryDependencies(): RecoveryDependencies {
   const admin = createAdminSupabaseClient();
   return {
+    async prepare() {
+      const { error } = await admin.rpc("prepare_ai_recovery" as never);
+      if (error) throw new Error("recovery_preparation_failed");
+    },
     async list(category, batchSize) {
       const rpc = rpcByCategory[category];
       const { data, error } = await admin.rpc(rpc.name, {

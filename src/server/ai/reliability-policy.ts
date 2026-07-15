@@ -110,6 +110,18 @@ export function parseWorkflowReliabilityPolicy(source: EnvironmentSource) {
 
 export function classifyProviderFailure(error: unknown): ProviderFailure {
   if (error instanceof ProviderFailure) return error;
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : null;
+  if (code === "openai_timeout")
+    return new ProviderFailure("model_timeout", { cause: error });
+  if (code === "openai_rate_limited")
+    return new ProviderFailure("model_rate_limited", { cause: error });
+  if (code === "invalid_model_response")
+    return new ProviderFailure("invalid_model_output", { cause: error });
+  if (code === "openai_unavailable")
+    return new ProviderFailure("model_unavailable", { cause: error });
   if (error instanceof DOMException && error.name === "TimeoutError")
     return new ProviderFailure("model_timeout", { cause: error });
   if (error instanceof Error && error.name === "TimeoutError")

@@ -122,4 +122,43 @@ describe("planning worker", () => {
     expect(sleep).toHaveBeenNthCalledWith(1, 500);
     expect(sleep).toHaveBeenNthCalledWith(2, 1_000);
   });
+
+  it("stages the validated planning summary before completing the request", async () => {
+    const repository = {
+      claim: vi.fn().mockResolvedValue({
+        claimed: true,
+        status: "generating_summary",
+        attemptCount: 1,
+        summaryVersion: 1,
+      }),
+      loadContext: vi.fn().mockResolvedValue(context),
+      complete: vi.fn(),
+      fail: vi.fn(),
+    };
+    const run = vi.fn(async (input) => {
+      const result = await input.execute({
+        attemptId: "5c000000-0000-4000-8000-000000000001",
+        leaseOwner: "5c000000-0000-4000-8000-000000000002",
+      });
+      await input.apply(result.value, result);
+      return { status: "applied", recovered: false, result };
+    });
+    await processPlanningSummary(context.requestId, {
+      repository,
+      provider: createFakePlanningSummaryProvider(),
+      safetyIdentifier: "safe",
+      providerAttempts: { run } as never,
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
+    });
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: "planning_summary",
+        operationKey: `${context.requestId}:summary:1`,
+        attempt: 1,
+        model: "gpt-5.6-sol",
+        leaseMs: 360_000,
+      }),
+    );
+    expect(repository.complete).toHaveBeenCalledOnce();
+  });
 });

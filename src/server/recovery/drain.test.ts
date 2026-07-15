@@ -18,13 +18,15 @@ describe("bounded recovery drain", () => {
       },
     );
     const drain = vi.fn(async () => undefined);
+    const prepare = vi.fn(async () => undefined);
 
     const result = await runRecovery(
-      { list, drain },
+      { prepare, list, drain },
       { batchSize: 1, maxJobs: 2 },
     );
 
     expect(list).toHaveBeenCalledTimes(5);
+    expect(prepare).toHaveBeenCalledOnce();
     expect(list.mock.calls.every((call) => call[1] === 1)).toBe(true);
     expect(drain).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
@@ -64,7 +66,7 @@ describe("bounded recovery drain", () => {
       throw new Error("raw private provider failure");
     });
     const result = await runRecovery(
-      { list, drain },
+      { prepare: vi.fn(async () => undefined), list, drain },
       { batchSize: 1, maxJobs: 2 },
     );
     expect(result.failed.itinerary).toBe(1);

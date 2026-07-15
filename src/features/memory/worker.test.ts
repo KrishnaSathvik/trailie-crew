@@ -137,4 +137,33 @@ describe("memory extraction worker", () => {
     expect(sleep).toHaveBeenNthCalledWith(1, 500);
     expect(sleep).toHaveBeenNthCalledWith(2, 1_000);
   });
+
+  it("stages validated memory output through the durable attempt controller", async () => {
+    const store = repository("I prefer hiking");
+    const run = vi.fn(async (input) => {
+      const result = await input.execute({
+        attemptId: "5c000000-0000-4000-8000-000000000001",
+        leaseOwner: "5c000000-0000-4000-8000-000000000002",
+      });
+      await input.apply(result.value, result);
+      return { status: "applied", recovered: false, result };
+    });
+    await processMemoryExtraction(messageId, {
+      repository: store,
+      provider: createFakeMemoryExtractionProvider(),
+      safetyIdentifier: "safe",
+      providerAttempts: { run } as never,
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
+    });
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: "memory_extraction",
+        operationKey: `memory:${messageId}`,
+        attempt: 1,
+        model: "gpt-5.6-luna",
+        leaseMs: 360_000,
+      }),
+    );
+    expect(store.complete).toHaveBeenCalledOnce();
+  });
 });

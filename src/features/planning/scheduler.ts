@@ -3,6 +3,9 @@ import { after } from "next/server";
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { resolveAiQuotaSubject } from "@/server/ai/quota";
+import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
+import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
+import type { PlanningSummary } from "@trailie/schemas";
 import { createOpenAIPlanningSummaryProvider } from "./openai-provider";
 import { createFakePlanningSummaryProvider } from "./provider";
 import { createPlanningRepository } from "./repository";
@@ -46,6 +49,9 @@ export async function drainPlanningSummary(id: string) {
     model: env.planningModel,
     quotaSubject,
     reliabilityPolicy: env.reliabilityPolicy,
+    providerAttempts: createDurableProviderAttemptController(
+      createProviderAttemptRepository<PlanningSummary>(),
+    ),
   });
 }
 export function schedulePlanningSummary(id: string) {

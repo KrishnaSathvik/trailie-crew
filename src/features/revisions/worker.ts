@@ -8,6 +8,7 @@ import type {
   PlanningSummary,
   ValidationReport,
 } from "@trailie/schemas";
+import { itinerarySchema, planChangeAnalysisSchema } from "@trailie/schemas";
 import type { TravelProvider } from "@trailie/travel-tools";
 import { enrichWithTravelEvidence } from "@/features/itinerary/worker";
 import {
@@ -43,6 +44,10 @@ import {
   remainingProviderTimeout,
   type WorkflowReliabilityPolicy,
 } from "@/server/ai/reliability-policy";
+import {
+  type DurableProviderAttemptController,
+  type ProviderAttemptExecutionResult,
+} from "@/server/ai/provider-attempts";
 
 export type RevisionContext = {
   request: {
@@ -66,13 +71,18 @@ export type RevisionContext = {
 
 export interface RevisionRepository {
   loadContext(id: string): Promise<RevisionContext>;
-  claimAnalysis(id: string, model: string): Promise<{ claimed: boolean }>;
+  claimAnalysis(
+    id: string,
+    model: string,
+  ): Promise<{ claimed: boolean; attemptCount?: number }>;
   completeAnalysis(
     id: string,
     analysis: PlanChangeAnalysis,
     output: ProviderMeta,
   ): Promise<void>;
-  claimCandidate(id: string): Promise<{ claimed: boolean }>;
+  claimCandidate(
+    id: string,
+  ): Promise<{ claimed: boolean; attemptCount?: number }>;
   attachCandidate(
     id: string,
     itinerary: Itinerary,
@@ -112,6 +122,8 @@ type Dependencies = {
   now?: string;
   quotaSubject?: AiQuotaSubject;
   reliabilityPolicy?: WorkflowReliabilityPolicy;
+  analysisAttempts?: DurableProviderAttemptController<PlanChangeAnalysis>;
+  candidateAttempts?: DurableProviderAttemptController<Itinerary>;
 };
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
@@ -119,6 +131,7 @@ function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
   workflow: "revision_analysis" | "revision_candidate",
   model: string,
   operation: () => Promise<T>,
+  reservationId?: string,
 ) {
   return dependencies.quotaSubject
     ? runWithAiQuota(
@@ -127,6 +140,7 @@ function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
           workflow,
           model,
           estimatedTokens: workflow === "revision_analysis" ? 5_000 : 12_000,
+          ...(reservationId ? { reservationId } : {}),
         },
         operation,
       )
@@ -257,94 +271,184 @@ export async function processPlanChange(
       });
       const claim = await dependencies.repository.claimAnalysis(id, model);
       if (!claim.claimed) return;
-      const output = await callProvider(
-        dependencies,
-        "revision_analysis",
-        model,
-        () =>
-          dependencies.provider.analyze({
-            operationKey: `${id}:analysis:${context.request.currentAnalysisVersion + 1}`,
-            model,
-            safetyIdentifier: dependencies.safetyIdentifier,
-            context: buildChangeAnalysisContext({
-              requestType: context.request.requestType,
-              targetItemId: context.request.targetItemId,
-              requestText: context.request.requestText,
+      const operationKey = `${id}:analysis:${context.request.currentAnalysisVersion + 1}`;
+      const execute = async (reservationId?: string) => {
+        const providerStartedAt = Date.now();
+        const output = await callProvider(
+          dependencies,
+          "revision_analysis",
+          model,
+          () =>
+            dependencies.provider.analyze({
+              operationKey,
+              model,
+              safetyIdentifier: dependencies.safetyIdentifier,
+              context: buildChangeAnalysisContext({
+                requestType: context.request.requestType,
+                targetItemId: context.request.targetItemId,
+                requestText: context.request.requestText,
+                basePlan: context.basePlan,
+              }),
               basePlan: context.basePlan,
-            }),
-            basePlan: context.basePlan,
-            signal: AbortSignal.timeout(
-              Math.min(
-                dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
-                remainingProviderTimeout(
-                  policy,
-                  "revisionAnalysis",
-                  workflowStartedAt,
+              signal: AbortSignal.timeout(
+                Math.min(
+                  dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+                  remainingProviderTimeout(
+                    policy,
+                    "revisionAnalysis",
+                    workflowStartedAt,
+                  ),
                 ),
               ),
-            ),
-          }),
-      );
-      await dependencies.repository.completeAnalysis(
-        id,
-        verifyAnalysis(output.analysis, context),
-        meta(output),
-      );
-      await dependencies.repository.recordRunUsage(
-        id,
-        "impact_analysis",
-        meta(output),
-      );
+            }),
+          reservationId,
+        );
+        return {
+          value: verifyAnalysis(output.analysis, context),
+          responseId: output.responseId,
+          requestId: output.requestId,
+          usage: output.usage,
+          providerDurationMs: Date.now() - providerStartedAt,
+          totalDurationMs: Date.now() - workflowStartedAt,
+          retryCount: Math.max((claim.attemptCount ?? 1) - 1, 0),
+          repairCount: 0,
+        } satisfies ProviderAttemptExecutionResult<PlanChangeAnalysis>;
+      };
+      const apply = async (
+        analysis: PlanChangeAnalysis,
+        result: ProviderAttemptExecutionResult<PlanChangeAnalysis>,
+      ) => {
+        const output = { analysis, ...result };
+        await dependencies.repository.completeAnalysis(
+          id,
+          analysis,
+          meta(output),
+        );
+        await dependencies.repository.recordRunUsage(
+          id,
+          "impact_analysis",
+          meta(output),
+        );
+      };
+      if (dependencies.analysisAttempts) {
+        const outcome = await dependencies.analysisAttempts.run({
+          workflow: "revision_analysis",
+          operationKey,
+          attempt: claim.attemptCount ?? 1,
+          model,
+          leaseMs: policy.recoveryLeaseMs,
+          execute: ({ attemptId }) => execute(attemptId),
+          parse: (value) => planChangeAnalysisSchema.parse(value),
+          apply,
+        });
+        if (outcome.status !== "applied") return;
+      } else {
+        const output = await execute();
+        await apply(output.value, output);
+      }
       return;
     }
     if (context.request.status !== "approved" || !context.analysis) return;
     const approvedAnalysis = context.analysis;
     const claim = await dependencies.repository.claimCandidate(id);
     if (!claim.claimed) return;
-    const generated = await callProvider(
-      dependencies,
-      "revision_candidate",
-      "gpt-5.6-sol",
-      () =>
-        dependencies.provider.generate({
-          operationKey: `${id}:candidate:${context.request.currentAnalysisVersion}`,
-          model: "gpt-5.6-sol",
-          safetyIdentifier: dependencies.safetyIdentifier,
-          context: buildRevisionCandidateContext({
+    const model = "gpt-5.6-sol";
+    const operationKey = `${id}:candidate:${context.request.currentAnalysisVersion}`;
+    const generate = async (reservationId?: string) => {
+      const providerStartedAt = Date.now();
+      const output = await callProvider(
+        dependencies,
+        "revision_candidate",
+        model,
+        () =>
+          dependencies.provider.generate({
+            operationKey,
+            model,
+            safetyIdentifier: dependencies.safetyIdentifier,
+            context: buildRevisionCandidateContext({
+              basePlan: context.basePlan,
+              approvedSummary: context.approvedSummary,
+              analysis: approvedAnalysis,
+              evidence: context.evidence,
+            }),
             basePlan: context.basePlan,
-            approvedSummary: context.approvedSummary,
             analysis: approvedAnalysis,
-            evidence: context.evidence,
-          }),
-          basePlan: context.basePlan,
-          analysis: approvedAnalysis,
-          signal: AbortSignal.timeout(
-            Math.min(
-              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
-              remainingProviderTimeout(
-                policy,
-                "revisionGeneration",
-                workflowStartedAt,
+            signal: AbortSignal.timeout(
+              Math.min(
+                dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+                remainingProviderTimeout(
+                  policy,
+                  "revisionGeneration",
+                  workflowStartedAt,
+                ),
               ),
             ),
-          ),
-        }),
-    );
-    const candidate = await dependencies.repository.attachCandidate(
-      id,
-      generated.itinerary,
-      meta(generated),
-    );
-    await dependencies.repository.recordRunUsage(
-      id,
-      "candidate_generation",
-      meta(generated),
-    );
+          }),
+        reservationId,
+      );
+      return {
+        value: output.itinerary,
+        responseId: output.responseId,
+        requestId: output.requestId,
+        usage: output.usage,
+        providerDurationMs: Date.now() - providerStartedAt,
+        totalDurationMs: Date.now() - workflowStartedAt,
+        retryCount: Math.max((claim.attemptCount ?? 1) - 1, 0),
+        repairCount: 0,
+      } satisfies ProviderAttemptExecutionResult<Itinerary>;
+    };
+    let candidate: { id: string; version: number } | null = null;
+    let generatedItinerary: Itinerary | null = null;
+    const applyGenerated = async (
+      itinerary: Itinerary,
+      output: ProviderAttemptExecutionResult<Itinerary>,
+    ) => {
+      candidate = await dependencies.repository.attachCandidate(
+        id,
+        itinerary,
+        meta({ itinerary, ...output }),
+      );
+      await dependencies.repository.recordRunUsage(
+        id,
+        "candidate_generation",
+        meta({ itinerary, ...output }),
+      );
+      generatedItinerary = itinerary;
+    };
+    if (dependencies.candidateAttempts) {
+      const outcome = await dependencies.candidateAttempts.run({
+        workflow: "revision_candidate",
+        operationKey,
+        attempt: claim.attemptCount ?? 1,
+        model,
+        leaseMs: policy.recoveryLeaseMs,
+        execute: ({ attemptId }) => generate(attemptId),
+        parse: (value) => itinerarySchema.parse(value),
+        apply: applyGenerated,
+      });
+      if (outcome.status === "owned_elsewhere") return;
+      if (outcome.status === "applied")
+        generatedItinerary = outcome.result.value;
+      if (!candidate || !generatedItinerary) {
+        const recovered = await dependencies.repository.loadContext(id);
+        if (!recovered.request.candidateTripPlanId || !recovered.candidatePlan)
+          return;
+        candidate = {
+          id: recovered.request.candidateTripPlanId,
+          version: recovered.request.basePlanVersion + 1,
+        };
+        generatedItinerary = recovered.candidatePlan;
+      }
+    } else {
+      const output = await generate();
+      await applyGenerated(output.value, output);
+    }
+    if (!candidate || !generatedItinerary) return;
     let result = await validateCandidate(
       id,
       candidate.id,
       candidate.version,
-      generated.itinerary,
+      generatedItinerary,
       context,
       dependencies,
       context.evidence,
@@ -374,48 +478,95 @@ export async function processPlanChange(
     }
     const repairClaim = await dependencies.repository.startRepair(id);
     if (!repairClaim.claimed) return;
-    const repaired = await callProvider(
-      dependencies,
-      "revision_candidate",
-      "gpt-5.6-sol",
-      () =>
-        dependencies.provider.repair({
-          operationKey: `${id}:repair:1`,
-          model: "gpt-5.6-sol",
-          safetyIdentifier: dependencies.safetyIdentifier,
-          context: buildRevisionRepairContext({
-            basePlan: context.basePlan,
-            approvedSummary: context.approvedSummary,
+    const candidateId = candidate.id;
+    const repairOperationKey = `${id}:repair:1`;
+    const repair = async (reservationId?: string) => {
+      const providerStartedAt = Date.now();
+      const output = await callProvider(
+        dependencies,
+        "revision_candidate",
+        model,
+        () =>
+          dependencies.provider.repair({
+            operationKey: repairOperationKey,
+            model,
+            safetyIdentifier: dependencies.safetyIdentifier,
+            context: buildRevisionRepairContext({
+              basePlan: context.basePlan,
+              approvedSummary: context.approvedSummary,
+              analysis: approvedAnalysis,
+              evidence: result.evidence,
+              candidate: result.itinerary,
+              validation: result.validation,
+              boundary: result.boundary,
+            }),
+            basePlan: result.itinerary,
             analysis: approvedAnalysis,
-            evidence: result.evidence,
-            candidate: result.itinerary,
-            validation: result.validation,
-            boundary: result.boundary,
-          }),
-          basePlan: result.itinerary,
-          analysis: approvedAnalysis,
-          signal: AbortSignal.timeout(
-            Math.min(
-              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
-              remainingProviderTimeout(
-                policy,
-                "revisionGeneration",
-                workflowStartedAt,
+            signal: AbortSignal.timeout(
+              Math.min(
+                dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+                remainingProviderTimeout(
+                  policy,
+                  "revisionGeneration",
+                  workflowStartedAt,
+                ),
               ),
             ),
-          ),
-        }),
-    );
-    await dependencies.repository.recordRunUsage(
-      id,
-      "candidate_repair",
-      meta(repaired),
-    );
+          }),
+        reservationId,
+      );
+      return {
+        value: output.itinerary,
+        responseId: output.responseId,
+        requestId: output.requestId,
+        usage: output.usage,
+        providerDurationMs: Date.now() - providerStartedAt,
+        totalDurationMs: Date.now() - workflowStartedAt,
+        retryCount: 0,
+        repairCount: 1,
+      } satisfies ProviderAttemptExecutionResult<Itinerary>;
+    };
+    let repairedItinerary: Itinerary | null = null;
+    const applyRepair = async (
+      itinerary: Itinerary,
+      output: ProviderAttemptExecutionResult<Itinerary>,
+    ) => {
+      await dependencies.repository.updateCandidate(candidateId, itinerary);
+      await dependencies.repository.recordRunUsage(
+        id,
+        "candidate_repair",
+        meta({ itinerary, ...output }),
+      );
+      repairedItinerary = itinerary;
+    };
+    if (dependencies.candidateAttempts) {
+      const outcome = await dependencies.candidateAttempts.run({
+        workflow: "revision_repair",
+        operationKey: repairOperationKey,
+        attempt: 1,
+        model,
+        leaseMs: policy.recoveryLeaseMs,
+        execute: ({ attemptId }) => repair(attemptId),
+        parse: (value) => itinerarySchema.parse(value),
+        apply: applyRepair,
+      });
+      if (outcome.status === "owned_elsewhere") return;
+      if (outcome.status === "applied")
+        repairedItinerary = outcome.result.value;
+      if (!repairedItinerary) {
+        const recovered = await dependencies.repository.loadContext(id);
+        repairedItinerary = recovered.candidatePlan;
+      }
+    } else {
+      const output = await repair();
+      await applyRepair(output.value, output);
+    }
+    if (!repairedItinerary) return;
     result = await validateCandidate(
       id,
       candidate.id,
       candidate.version,
-      repaired.itinerary,
+      repairedItinerary,
       context,
       dependencies,
       result.evidence,
