@@ -4,7 +4,7 @@ import {
   RecoveryRateLimitedError,
   runDefaultRecovery,
 } from "@/server/recovery/drain";
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 vi.mock("@/server/recovery/drain", () => ({
   RecoveryRateLimitedError: class RecoveryRateLimitedError extends Error {},
@@ -70,6 +70,41 @@ describe("internal recovery route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ status: "ok" });
+  });
+
+  it("accepts Vercel Cron GET authentication through CRON_SECRET", async () => {
+    vi.stubEnv("RECOVERY_SECRET", "");
+    vi.stubEnv("CRON_SECRET", secret);
+    vi.mocked(runDefaultRecovery).mockResolvedValue({
+      selected: {
+        memory: 0,
+        planning: 0,
+        itinerary: 0,
+        revision: 0,
+        revisionPublication: 0,
+      },
+      completed: {
+        memory: 0,
+        planning: 0,
+        itinerary: 0,
+        revision: 0,
+        revisionPublication: 0,
+      },
+      failed: {
+        memory: 0,
+        planning: 0,
+        itinerary: 0,
+        revision: 0,
+        revisionPublication: 0,
+      },
+      remainingEligible: 0,
+    });
+    const response = await GET(
+      new Request("https://production.example/api/internal/recovery", {
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+    );
+    expect(response.status).toBe(200);
   });
 
   it("maps internal failures to a safe operational error", async () => {

@@ -2,6 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
+grant execute on function public.create_trip_unprotected(text,text,integer),public.join_trip_unprotected(text,text) to authenticated;
 
 select plan(31);
 
@@ -15,17 +16,17 @@ values
 
 select set_config('request.jwt.claim.sub', '30000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
-create temporary table chat_trip as select * from public.create_trip('Chat Trip', 'Maya', null);
+create temporary table chat_trip as select * from public.create_trip_unprotected('Chat Trip', 'Maya', null);
 reset role;
 
 select set_config('request.jwt.claim.sub', '30000000-0000-4000-8000-000000000002', true);
 set local role authenticated;
-create temporary table chat_member as select * from public.join_trip((select invite_token from chat_trip), 'Leo');
+create temporary table chat_member as select * from public.join_trip_unprotected((select invite_token from chat_trip), 'Leo');
 reset role;
 
 select set_config('request.jwt.claim.sub', '30000000-0000-4000-8000-000000000003', true);
 set local role authenticated;
-create temporary table other_trip as select * from public.create_trip('Other Trip', 'Nia', null);
+create temporary table other_trip as select * from public.create_trip_unprotected('Other Trip', 'Nia', null);
 reset role;
 
 set local role authenticated;
@@ -304,7 +305,7 @@ select ok(
 
 select set_config('request.jwt.claim.sub', '30000000-0000-4000-8000-000000000005', true);
 set local role authenticated;
-create temporary table rate_trip as select * from public.create_trip('Rate Trip', 'Ari', null);
+create temporary table rate_trip as select * from public.create_trip_unprotected('Rate Trip', 'Ari', null);
 select public.send_message(
   (select room_id from rate_trip),
   (select participant_id from rate_trip),

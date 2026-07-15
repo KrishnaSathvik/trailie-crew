@@ -17,6 +17,7 @@ describe("structured operational logging", () => {
     });
     expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toEqual({
       timestamp: expect.any(String),
+      classification: "info",
       event: "recovery.completed",
       correlationId: "correlation-1",
       status: "ok",
@@ -24,6 +25,18 @@ describe("structured operational logging", () => {
       latencyMs: 42,
       model: "gpt-5.6-sol",
       counts: { memory: 1 },
+    });
+  });
+
+  it("classifies synthetic failures as alert-worthy", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    logOperation("recovery.failed", {
+      correlationId: "synthetic",
+      errorCode: "synthetic_failure",
+    });
+    expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toMatchObject({
+      classification: "alert",
+      errorCode: "synthetic_failure",
     });
   });
 

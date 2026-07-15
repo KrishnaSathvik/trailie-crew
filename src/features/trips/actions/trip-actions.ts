@@ -8,6 +8,8 @@ import {
 } from "@trailie/schemas";
 
 import type { TripActionResult } from "@/features/trips/actions/action-types";
+import { verifyCaptchaForAction } from "@/features/security/captcha-server";
+import { CaptchaVerificationError } from "@/features/security/captcha";
 import { mapTripOperationError } from "@/features/trips/errors/trip-errors";
 import { mapCreateTripResult, mapJoinTripResult } from "@/lib/supabase/mappers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -22,11 +24,17 @@ function fieldErrorsFromIssues(
   );
 }
 
-async function hasAuthenticatedUser(
+async function getAuthenticatedUser(
   client: Awaited<ReturnType<typeof createServerSupabaseClient>>,
 ) {
   const { data, error } = await client.auth.getUser();
-  return !error && Boolean(data.user);
+  return error ? null : data.user;
+}
+
+function captchaTokenFromInput(input: unknown) {
+  if (!input || typeof input !== "object" || !("captchaToken" in input))
+    return "";
+  return typeof input.captchaToken === "string" ? input.captchaToken : "";
 }
 
 export async function createTripAction(
@@ -43,14 +51,21 @@ export async function createTripAction(
 
   try {
     const client = await createServerSupabaseClient();
-    if (!(await hasAuthenticatedUser(client))) {
+    const user = await getAuthenticatedUser(client);
+    if (!user) {
       return { ok: false, error: "authentication_required" };
     }
+    const receiptId = await verifyCaptchaForAction({
+      token: captchaTokenFromInput(input),
+      purpose: "create_trip",
+      user,
+    });
 
-    const { data, error } = await client.rpc("create_trip", {
+    const { data, error } = await client.rpc("create_trip_protected", {
       trip_name: parsed.data.tripName,
       display_name: parsed.data.displayName,
       expected_travelers: parsed.data.expectedTravelers ?? null,
+      target_receipt_id: receiptId,
     });
 
     if (error) {
@@ -67,6 +82,18 @@ export async function createTripAction(
       return { ok: false, error: "invalid_server_response" };
     }
   } catch (error) {
+    if (error instanceof CaptchaVerificationError)
+      return { ok: false, error: error.code };
+    if (
+      error instanceof Error &&
+      [
+        "captcha_required",
+        "captcha_invalid",
+        "captcha_expired",
+        "captcha_unavailable",
+      ].includes(error.message)
+    )
+      return { ok: false, error: error.message as "captcha_required" };
     return { ok: false, error: mapTripOperationError(error) };
   }
 }
@@ -85,13 +112,20 @@ export async function joinTripAction(
 
   try {
     const client = await createServerSupabaseClient();
-    if (!(await hasAuthenticatedUser(client))) {
+    const user = await getAuthenticatedUser(client);
+    if (!user) {
       return { ok: false, error: "authentication_required" };
     }
+    const receiptId = await verifyCaptchaForAction({
+      token: captchaTokenFromInput(input),
+      purpose: "join_trip",
+      user,
+    });
 
-    const { data, error } = await client.rpc("join_trip", {
+    const { data, error } = await client.rpc("join_trip_protected", {
       invite_value: parsed.data.inviteValue,
       display_name: parsed.data.displayName,
+      target_receipt_id: receiptId,
     });
 
     if (error) {
@@ -108,6 +142,18 @@ export async function joinTripAction(
       return { ok: false, error: "invalid_server_response" };
     }
   } catch (error) {
+    if (error instanceof CaptchaVerificationError)
+      return { ok: false, error: error.code };
+    if (
+      error instanceof Error &&
+      [
+        "captcha_required",
+        "captcha_invalid",
+        "captcha_expired",
+        "captcha_unavailable",
+      ].includes(error.message)
+    )
+      return { ok: false, error: error.message as "captcha_required" };
     return { ok: false, error: mapTripOperationError(error) };
   }
 }

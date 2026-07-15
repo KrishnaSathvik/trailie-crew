@@ -18,7 +18,9 @@ import {
   type FocusedAnswerProvider,
 } from "@/server/ai/provider";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
+import { AiQuotaError, runWithAiQuota } from "@/server/ai/quota";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
+import { createCorrelationId, logOperation } from "@/server/operations/logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,6 +55,7 @@ function providerFor(
 }
 
 export async function POST(request: Request) {
+  const correlationId = createCorrelationId();
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError("source_message_invalid", 400);
 
@@ -148,13 +151,24 @@ export async function POST(request: Request) {
       target_prompt_version: environment.promptVersion,
     },
   );
-  if (invocationError)
+  if (invocationError) {
+    const rateLimited = invocationError.message.includes("rate limit");
+    logOperation(
+      rateLimited
+        ? "rate_limit.focused_answer"
+        : "trailie_ai.invocation_failed",
+      {
+        correlationId,
+        workflow: "focused_answer",
+        status: "rejected",
+        errorCode: rateLimited ? "rate_limited" : "invocation_failed",
+      },
+    );
     return jsonError(
-      invocationError.message.includes("rate limit")
-        ? "openai_rate_limited"
-        : "invocation_failed",
+      rateLimited ? "openai_rate_limited" : "invocation_failed",
       429,
     );
+  }
   const invocation = asRecord(invocationData);
   const invocationId = asString(invocation.id);
   if (!invocationId) return jsonError("invocation_failed", 500);
@@ -231,20 +245,31 @@ export async function POST(request: Request) {
       };
       emit({ type: "invocation_started", invocationId });
       try {
-        const providerStream = await providerFor(environment).stream({
-          operationKey: invocationId,
-          request: decision.normalizedRequest,
-          context: context.text,
-          model: route.model,
-          safetyIdentifier: createSafetyIdentifier(
-            authData.user.id,
-            environment.safetyHmacSecret,
-          ),
-          signal: request.signal,
-        });
-        for await (const delta of providerStream.textDeltas)
-          emit({ type: "text_delta", delta });
-        const result = await providerStream.completed;
+        const result = await runWithAiQuota(
+          {
+            userId: authData.user.id,
+            roomId: parsed.data.roomId,
+            workflow: "focused_answer",
+            model: route.model,
+            estimatedTokens: 4_000,
+          },
+          async () => {
+            const providerStream = await providerFor(environment).stream({
+              operationKey: invocationId,
+              request: decision.normalizedRequest,
+              context: context.text,
+              model: route.model,
+              safetyIdentifier: createSafetyIdentifier(
+                authData.user.id,
+                environment.safetyHmacSecret,
+              ),
+              signal: request.signal,
+            });
+            for await (const delta of providerStream.textDeltas)
+              emit({ type: "text_delta", delta });
+            return providerStream.completed;
+          },
+        );
         const envelope = trailieResponseEnvelopeSchema.parse({
           schemaVersion: "1",
           ...result.answer,
@@ -277,14 +302,16 @@ export async function POST(request: Request) {
         });
       } catch (error) {
         const failure =
-          error instanceof TrailieProviderError
-            ? error
-            : new TrailieProviderError(
-                request.signal.aborted
-                  ? "invocation_cancelled"
-                  : "openai_unavailable",
-                true,
-              );
+          error instanceof AiQuotaError
+            ? new TrailieProviderError(error.code as never, false)
+            : error instanceof TrailieProviderError
+              ? error
+              : new TrailieProviderError(
+                  request.signal.aborted
+                    ? "invocation_cancelled"
+                    : "openai_unavailable",
+                  true,
+                );
         await admin.rpc("fail_ai_run", {
           target_invocation_id: invocationId,
           target_run_id: runId,

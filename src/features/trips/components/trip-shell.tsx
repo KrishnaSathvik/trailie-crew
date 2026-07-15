@@ -5,10 +5,11 @@ import {
   Map,
   MessageCircle,
   Route,
+  Settings,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { CrewList } from "@/features/crew/components/crew-list";
@@ -16,12 +17,16 @@ import type { TripShellData } from "@/features/crew/queries/trip-crew";
 import { InvitePanel } from "@/features/trips/components/invite-panel";
 import { ChatExperience } from "@/features/chat/components/chat-experience";
 import { PlanExperience } from "@/features/planning/components/plan-experience";
+import { TripDangerZone } from "@/features/lifecycle/trip-danger-zone";
 
 const destinations = [
   { label: "Chat", icon: MessageCircle, enabled: true },
   { label: "Plan", icon: CalendarRange, enabled: true },
+  { label: "Settings", icon: Settings, enabled: true },
   { label: "Map", icon: Map, enabled: false },
 ];
+
+type Area = "Chat" | "Plan" | "Settings";
 
 export function TripShell({ data }: { data: TripShellData }) {
   const isHost = data.currentParticipant.role === "host";
@@ -29,10 +34,41 @@ export function TripShell({ data }: { data: TripShellData }) {
     [],
   );
   const [peopleOpen, setPeopleOpen] = useState(false);
-  const [area, setArea] = useState<"Chat" | "Plan">("Chat");
+  const [area, setArea] = useState<Area>("Chat");
+  const peopleButtonRef = useRef<HTMLButtonElement>(null);
+  const closePeopleRef = useRef<HTMLButtonElement>(null);
   const handlePresenceChange = useCallback((participantIds: string[]) => {
     setOnlineParticipantIds(participantIds);
   }, []);
+
+  useEffect(() => {
+    if (!peopleOpen) return;
+    const trigger = peopleButtonRef.current;
+    closePeopleRef.current?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setPeopleOpen(false);
+      if (event.key !== "Tab") return;
+      const dialog = closePeopleRef.current?.closest('[role="dialog"]');
+      const controls = dialog?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!controls?.length) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      trigger?.focus();
+    };
+  }, [peopleOpen]);
 
   return (
     <main className="bg-background text-foreground min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)_19rem]">
@@ -62,7 +98,7 @@ export function TripShell({ data }: { data: TripShellData }) {
               <button
                 type="button"
                 key={label}
-                onClick={() => enabled && setArea(label as "Chat" | "Plan")}
+                onClick={() => enabled && setArea(label as Area)}
                 disabled={!enabled}
                 className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${active ? "bg-subtle font-semibold" : "text-muted-foreground"}`}
               >
@@ -102,19 +138,42 @@ export function TripShell({ data }: { data: TripShellData }) {
           <div className="hidden items-center gap-2 lg:flex">
             <Route aria-hidden="true" className="size-4" strokeWidth={1.75} />
             <p className="text-sm font-semibold">
-              {area === "Chat" ? "Shared conversation" : "Planning review"}
+              {area === "Chat"
+                ? "Shared conversation"
+                : area === "Plan"
+                  ? "Planning review"
+                  : "Trip settings"}
             </p>
           </div>
           <ThemeToggle />
         </header>
         {area === "Chat" ? (
           <ChatExperience data={data} onPresenceChange={handlePresenceChange} />
-        ) : (
+        ) : area === "Plan" ? (
           <PlanExperience
             roomId={data.room.id}
             participantId={data.currentParticipant.id}
             participantRole={data.currentParticipant.role}
           />
+        ) : isHost ? (
+          <TripDangerZone
+            roomId={data.room.id}
+            roomName={data.room.name}
+            participants={data.participants}
+          />
+        ) : (
+          <div className="mx-auto w-full max-w-2xl px-5 py-10 sm:px-8">
+            <h2 className="text-2xl font-semibold">Trip settings</h2>
+            <p className="text-muted-foreground mt-3">
+              Only the current host can transfer ownership or delete this trip.
+            </p>
+            <Link
+              href="/settings"
+              className="focus-visible:ring-ring mt-6 inline-flex min-h-11 items-center rounded-md underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Open account settings
+            </Link>
+          </div>
         )}
       </section>
 
@@ -155,6 +214,7 @@ export function TripShell({ data }: { data: TripShellData }) {
           <aside className="bg-background border-border absolute inset-y-0 right-0 w-[min(21rem,88vw)] overflow-y-auto border-l px-5 py-6 shadow-xl">
             <div className="mb-6 flex justify-end">
               <button
+                ref={closePeopleRef}
                 type="button"
                 aria-label="Close crew"
                 onClick={() => setPeopleOpen(false)}
@@ -170,7 +230,7 @@ export function TripShell({ data }: { data: TripShellData }) {
 
       <nav
         aria-label="Trip sections"
-        className="border-border bg-background fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t lg:hidden"
+        className="border-border bg-background fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t lg:hidden"
       >
         {[
           ...destinations,
@@ -179,12 +239,13 @@ export function TripShell({ data }: { data: TripShellData }) {
           const active = area === label;
           return (
             <button
+              ref={label === "People" ? peopleButtonRef : undefined}
               type="button"
               key={label}
               onClick={() =>
                 label === "People"
                   ? setPeopleOpen(true)
-                  : enabled && setArea(label as "Chat" | "Plan")
+                  : enabled && setArea(label as Area)
               }
               disabled={!enabled}
               className={`flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] ${active ? "font-semibold" : "text-muted-foreground"}`}

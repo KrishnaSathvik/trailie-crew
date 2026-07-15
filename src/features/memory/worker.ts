@@ -2,6 +2,11 @@ import "server-only";
 
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
+import {
+  resolveAiQuotaSubject,
+  runWithAiQuota,
+  type AiQuotaSubject,
+} from "@/server/ai/quota";
 import { classifyMemoryEligibility } from "./eligibility";
 import { createOpenAIMemoryExtractionProvider } from "./openai-provider";
 import {
@@ -18,6 +23,7 @@ type Dependencies = {
   safetyIdentifier: string;
   timeoutMs?: number;
   model?: string;
+  quotaSubject?: AiQuotaSubject;
 };
 
 function safeFailure(error: unknown) {
@@ -62,18 +68,30 @@ export async function processMemoryExtraction(
     const startedAt = Date.now();
     try {
       const signal = AbortSignal.timeout(dependencies.timeoutMs ?? 20_000);
-      const result = await dependencies.provider.extract({
-        operationKey: messageId,
-        model: dependencies.model ?? "gpt-5.6-luna",
-        safetyIdentifier: dependencies.safetyIdentifier,
-        sourceMessage: context.sourceMessage,
-        sourceParticipant: context.sourceParticipant,
-        approvalMode: context.approvalMode,
-        replyTarget: context.replyTarget,
-        recentMessages: context.recentMessages,
-        activeFacts: context.activeFacts,
-        signal,
-      });
+      const extract = () =>
+        dependencies.provider.extract({
+          operationKey: messageId,
+          model: dependencies.model ?? "gpt-5.6-luna",
+          safetyIdentifier: dependencies.safetyIdentifier,
+          sourceMessage: context.sourceMessage,
+          sourceParticipant: context.sourceParticipant,
+          approvalMode: context.approvalMode,
+          replyTarget: context.replyTarget,
+          recentMessages: context.recentMessages,
+          activeFacts: context.activeFacts,
+          signal,
+        });
+      const result = dependencies.quotaSubject
+        ? await runWithAiQuota(
+            {
+              ...dependencies.quotaSubject,
+              workflow: "memory_extraction",
+              model: dependencies.model ?? "gpt-5.6-luna",
+              estimatedTokens: 3_000,
+            },
+            extract,
+          )
+        : await extract();
       const patch = validateMemoryPatch(result.patch, {
         roomId: context.roomId,
         sourceMessageId: context.sourceMessage.id,
@@ -113,6 +131,7 @@ export async function drainMemoryExtraction(messageId: string) {
     promptVersion: environment.memoryPromptVersion,
     schemaVersion: environment.memorySchemaVersion,
   });
+  const quotaSubject = await resolveAiQuotaSubject("memory", messageId);
   await processMemoryExtraction(messageId, {
     repository,
     provider,
@@ -122,5 +141,6 @@ export async function drainMemoryExtraction(messageId: string) {
     ),
     timeoutMs: environment.memoryTimeoutMs,
     model: environment.memoryModel,
+    quotaSubject,
   });
 }

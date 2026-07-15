@@ -1,6 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
+grant execute on function public.create_trip_unprotected(text,text,integer),public.join_trip_unprotected(text,text) to authenticated;
 select plan(46);
 
 select has_table('public','planning_requests','planning requests exist');
@@ -30,11 +31,11 @@ insert into auth.users(id,instance_id,aud,role,created_at,updated_at,is_anonymou
 
 select set_config('request.jwt.claim.sub','70000000-0000-4000-8000-000000000001',true);
 set local role authenticated;
-create temporary table plan_trip as select * from public.create_trip('Approval Trip','Maya',null);
+create temporary table plan_trip as select * from public.create_trip_unprotected('Approval Trip','Maya',null);
 reset role;
 select set_config('request.jwt.claim.sub','70000000-0000-4000-8000-000000000002',true);
 set local role authenticated;
-create temporary table plan_member as select * from public.join_trip((select invite_token from plan_trip),'Alex');
+create temporary table plan_member as select * from public.join_trip_unprotected((select invite_token from plan_trip),'Alex');
 reset role;
 
 select set_config('request.jwt.claim.sub','70000000-0000-4000-8000-000000000003',true);

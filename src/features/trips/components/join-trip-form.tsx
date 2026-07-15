@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import type { TripActionResult } from "@/features/trips/actions/action-types";
+import { CaptchaChallenge } from "@/features/security/components/captcha-challenge";
 import { joinTripAction } from "@/features/trips/actions/trip-actions";
 import {
   Field,
@@ -26,12 +27,12 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 type JoinTripFormProps = {
   initialInviteValue?: string;
   action?: (input: unknown) => Promise<TripActionResult<JoinTripResult>>;
-  ensureSession?: () => Promise<unknown>;
+  ensureSession?: (captchaToken: string) => Promise<unknown>;
   onJoined?: (result: JoinTripResult) => void;
 };
 
-function defaultEnsureSession() {
-  return ensureAnonymousSession(createBrowserSupabaseClient());
+function defaultEnsureSession(captchaToken: string) {
+  return ensureAnonymousSession(createBrowserSupabaseClient(), captchaToken);
 }
 
 export function JoinTripForm({
@@ -45,6 +46,7 @@ export function JoinTripForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<TripErrorCode | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [captchaToken, setCaptchaToken] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,8 +89,8 @@ export function JoinTripForm({
     setFieldErrors({});
     setError(null);
     try {
-      await ensureSession();
-      const result = await action(parsed.data);
+      await ensureSession(captchaToken);
+      const result = await action({ ...parsed.data, captchaToken });
       if (!result.ok) {
         setError(result.error);
         setFieldErrors(result.fieldErrors ?? {});
@@ -148,6 +150,7 @@ export function JoinTripForm({
         placeholder="Leo"
         error={fieldErrors.displayName}
       />
+      <CaptchaChallenge onToken={setCaptchaToken} />
       <button type="submit" disabled={pending} className={submitClassName}>
         {pending ? (
           <>

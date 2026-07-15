@@ -2,6 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
+grant execute on function public.create_trip_unprotected(text,text,integer),public.join_trip_unprotected(text,text) to authenticated;
 
 select plan(19);
 
@@ -13,12 +14,12 @@ values
 
 select set_config('request.jwt.claim.sub', '40000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
-create temporary table rls_trip as select * from public.create_trip('RLS Chat', 'Maya', null);
+create temporary table rls_trip as select * from public.create_trip_unprotected('RLS Chat', 'Maya', null);
 reset role;
 
 select set_config('request.jwt.claim.sub', '40000000-0000-4000-8000-000000000002', true);
 set local role authenticated;
-create temporary table rls_member as select * from public.join_trip((select invite_token from rls_trip), 'Leo');
+create temporary table rls_member as select * from public.join_trip_unprotected((select invite_token from rls_trip), 'Leo');
 create temporary table sent as
 select public.send_message(
   (select room_id from rls_trip), (select participant_id from rls_member), 'Visible to crew',

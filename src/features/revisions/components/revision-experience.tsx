@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   PlanChangeRequest,
   PlanChangeType,
@@ -391,7 +391,6 @@ export function RevisionExperience({
   const [error, setError] = useState<string | null>(null);
   const [historical, setHistorical] = useState<TripPlanView | null>(null);
   const [comparison, setComparison] = useState<PlanVersionDiff | null>(null);
-  const publicationRefreshStarted = useRef(false);
   const refresh = useCallback(async () => {
     const [requestResult, versionsResult] = await Promise.all([
       getPlanChangeRequestAction(roomId),
@@ -411,10 +410,8 @@ export function RevisionExperience({
         setReviewOpen(false);
       if (
         requestResult.data?.status === "published" &&
-        requestResult.data.basePlanVersion >= plan.version &&
-        !publicationRefreshStarted.current
+        requestResult.data.basePlanVersion >= plan.version
       ) {
-        publicationRefreshStarted.current = true;
         await onPlanPublished();
       }
     }

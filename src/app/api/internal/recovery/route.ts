@@ -15,7 +15,7 @@ const responseHeaders = {
   "x-content-type-options": "nosniff",
 };
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const correlationId = createCorrelationId();
   const startedAt = Date.now();
   let secret: string;
@@ -47,6 +47,17 @@ export async function POST(request: Request) {
   }
   try {
     const counts = await runDefaultRecovery();
+    const failedCount = Object.values(counts.failed).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    if (counts.remainingEligible > 0 || failedCount > 0)
+      logOperation("recovery.stale_jobs_remaining", {
+        correlationId,
+        status: "warning",
+        staleJobCount: counts.remainingEligible,
+        failedCount,
+      });
     logOperation("recovery.completed", {
       correlationId,
       status: "ok",
@@ -81,4 +92,12 @@ export async function POST(request: Request) {
       { status: 503, headers: responseHeaders },
     );
   }
+}
+
+export function GET(request: Request) {
+  return handle(request);
+}
+
+export function POST(request: Request) {
+  return handle(request);
 }

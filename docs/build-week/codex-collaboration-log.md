@@ -26,6 +26,12 @@ The landing test was written against an empty shell and observed failing before 
 
 Future entries should identify the human decisions, Codex contributions, verification evidence, and any external sources used for each phase.
 
+## July 14, 2026 — Phase 5B production hardening
+
+Started from clean `main` commit `90e8296`. Human direction fixed the sequence, kept the accepted Preview functional, prohibited Production and Phase 6/7 scope, and required truthful external-infrastructure blockers. Codex verified current official Supabase CAPTCHA/anonymous Auth/admin deletion/backup guidance and Vercel Cron semantics, then implemented single-use CAPTCHA receipts and protected trip entry, transactional AI quota reservations, emergency switches, leased recovery/cleanup, host/account/room lifecycle controls, personal export, redacted alert-classified logs, draft trust pages, accessibility improvements, and the Production runbook set.
+
+Test-first database work initially exposed an ambiguous quota reconciliation parameter and later a qualified participant fixture issue; both were corrected before the Phase 5B suite reached 46 passing assertions. Unit/component work began with missing CAPTCHA/quota/lifecycle modules and now covers deterministic verification, expiry/retry, server actions, destructive phrases, quota release/reconciliation, provider switches, redaction/classification, and trust pages. The clean local release gate reached 437 database assertions, 371 unit/component tests, and 16 passing local E2E scenarios with one hosted-only skip. Hosted-Preview, commit, and push evidence remains recorded only after the exact release commit is verified.
+
 ## July 13, 2026 — Phase 1A secure persistence
 
 Human direction locked anonymous Supabase identity, the four-table data model, invite security, RPC-only create/join workflows, RLS boundaries, test coverage, and the explicit exclusion of UI/chat/AI/planning work. Codex inspected the Phase 0 baseline, proposed the migration/client design, verified current official Supabase guidance, and implemented the migrations, typed clients/contracts/mappers, pgTAP suites, and security documentation.

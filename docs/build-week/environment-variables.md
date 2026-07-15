@@ -46,3 +46,9 @@ All OpenAI variables are server-only. The key and safety secret are required whe
 `TRAILIE_FAKE_ITINERARY_SCENARIO` and `TRAILIE_FAKE_TRAVEL_SCENARIO` are deterministic local-test controls. `PLAYWRIGHT_SKIP_WEBSERVER` and `CI` control test execution. None may be configured in Vercel Preview. `VERCEL_OIDC_TOKEN` is CLI-managed in ignored `.env.local` and is not an application runtime variable.
 
 The former example-only TrailVerse, NPS, Google Places, and public Mapbox variables were removed from `.env.example` because current code does not consume them. No server secret uses a `NEXT_PUBLIC_` prefix, `.env.local` remains ignored, and production variables are intentionally absent.
+
+## Phase 5B additions
+
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` is the only browser-visible CAPTCHA value. `TURNSTILE_SECRET_KEY` stays server-only; `SUPABASE_AUTH_CAPTCHA_ENABLED=true` is permitted only after hosted Auth is actually configured. `CAPTCHA_TEST_MODE` and `NEXT_PUBLIC_CAPTCHA_TEST_MODE` are local/controlled-Preview adapters and are rejected in Production.
+
+Recovery and cleanup may share Vercel `CRON_SECRET` or use distinct `RECOVERY_SECRET`/`CLEANUP_SECRET` values. Cleanup adds `ANONYMOUS_RETENTION_DAYS` and `ANONYMOUS_CLEANUP_BATCH_SIZE`. `TRAVEL_PROVIDERS_ENABLED` is server-only and remains false until Phase 6A. The complete Preview-versus-Production matrix is in [`../production/environment-variables.md`](../production/environment-variables.md).

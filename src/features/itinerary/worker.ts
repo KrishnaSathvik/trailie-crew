@@ -8,6 +8,11 @@ import {
 import { itinerarySchema, type Itinerary } from "@trailie/schemas";
 import { buildItineraryContext, buildItineraryRepairContext } from "./context";
 import { ItineraryProviderError, type ItineraryProvider } from "./provider";
+import {
+  AiQuotaError,
+  runWithAiQuota,
+  type AiQuotaSubject,
+} from "@/server/ai/quota";
 import type {
   ItineraryGenerationContext,
   ItineraryRepository,
@@ -28,7 +33,26 @@ type Dependencies = TravelEvidenceDependencies & {
   safetyIdentifier: string;
   model?: string;
   timeoutMs?: number;
+  quotaSubject?: AiQuotaSubject;
 };
+
+function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
+  dependencies: Dependencies,
+  workflow: "itinerary_generation" | "itinerary_repair",
+  operation: () => Promise<T>,
+) {
+  return dependencies.quotaSubject
+    ? runWithAiQuota(
+        {
+          ...dependencies.quotaSubject,
+          workflow,
+          model: dependencies.model ?? "gpt-5.6-sol",
+          estimatedTokens: workflow === "itinerary_repair" ? 8_000 : 12_000,
+        },
+        operation,
+      )
+    : operation();
+}
 
 function evidenceFromResult<T>(
   itemId: string | null,
@@ -238,28 +262,34 @@ export async function processItineraryGeneration(
     let output;
     if (firstClaim.stage === "repair") {
       if (!context.draft || !context.latestValidation) return;
-      output = await dependencies.provider.repair({
-        operationKey: `${id}:repair`,
-        model: dependencies.model ?? "gpt-5.6-sol",
-        safetyIdentifier: dependencies.safetyIdentifier,
-        context: buildItineraryRepairContext({
-          approvedSummary: context.approvedSummary,
-          draft: context.draft,
-          validation: context.latestValidation,
-          evidence: context.evidence,
+      const repairDraft = context.draft;
+      const repairValidation = context.latestValidation;
+      output = await callProvider(dependencies, "itinerary_repair", () =>
+        dependencies.provider.repair({
+          operationKey: `${id}:repair`,
+          model: dependencies.model ?? "gpt-5.6-sol",
+          safetyIdentifier: dependencies.safetyIdentifier,
+          context: buildItineraryRepairContext({
+            approvedSummary: context.approvedSummary,
+            draft: repairDraft,
+            validation: repairValidation,
+            evidence: context.evidence,
+          }),
+          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
         }),
-        signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
-      });
+      );
     } else if (firstClaim.stage === "validate" && context.draft) {
       output = null;
     } else {
-      output = await dependencies.provider.generate({
-        operationKey: `${id}:generate`,
-        model: dependencies.model ?? "gpt-5.6-sol",
-        safetyIdentifier: dependencies.safetyIdentifier,
-        context: buildItineraryContext(context),
-        signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
-      });
+      output = await callProvider(dependencies, "itinerary_generation", () =>
+        dependencies.provider.generate({
+          operationKey: `${id}:generate`,
+          model: dependencies.model ?? "gpt-5.6-sol",
+          safetyIdentifier: dependencies.safetyIdentifier,
+          context: buildItineraryContext(context),
+          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+        }),
+      );
     }
     let draft = output?.itinerary ?? context.draft;
     if (!draft)
@@ -286,18 +316,20 @@ export async function processItineraryGeneration(
     const repairClaim = await dependencies.repository.claim(id);
     if (!repairClaim.claimed) return;
     context = await dependencies.repository.loadContext(id);
-    const repaired = await dependencies.provider.repair({
-      operationKey: `${id}:repair`,
-      model: dependencies.model ?? "gpt-5.6-sol",
-      safetyIdentifier: dependencies.safetyIdentifier,
-      context: buildItineraryRepairContext({
-        approvedSummary: context.approvedSummary,
-        draft: result.itinerary,
-        validation: result.report,
-        evidence: result.evidence,
+    const repaired = await callProvider(dependencies, "itinerary_repair", () =>
+      dependencies.provider.repair({
+        operationKey: `${id}:repair`,
+        model: dependencies.model ?? "gpt-5.6-sol",
+        safetyIdentifier: dependencies.safetyIdentifier,
+        context: buildItineraryRepairContext({
+          approvedSummary: context.approvedSummary,
+          draft: result.itinerary,
+          validation: result.report,
+          evidence: result.evidence,
+        }),
+        signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
       }),
-      signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
-    });
+    );
     draft = repaired.itinerary;
     await dependencies.repository.recordDraft(id, draft, repaired);
     result = await validateAndRecord(
@@ -311,9 +343,11 @@ export async function processItineraryGeneration(
       await dependencies.repository.publish(id, result.itinerary);
   } catch (error) {
     const failure =
-      error instanceof ItineraryProviderError
-        ? error
-        : new ItineraryProviderError("unknown_error", false);
+      error instanceof AiQuotaError
+        ? new ItineraryProviderError(error.code as never, false)
+        : error instanceof ItineraryProviderError
+          ? error
+          : new ItineraryProviderError("unknown_error", false);
     await dependencies.repository.fail(id, failure.code);
   }
 }

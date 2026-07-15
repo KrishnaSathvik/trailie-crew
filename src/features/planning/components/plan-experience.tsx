@@ -297,15 +297,24 @@ export function PlanExperience({
           The summary could not be prepared.
         </h1>
         <p className="text-muted-foreground mt-3">
-          Chat and private memory are unchanged. You can retry safely.
+          {request.generationErrorCode === "ai_disabled"
+            ? "New AI generation is temporarily paused. Chat and prior plans remain available."
+            : request.generationErrorCode?.includes("ai_limit_reached") ||
+                request.generationErrorCode === "provider_budget_unavailable"
+              ? "The current generation allowance is unavailable or has been reached. Chat and prior plans remain available."
+              : "Chat and private memory are unchanged. You can retry safely."}
         </p>
-        <button
-          type="button"
-          onClick={() => void regenerate()}
-          className="border-border mt-6 min-h-11 self-start rounded-md border px-4 text-sm font-semibold"
-        >
-          Retry summary
-        </button>
+        {!request.generationErrorCode?.includes("ai_limit_reached") &&
+        request.generationErrorCode !== "ai_disabled" &&
+        request.generationErrorCode !== "provider_budget_unavailable" ? (
+          <button
+            type="button"
+            onClick={() => void regenerate()}
+            className="border-border mt-6 min-h-11 self-start rounded-md border px-4 text-sm font-semibold"
+          >
+            Retry summary
+          </button>
+        ) : null}
       </div>
     );
   const summary = request?.summary;

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/internal/recovery",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/internal/anonymous-cleanup",
+      "schedule": "17 4 * * *"
+    }
+  ]
+}

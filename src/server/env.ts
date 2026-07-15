@@ -95,8 +95,54 @@ const openAIEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
 
-const recoveryEnvSchema = z.object({
-  RECOVERY_SECRET: z.string().min(32),
+const recoveryEnvSchema = z
+  .object({
+    RECOVERY_SECRET: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().min(32).optional(),
+    ),
+    CRON_SECRET: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().min(16).optional(),
+    ),
+  })
+  .refine((value) => value.RECOVERY_SECRET || value.CRON_SECRET);
+
+const cleanupEnvSchema = z
+  .object({
+    CLEANUP_SECRET: z.string().min(32).optional(),
+    CRON_SECRET: z.string().min(16).optional(),
+    RECOVERY_SECRET: z.string().min(32).optional(),
+    ANONYMOUS_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(3650)
+      .default(30),
+    ANONYMOUS_CLEANUP_BATCH_SIZE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(25),
+  })
+  .refine(
+    (value) =>
+      value.CLEANUP_SECRET || value.CRON_SECRET || value.RECOVERY_SECRET,
+  );
+
+const captchaEnvSchema = z.object({
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  SUPABASE_AUTH_CAPTCHA_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  CAPTCHA_TEST_MODE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
 });
 
 export function parseServerSupabaseEnv(source: EnvironmentSource) {
@@ -163,5 +209,35 @@ export function requireAiGeneration(
 
 export function parseRecoveryEnv(source: EnvironmentSource) {
   const values = recoveryEnvSchema.parse(source);
-  return { secret: values.RECOVERY_SECRET };
+  return { secret: values.RECOVERY_SECRET ?? values.CRON_SECRET! };
+}
+
+export function parseCleanupEnv(source: EnvironmentSource) {
+  const values = cleanupEnvSchema.parse(source);
+  return {
+    secret:
+      values.CLEANUP_SECRET ?? values.CRON_SECRET ?? values.RECOVERY_SECRET!,
+    retentionDays: values.ANONYMOUS_RETENTION_DAYS,
+    batchSize: values.ANONYMOUS_CLEANUP_BATCH_SIZE,
+  };
+}
+
+export function parseCaptchaEnv(source: EnvironmentSource) {
+  const values = captchaEnvSchema.parse(source);
+  if (
+    values.CAPTCHA_TEST_MODE &&
+    (values.VERCEL_ENV === "production" ||
+      (values.NODE_ENV === "production" && values.VERCEL_ENV !== "preview"))
+  )
+    throw new Error("CAPTCHA test mode is disabled in production.");
+  if (
+    !values.CAPTCHA_TEST_MODE &&
+    (!values.TURNSTILE_SECRET_KEY || !values.SUPABASE_AUTH_CAPTCHA_ENABLED)
+  )
+    throw new Error("CAPTCHA server configuration is incomplete.");
+  return {
+    secretKey: values.TURNSTILE_SECRET_KEY ?? "test-mode-secret",
+    authCaptchaEnabled: values.SUPABASE_AUTH_CAPTCHA_ENABLED,
+    testMode: values.CAPTCHA_TEST_MODE,
+  };
 }

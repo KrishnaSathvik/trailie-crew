@@ -1,5 +1,6 @@
 import type { PublicSharedItinerary } from "@trailie/schemas";
 import { PrintButton } from "./print-button";
+import { TrustLinks } from "@/components/shared/trust-links";
 
 function Status({ value }: { value: string }) {
   return (
@@ -345,6 +346,7 @@ export function PublicItinerary({
           <span className="print-page-number" aria-hidden="true">
             Page
           </span>
+          <TrustLinks className="flex flex-wrap gap-3 print:hidden" />
         </footer>
       </article>
     </main>

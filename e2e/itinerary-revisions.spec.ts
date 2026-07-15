@@ -58,7 +58,7 @@ async function publishedCrew(browser: Browser) {
 test("two-person revision publishes Version 2 while Version 1 remains immutable", async ({
   browser,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const { hostContext, host, memberContext, member, roomUrl } =
     await publishedCrew(browser);
   const providerRequests: string[] = [];

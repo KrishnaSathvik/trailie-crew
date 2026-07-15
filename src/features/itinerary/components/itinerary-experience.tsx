@@ -22,6 +22,18 @@ const views: View[] = [
   "Food",
   "Validation",
 ];
+const quotaCopy: Record<string, string> = {
+  ai_disabled:
+    "New AI generation is temporarily paused. Chat and existing plans remain available.",
+  user_ai_limit_reached:
+    "Your daily generation allowance has been reached. Existing trip data remains available.",
+  room_ai_limit_reached:
+    "This trip’s daily generation allowance has been reached.",
+  global_ai_limit_reached:
+    "Trailie’s daily generation capacity has been reached.",
+  provider_budget_unavailable:
+    "Generation is temporarily unavailable because the provider budget cannot be reserved.",
+};
 
 function costLabel(cost: CostEstimate) {
   if (cost.status === "unknown") return "Cost unknown";
@@ -350,8 +362,8 @@ export function ItineraryExperience({
             : "The itinerary could not be generated."}
         </h1>
         <p className="text-muted-foreground mt-3 leading-7">
-          The approved summary and crew conversation are unchanged. Trailie did
-          not present an unvalidated plan as ready.
+          {quotaCopy[plan.errorCode ?? ""] ??
+            "The approved summary and crew conversation are unchanged. Trailie did not present an unvalidated plan as ready."}
         </p>
         {plan.status === "failed" && onRetry ? (
           <button

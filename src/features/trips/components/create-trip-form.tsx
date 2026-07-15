@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import type { TripActionResult } from "@/features/trips/actions/action-types";
+import { CaptchaChallenge } from "@/features/security/components/captcha-challenge";
 import { createTripAction } from "@/features/trips/actions/trip-actions";
 import {
   Field,
@@ -25,12 +26,12 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type CreateTripFormProps = {
   action?: (input: unknown) => Promise<TripActionResult<CreateTripResult>>;
-  ensureSession?: () => Promise<unknown>;
+  ensureSession?: (captchaToken: string) => Promise<unknown>;
   onCreated?: (result: CreateTripResult) => void;
 };
 
-function defaultEnsureSession() {
-  return ensureAnonymousSession(createBrowserSupabaseClient());
+function defaultEnsureSession(captchaToken: string) {
+  return ensureAnonymousSession(createBrowserSupabaseClient(), captchaToken);
 }
 
 export function CreateTripForm({
@@ -44,6 +45,7 @@ export function CreateTripForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<TripErrorCode | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [captchaToken, setCaptchaToken] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,8 +81,8 @@ export function CreateTripForm({
     setError(null);
 
     try {
-      await ensureSession();
-      const result = await action(parsed.data);
+      await ensureSession(captchaToken);
+      const result = await action({ ...parsed.data, captchaToken });
       if (!result.ok) {
         setError(result.error);
         setFieldErrors(result.fieldErrors ?? {});
@@ -149,6 +151,7 @@ export function CreateTripForm({
         placeholder="4"
         error={fieldErrors.expectedTravelers}
       />
+      <CaptchaChallenge onToken={setCaptchaToken} />
       <button type="submit" disabled={pending} className={submitClassName}>
         {pending ? (
           <>

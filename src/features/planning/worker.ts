@@ -7,6 +7,11 @@ import {
   type PlanningSummaryProvider,
 } from "./provider";
 import type { PlanningRepository } from "./repository";
+import {
+  AiQuotaError,
+  runWithAiQuota,
+  type AiQuotaSubject,
+} from "@/server/ai/quota";
 
 type Dependencies = {
   repository: PlanningRepository;
@@ -14,6 +19,7 @@ type Dependencies = {
   safetyIdentifier: string;
   model?: string;
   timeoutMs?: number;
+  quotaSubject?: AiQuotaSubject;
 };
 export async function processPlanningSummary(id: string, deps: Dependencies) {
   for (let pass = 0; pass < 2; pass += 1) {
@@ -22,13 +28,25 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
     const context = await deps.repository.loadContext(id);
     const started = Date.now();
     try {
-      const result = await deps.provider.summarize({
-        operationKey: `${id}:${claim.summaryVersion}`,
-        model: deps.model ?? "gpt-5.6-sol",
-        safetyIdentifier: deps.safetyIdentifier,
-        context: buildPlanningContext(context),
-        signal: AbortSignal.timeout(deps.timeoutMs ?? 45_000),
-      });
+      const summarize = () =>
+        deps.provider.summarize({
+          operationKey: `${id}:${claim.summaryVersion}`,
+          model: deps.model ?? "gpt-5.6-sol",
+          safetyIdentifier: deps.safetyIdentifier,
+          context: buildPlanningContext(context),
+          signal: AbortSignal.timeout(deps.timeoutMs ?? 45_000),
+        });
+      const result = deps.quotaSubject
+        ? await runWithAiQuota(
+            {
+              ...deps.quotaSubject,
+              workflow: "planning_summary",
+              model: deps.model ?? "gpt-5.6-sol",
+              estimatedTokens: 8_000,
+            },
+            summarize,
+          )
+        : await summarize();
       const readiness = computePlanningReadiness({
         destinations: result.summary.tripSnapshot.destinations,
         destinationUnresolved: result.summary.proposals.some((i) =>
@@ -75,9 +93,11 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
       return;
     } catch (error) {
       const failure =
-        error instanceof PlanningProviderError
-          ? error
-          : new PlanningProviderError("unknown_error", false);
+        error instanceof AiQuotaError
+          ? new PlanningProviderError(error.code as never, false)
+          : error instanceof PlanningProviderError
+            ? error
+            : new PlanningProviderError("unknown_error", false);
       await deps.repository.fail(id, failure.code);
       if (!failure.retryable || claim.attemptCount >= 2) return;
     }

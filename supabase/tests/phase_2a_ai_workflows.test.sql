@@ -2,6 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
+grant execute on function public.create_trip_unprotected(text,text,integer),public.join_trip_unprotected(text,text) to authenticated;
 select plan(38);
 
 select has_table('private', 'ai_invocations', 'ai_invocations is private');
@@ -33,7 +34,7 @@ values
 
 select set_config('request.jwt.claim.sub', '50000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
-create temporary table ai_trip as select * from public.create_trip('AI Trip', 'Maya', null);
+create temporary table ai_trip as select * from public.create_trip_unprotected('AI Trip', 'Maya', null);
 create temporary table ai_message as select public.send_message(
   (select room_id from ai_trip), (select participant_id from ai_trip),
   '@Trailie compare driving and flying', '51000000-0000-4000-8000-000000000001', null

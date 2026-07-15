@@ -71,7 +71,7 @@ pnpm exec supabase test db
 
 ## Current implementation status
 
-Implemented through Phase 4B:
+Implemented through Phase 5B locally (hosted Phase 5B acceptance is reported separately):
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -109,11 +109,19 @@ Implemented through Phase 4B:
 - server-only public projection with deterministic identity, preference, operational, evidence, coordinate, and cost redaction
 - anonymous noindex/noarchive `/share/[token]` rendering that fails closed on revocation, expiration, or snapshot drift
 - exact-version RFC 5545 calendar downloads and print-optimized browser Save-as-PDF routes
+- single-use CAPTCHA-protected anonymous create/join workflows and deterministic local acceptance adapter
+- transactional AI invocation/token quotas with user, room, global, workflow, and model controls plus emergency disable
+- leased recovery and anonymous-cleanup cron routes with bounded privacy-safe summaries
+- host transfer, room deletion, account deletion preparation/session revocation, and personal-data export
+- structured redacted operational logging, draft public trust pages, lifecycle settings, and Production runbooks
 
 Not yet implemented:
 
 - booking, public editing/comments, external guest collaboration, password-protected links, and public indexing
 - live place/reservation, hotel/flight, weather, and TrailVerse/NPS service integration
+- paid Production backup/PITR and restore proof, provider/platform alert ownership, professional legal review, and final manual accessibility acceptance
+
+Phase 5B details and the intentionally blocked Production verdict are in [`docs/build-week/phase-5b-production-hardening.md`](docs/build-week/phase-5b-production-hardening.md). Operational release documents are under [`docs/production/`](docs/production/).
 
 ## Build Week timing
 

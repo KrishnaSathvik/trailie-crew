@@ -20,7 +20,9 @@ describe("ensureAnonymousSession", () => {
       },
     };
 
-    await expect(ensureAnonymousSession(client)).resolves.toBe(session);
+    await expect(ensureAnonymousSession(client, "captcha-token")).resolves.toBe(
+      session,
+    );
     expect(signInAnonymously).not.toHaveBeenCalled();
   });
 
@@ -36,8 +38,12 @@ describe("ensureAnonymousSession", () => {
       },
     };
 
-    await expect(ensureAnonymousSession(client)).resolves.toBe(session);
-    expect(client.auth.signInAnonymously).toHaveBeenCalledOnce();
+    await expect(ensureAnonymousSession(client, "captcha-token")).resolves.toBe(
+      session,
+    );
+    expect(client.auth.signInAnonymously).toHaveBeenCalledWith({
+      options: { captchaToken: "captcha-token" },
+    });
   });
 
   it("surfaces authentication failures", async () => {
@@ -53,8 +59,24 @@ describe("ensureAnonymousSession", () => {
       },
     };
 
-    await expect(ensureAnonymousSession(client)).rejects.toThrow(
-      "anonymous auth disabled",
+    await expect(
+      ensureAnonymousSession(client, "captcha-token"),
+    ).rejects.toThrow("anonymous auth disabled");
+  });
+
+  it("requires CAPTCHA before creating an anonymous identity", async () => {
+    const client = {
+      auth: {
+        getSession: vi
+          .fn()
+          .mockResolvedValue({ data: { session: null }, error: null }),
+        signInAnonymously: vi.fn(),
+      },
+    };
+
+    await expect(ensureAnonymousSession(client, "")).rejects.toThrow(
+      "captcha_required",
     );
+    expect(client.auth.signInAnonymously).not.toHaveBeenCalled();
   });
 });

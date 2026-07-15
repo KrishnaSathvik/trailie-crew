@@ -6,12 +6,15 @@ type AuthResult<TSession> = {
 type AnonymousSessionClient<TSession> = {
   auth: {
     getSession: () => Promise<AuthResult<TSession>>;
-    signInAnonymously: () => Promise<AuthResult<TSession>>;
+    signInAnonymously: (options: {
+      options: { captchaToken: string };
+    }) => Promise<AuthResult<TSession>>;
   };
 };
 
 export async function ensureAnonymousSession<TSession>(
   client: AnonymousSessionClient<TSession>,
+  captchaToken: string,
 ): Promise<TSession> {
   const existing = await client.auth.getSession();
 
@@ -23,7 +26,11 @@ export async function ensureAnonymousSession<TSession>(
     return existing.data.session;
   }
 
-  const created = await client.auth.signInAnonymously();
+  if (!captchaToken.trim()) throw new Error("captcha_required");
+
+  const created = await client.auth.signInAnonymously({
+    options: { captchaToken },
+  });
 
   if (created.error) {
     throw created.error;

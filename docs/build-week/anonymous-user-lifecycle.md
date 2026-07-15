@@ -1,38 +1,9 @@
-# Anonymous User Lifecycle Strategy
+# Anonymous user lifecycle
 
-Supabase anonymous identities use the authenticated database role, so application RLS and RPC authorization remain mandatory. Automatic anonymous-user cleanup is not currently available as a complete Trailie operation; destructive execution is intentionally deferred.
+Supabase anonymous identities use the authenticated role, so CAPTCHA never replaces RLS or RPC authorization.
 
-## Eligibility proposal
+Phase 5B implements a scheduled-capable cleanup route with dry-run default for manual POSTs, an explicit retention threshold (30-day default), a batch cap, a distributed lease, soft Auth deletion, retryable failure records, and safe audit counts. A candidate must be anonymous, older than retention, and have no active membership, active hosted room, active share-management obligation, queued/running focused invocation, active planning generation, recoverable itinerary work, or active revision work. Tests prove inactive eligibility and active-room exclusion.
 
-An anonymous Auth user becomes a cleanup candidate only when all are true:
+Room deletion is host-only and cascade-reviewed. Account deletion blocks any active host, removes participant-attributed private memory, de-identifies memberships, revokes refresh sessions, soft-deletes Auth through a trusted server client, and signs out locally. A personal export is offered first. Existing room history is retained only in de-attributed shared form.
 
-- the account is at least 30 days old;
-- it has no active participant membership in an active Trip;
-- it is not the host of an active room;
-- it has no recent message, planning, itinerary, revision, share-management, or recovery activity;
-- all associated jobs are completed, skipped, or terminally failed;
-- the candidate was reported by a dry run at least once before deletion.
-
-The age threshold is a proposed production default, not an active policy. Preview acceptance uses representative disposable identities and performs no destructive cleanup.
-
-## Relationship and cascade review
-
-Before implementation, verify Auth user references across participants, rooms, messages, private AI invocations/runs, memory facts/snapshots, planning records, immutable plans, revision records, and share audit data. Active rooms must be protected. Published immutable plans and audit history must not be silently corrupted. Existing foreign-key delete actions require an explicit catalog review and a representative restore-capable test before any cleanup job can delete users.
-
-## Required cleanup tool
-
-The production tool should support:
-
-- dry-run-only default behavior;
-- account-age and last-activity cutoffs;
-- active-room/host protection;
-- bounded batches, idempotency, and attempt caps;
-- privacy-safe audit counts plus internal candidate identifiers;
-- a separate confirmation step for destructive execution;
-- a durable schedule, alerts, and a pause switch;
-- tests for chat, memory, plan, share, and Auth cascade outcomes;
-- documented backup/restore prerequisites.
-
-## Preview behavior and remaining work
-
-No anonymous users are deleted during Phase 5A. The controlled Preview is team-only, contains no production customer data, and may be reset or retired as a whole after acceptance. Production still requires an implemented dry-run report, reviewed cascade policy, user/room deletion product, retention disclosure, durable schedule, and restore drill.
+Production cleanup is configured separately from recovery in `vercel.json`. Vercel Cron runs only on Production deployments; protected Preview uses an authorized manual dry-run and disposable destructive drill. The hosted Free Preview does not provide a Production restore guarantee, so destructive Production scheduling remains blocked until the paid plan, backup/PITR, restore drill, retention policy, and alert owner are approved. See [`../production/data-retention.md`](../production/data-retention.md) and [`../production/deletion-runbook.md`](../production/deletion-runbook.md).

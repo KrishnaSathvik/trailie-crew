@@ -74,6 +74,21 @@
 - [x] Bounded recovery drain for abandoned extraction rows
 - [ ] Durable production queue/cron scheduling for recovery
 
+## Phase 5B Production-hardening checklist
+
+- [x] CAPTCHA-protected anonymous sign-in/create/join application boundary with deterministic local adapter
+- [x] Direct create/join RPC bypass revoked and single-use CAPTCHA receipt tests
+- [x] User/room/global/model AI quota reservation and emergency disable
+- [x] Recovery and cleanup cron configuration, bounded leases, and safe logs
+- [x] Host transfer, disposable room deletion path, account deletion path, and personal export
+- [x] Draft privacy, terms, accuracy, support, retention, incident, backup, and deletion documentation
+- [ ] Final protected-Preview Phase 5B acceptance on disposable records
+- [ ] Real Turnstile plus hosted Supabase Auth CAPTCHA on final domain
+- [ ] Platform abuse controls and alert owner/delivery evidence
+- [ ] Paid Production automatic backup/PITR and isolated restore drill
+- [ ] Professional legal/privacy review and manual assistive-technology acceptance
+- [ ] Production deployment (explicitly forbidden in Phase 5B)
+
 ## Phase 4B sharing and exports
 
 - [x] Host-only create, rotate, expire, and idempotent revoke

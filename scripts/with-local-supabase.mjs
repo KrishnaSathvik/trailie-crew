@@ -46,6 +46,17 @@ const child = spawnSync(command, args, {
     SUPABASE_SECRET_KEY:
       process.env.SUPABASE_SECRET_KEY ?? localEnvironment.SECRET_KEY,
     TRAILIE_AI_PROVIDER: process.env.TRAILIE_AI_PROVIDER ?? "fake",
+    CAPTCHA_TEST_MODE: process.env.CAPTCHA_TEST_MODE ?? "true",
+    NEXT_PUBLIC_CAPTCHA_TEST_MODE:
+      process.env.NEXT_PUBLIC_CAPTCHA_TEST_MODE ?? "true",
+    SUPABASE_AUTH_CAPTCHA_ENABLED:
+      process.env.SUPABASE_AUTH_CAPTCHA_ENABLED ?? "false",
+    RECOVERY_SECRET:
+      process.env.RECOVERY_SECRET ??
+      "local-recovery-secret-must-be-at-least-32-characters",
+    CLEANUP_SECRET:
+      process.env.CLEANUP_SECRET ??
+      "local-cleanup-secret-must-be-at-least-32-characters",
   },
   stdio: "inherit",
 });

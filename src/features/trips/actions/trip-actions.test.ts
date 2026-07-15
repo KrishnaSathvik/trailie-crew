@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyCaptchaForAction } from "@/features/security/captcha-server";
 
 import { createTripAction, joinTripAction } from "./trip-actions";
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: vi.fn(),
+}));
+vi.mock("@/features/security/captcha-server", () => ({
+  verifyCaptchaForAction: vi.fn(),
 }));
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -28,7 +32,12 @@ function mockClient(
 }
 
 describe("Trip Server Actions", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(verifyCaptchaForAction).mockResolvedValue(
+      "0198a0b2-07f0-7c80-9d5f-7f9cf7a950b3",
+    );
+  });
 
   it("validates create input before opening a database client", async () => {
     await expect(
@@ -43,7 +52,11 @@ describe("Trip Server Actions", () => {
   it("requires an authenticated Supabase identity", async () => {
     mockClient({ data: null, error: null }, null);
     await expect(
-      createTripAction({ tripName: "Boundary Waters", displayName: "Maya" }),
+      createTripAction({
+        tripName: "Boundary Waters",
+        displayName: "Maya",
+        captchaToken: "valid",
+      }),
     ).resolves.toEqual({ ok: false, error: "authentication_required" });
   });
 
@@ -66,12 +79,14 @@ describe("Trip Server Actions", () => {
       tripName: "Boundary Waters",
       displayName: "Maya",
       expectedTravelers: 4,
+      captchaToken: "valid",
     });
 
-    expect(rpc).toHaveBeenCalledWith("create_trip", {
+    expect(rpc).toHaveBeenCalledWith("create_trip_protected", {
       trip_name: "Boundary Waters",
       display_name: "Maya",
       expected_travelers: 4,
+      target_receipt_id: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950b3",
     });
     expect(result).toMatchObject({ ok: true, data: { roomId: uuid } });
   });
@@ -86,14 +101,38 @@ describe("Trip Server Actions", () => {
       },
     });
     await expect(
-      joinTripAction({ inviteValue: "ABCD2345", displayName: "Leo" }),
+      joinTripAction({
+        inviteValue: "ABCD2345",
+        displayName: "Leo",
+        captchaToken: "valid",
+      }),
     ).resolves.toEqual({ ok: false, error: "invite_expired" });
   });
 
   it("rejects malformed RPC output", async () => {
     mockClient({ data: [{ room_id: "not-a-uuid" }], error: null });
     await expect(
-      joinTripAction({ inviteValue: "ABCD2345", displayName: "Leo" }),
+      joinTripAction({
+        inviteValue: "ABCD2345",
+        displayName: "Leo",
+        captchaToken: "valid",
+      }),
     ).resolves.toEqual({ ok: false, error: "invalid_server_response" });
+  });
+
+  it("fails closed when CAPTCHA is missing", async () => {
+    mockClient({ data: null, error: null });
+    vi.mocked(verifyCaptchaForAction).mockRejectedValue(
+      Object.assign(new Error("captcha_required"), {
+        code: "captcha_required",
+      }),
+    );
+    await expect(
+      createTripAction({
+        tripName: "Boundary Waters",
+        displayName: "Maya",
+        captchaToken: "",
+      }),
+    ).resolves.toEqual({ ok: false, error: "captcha_required" });
   });
 });

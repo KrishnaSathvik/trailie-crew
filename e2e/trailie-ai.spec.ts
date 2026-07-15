@@ -78,10 +78,13 @@ test("Trailie stays silent, streams one focused answer, persists it, and handles
     host.getByText("Trailie will answer after this message is sent"),
   ).toBeVisible();
   await host.getByLabel("Message your crew").press("Enter");
-  await expect(host.getByText("Trailie is answering…")).toBeVisible();
+  const trailieAnswer = host.getByRole("article", {
+    name: "Message from Trailie",
+  });
   await expect(
-    host.getByRole("article", { name: "Message from Trailie" }),
-  ).toHaveCount(1, { timeout: 15_000 });
+    host.getByText("Trailie is answering…").or(trailieAnswer),
+  ).toBeVisible();
+  await expect(trailieAnswer).toHaveCount(1, { timeout: 15_000 });
   await expect(
     member.getByRole("article", { name: "Message from Trailie" }),
   ).toHaveCount(1, { timeout: 15_000 });

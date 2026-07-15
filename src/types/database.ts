@@ -207,6 +207,17 @@ export type PlanChangeAnalysisRow = {
   basis_plan_version: number;
   created_at: string;
 };
+export type PlanChangeApprovalRow = {
+  id: string;
+  change_request_id: string;
+  analysis_version: number;
+  participant_id: string;
+  user_id: string;
+  decision: "approved" | "changes_requested";
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
 export type PlanShareLinkRow = {
   id: string;
   room_id: string;
@@ -318,6 +329,7 @@ export type Database = {
       trip_plan_events: TableDefinition<TripPlanEventRow>;
       plan_change_requests: TableDefinition<PlanChangeRequestRow>;
       plan_change_analyses: TableDefinition<PlanChangeAnalysisRow>;
+      plan_change_approvals: TableDefinition<PlanChangeApprovalRow>;
       plan_share_links: TableDefinition<PlanShareLinkRow>;
     };
     Views: {
@@ -331,17 +343,87 @@ export type Database = {
         Args: { min_interval_seconds?: number };
         Returns: boolean;
       };
-      create_trip: {
+      create_trip_protected: {
         Args: {
           trip_name: string;
           display_name: string;
-          expected_travelers?: number | null;
+          expected_travelers: number | null;
+          target_receipt_id: string;
         };
         Returns: DbCreateTripResult[];
       };
-      join_trip: {
-        Args: { invite_value: string; display_name: string };
+      join_trip_protected: {
+        Args: {
+          invite_value: string;
+          display_name: string;
+          target_receipt_id: string;
+        };
         Returns: DbJoinTripResult[];
+      };
+      record_captcha_receipt: {
+        Args: {
+          target_user_id: string;
+          target_purpose: string;
+          verification_id: string;
+          target_expires_at: string;
+        };
+        Returns: string;
+      };
+      delete_room: {
+        Args: { target_room_id: string; confirmation: string };
+        Returns: boolean;
+      };
+      transfer_room_host: {
+        Args: { target_room_id: string; target_participant_id: string };
+        Returns: boolean;
+      };
+      assess_account_deletion: { Args: Record<never, never>; Returns: Json };
+      prepare_account_deletion: {
+        Args: { confirmation: string };
+        Returns: Json;
+      };
+      list_anonymous_cleanup_candidates: {
+        Args: { retention: string; batch_size: number; dry_run: boolean };
+        Returns: { user_id: string; created_at: string }[];
+      };
+      record_anonymous_cleanup_result: {
+        Args: { target_user_id: string; succeeded: boolean };
+        Returns: undefined;
+      };
+      claim_lifecycle_execution: {
+        Args: { target_category: string; lease_seconds: number };
+        Returns: boolean;
+      };
+      reserve_ai_quota: {
+        Args: {
+          target_user_id: string;
+          target_room_id: string;
+          target_workflow: string;
+          target_model: string;
+          estimated_tokens: number;
+          reservation_id: string;
+        };
+        Returns: Json;
+      };
+      get_ai_quota_subject: {
+        Args: { target_kind: string; target_id: string };
+        Returns: Json;
+      };
+      reconcile_ai_quota: {
+        Args: {
+          reservation_id: string;
+          actual_tokens: number;
+          result_status: string;
+        };
+        Returns: Json;
+      };
+      get_ai_usage_report: {
+        Args: { target_day: string };
+        Returns: Json;
+      };
+      set_ai_generation_enabled: {
+        Args: { enabled: boolean };
+        Returns: boolean;
       };
       send_message: {
         Args: {

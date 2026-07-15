@@ -6,6 +6,16 @@ export const trailieErrorMessages = {
   invocation_cancelled: "Trailie stopped answering.",
   ai_generation_disabled:
     "Trailie is temporarily paused. Crew chat is still available.",
+  ai_disabled:
+    "Trailie is temporarily paused. Crew chat and existing plans are still available.",
+  user_ai_limit_reached:
+    "Your daily Trailie allowance has been reached. Crew chat is still available.",
+  room_ai_limit_reached:
+    "This trip’s daily Trailie allowance has been reached. Crew chat is still available.",
+  global_ai_limit_reached:
+    "Trailie’s daily capacity has been reached. Crew chat is still available.",
+  provider_budget_unavailable:
+    "Trailie generation is temporarily unavailable. Crew chat is still available.",
   openai_authentication_failed:
     "Trailie is temporarily unavailable because its service is not configured.",
   openai_rate_limited:

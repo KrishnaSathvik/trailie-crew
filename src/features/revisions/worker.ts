@@ -11,6 +11,11 @@ import type {
 import type { TravelProvider } from "@trailie/travel-tools";
 import { enrichWithTravelEvidence } from "@/features/itinerary/worker";
 import {
+  AiQuotaError,
+  runWithAiQuota,
+  type AiQuotaSubject,
+} from "@/server/ai/quota";
+import {
   validateItinerary,
   type NormalizedToolEvidence,
 } from "@/features/itinerary/validation/validate-itinerary";
@@ -99,7 +104,27 @@ type Dependencies = {
   safetyIdentifier: string;
   timeoutMs?: number;
   now?: string;
+  quotaSubject?: AiQuotaSubject;
 };
+
+function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
+  dependencies: Dependencies,
+  workflow: "revision_analysis" | "revision_candidate",
+  model: string,
+  operation: () => Promise<T>,
+) {
+  return dependencies.quotaSubject
+    ? runWithAiQuota(
+        {
+          ...dependencies.quotaSubject,
+          workflow,
+          model,
+          estimatedTokens: workflow === "revision_analysis" ? 5_000 : 12_000,
+        },
+        operation,
+      )
+    : operation();
+}
 
 function targetLocation(base: Itinerary, targetId: string | null) {
   for (const day of base.days) {
@@ -222,19 +247,25 @@ export async function processPlanChange(
       });
       const claim = await dependencies.repository.claimAnalysis(id, model);
       if (!claim.claimed) return;
-      const output = await dependencies.provider.analyze({
-        operationKey: `${id}:analysis:${context.request.currentAnalysisVersion + 1}`,
+      const output = await callProvider(
+        dependencies,
+        "revision_analysis",
         model,
-        safetyIdentifier: dependencies.safetyIdentifier,
-        context: buildChangeAnalysisContext({
-          requestType: context.request.requestType,
-          targetItemId: context.request.targetItemId,
-          requestText: context.request.requestText,
-          basePlan: context.basePlan,
-        }),
-        basePlan: context.basePlan,
-        signal: AbortSignal.timeout(dependencies.timeoutMs ?? 60_000),
-      });
+        () =>
+          dependencies.provider.analyze({
+            operationKey: `${id}:analysis:${context.request.currentAnalysisVersion + 1}`,
+            model,
+            safetyIdentifier: dependencies.safetyIdentifier,
+            context: buildChangeAnalysisContext({
+              requestType: context.request.requestType,
+              targetItemId: context.request.targetItemId,
+              requestText: context.request.requestText,
+              basePlan: context.basePlan,
+            }),
+            basePlan: context.basePlan,
+            signal: AbortSignal.timeout(dependencies.timeoutMs ?? 60_000),
+          }),
+      );
       await dependencies.repository.completeAnalysis(
         id,
         verifyAnalysis(output.analysis, context),
@@ -248,22 +279,29 @@ export async function processPlanChange(
       return;
     }
     if (context.request.status !== "approved" || !context.analysis) return;
+    const approvedAnalysis = context.analysis;
     const claim = await dependencies.repository.claimCandidate(id);
     if (!claim.claimed) return;
-    const generated = await dependencies.provider.generate({
-      operationKey: `${id}:candidate:${context.request.currentAnalysisVersion}`,
-      model: "gpt-5.6-sol",
-      safetyIdentifier: dependencies.safetyIdentifier,
-      context: buildRevisionCandidateContext({
-        basePlan: context.basePlan,
-        approvedSummary: context.approvedSummary,
-        analysis: context.analysis,
-        evidence: context.evidence,
-      }),
-      basePlan: context.basePlan,
-      analysis: context.analysis,
-      signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
-    });
+    const generated = await callProvider(
+      dependencies,
+      "revision_candidate",
+      "gpt-5.6-sol",
+      () =>
+        dependencies.provider.generate({
+          operationKey: `${id}:candidate:${context.request.currentAnalysisVersion}`,
+          model: "gpt-5.6-sol",
+          safetyIdentifier: dependencies.safetyIdentifier,
+          context: buildRevisionCandidateContext({
+            basePlan: context.basePlan,
+            approvedSummary: context.approvedSummary,
+            analysis: approvedAnalysis,
+            evidence: context.evidence,
+          }),
+          basePlan: context.basePlan,
+          analysis: approvedAnalysis,
+          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+        }),
+    );
     const candidate = await dependencies.repository.attachCandidate(
       id,
       generated.itinerary,
@@ -308,23 +346,29 @@ export async function processPlanChange(
     }
     const repairClaim = await dependencies.repository.startRepair(id);
     if (!repairClaim.claimed) return;
-    const repaired = await dependencies.provider.repair({
-      operationKey: `${id}:repair:1`,
-      model: "gpt-5.6-sol",
-      safetyIdentifier: dependencies.safetyIdentifier,
-      context: buildRevisionRepairContext({
-        basePlan: context.basePlan,
-        approvedSummary: context.approvedSummary,
-        analysis: context.analysis,
-        evidence: result.evidence,
-        candidate: result.itinerary,
-        validation: result.validation,
-        boundary: result.boundary,
-      }),
-      basePlan: result.itinerary,
-      analysis: context.analysis,
-      signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
-    });
+    const repaired = await callProvider(
+      dependencies,
+      "revision_candidate",
+      "gpt-5.6-sol",
+      () =>
+        dependencies.provider.repair({
+          operationKey: `${id}:repair:1`,
+          model: "gpt-5.6-sol",
+          safetyIdentifier: dependencies.safetyIdentifier,
+          context: buildRevisionRepairContext({
+            basePlan: context.basePlan,
+            approvedSummary: context.approvedSummary,
+            analysis: approvedAnalysis,
+            evidence: result.evidence,
+            candidate: result.itinerary,
+            validation: result.validation,
+            boundary: result.boundary,
+          }),
+          basePlan: result.itinerary,
+          analysis: approvedAnalysis,
+          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+        }),
+    );
     await dependencies.repository.recordRunUsage(
       id,
       "candidate_repair",
@@ -352,7 +396,11 @@ export async function processPlanChange(
   } catch (error) {
     await dependencies.repository.fail(
       id,
-      error instanceof RevisionProviderError ? error.code : "unknown_error",
+      error instanceof AiQuotaError
+        ? error.code
+        : error instanceof RevisionProviderError
+          ? error.code
+          : "unknown_error",
     );
   }
 }

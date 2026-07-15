@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
+import { resolveAiQuotaSubject } from "@/server/ai/quota";
 import { createOpenAIPlanningSummaryProvider } from "./openai-provider";
 import { createFakePlanningSummaryProvider } from "./provider";
 import { createPlanningRepository } from "./repository";
@@ -30,6 +31,7 @@ export async function drainPlanningSummary(id: string) {
           apiKey: env.apiKey!,
           timeoutMs: env.planningTimeoutMs,
         });
+  const quotaSubject = await resolveAiQuotaSubject("planning", id);
   await processPlanningSummary(id, {
     repository: createPlanningRepository({
       model: env.planningModel,
@@ -43,6 +45,7 @@ export async function drainPlanningSummary(id: string) {
     ),
     model: env.planningModel,
     timeoutMs: env.planningTimeoutMs,
+    quotaSubject,
   });
 }
 export function schedulePlanningSummary(id: string) {

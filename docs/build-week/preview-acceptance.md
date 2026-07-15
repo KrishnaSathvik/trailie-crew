@@ -81,3 +81,9 @@ The initial 45-second planning deadline produced two measured 45.07-second abort
 ## Verdict
 
 **Preview ready with controlled conditions.** Keep Vercel Authentication enabled, do not circulate the URL publicly, preserve unavailable Mapbox labels, and retain a human operator for logs/recovery. This phase does not establish unrestricted Preview safety or production readiness.
+
+## Phase 5B change notice
+
+The acceptance above applies to the Phase 5A deployment and room, not automatically to the Phase 5B worktree. Phase 5B adds CAPTCHA-protected create/join, AI quotas/circuit breakers, cron configuration, lifecycle deletion/export, cleanup, trust pages, and accessibility changes. The accepted room must not be used for destructive tests.
+
+Until the final Phase 5B protected-Preview drill is recorded, keep Vercel Authentication enabled. Vercel Cron does not run on Preview, so recovery and cleanup must be invoked manually with protected secrets there. A controlled deterministic CAPTCHA adapter may be used only in the dedicated Preview acceptance environment; Production rejects it. Real public access still requires hosted Turnstile plus Supabase Auth configuration.

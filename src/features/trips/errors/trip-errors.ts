@@ -9,6 +9,11 @@ export const tripErrorCodes = [
   "duplicate_display_name",
   "trip_unavailable",
   "permission_denied",
+  "captcha_required",
+  "captcha_invalid",
+  "captcha_expired",
+  "captcha_unavailable",
+  "rate_limited",
   "network_error",
   "invalid_server_response",
   "unknown_error",
@@ -29,6 +34,12 @@ const errorMessages: Record<TripErrorCode, string> = {
   duplicate_display_name: "That display name is already in use for this Trip.",
   trip_unavailable: "This Trip is unavailable or you do not have access to it.",
   permission_denied: "You do not have permission to do that.",
+  captcha_required: "Complete the anti-bot check and try again.",
+  captcha_invalid: "The anti-bot check was not accepted. Please retry it.",
+  captcha_expired: "The anti-bot check expired. Complete it again.",
+  captcha_unavailable:
+    "The anti-bot check is temporarily unavailable. Please try again shortly.",
+  rate_limited: "Too many attempts. Wait a moment before trying again.",
   network_error: "We could not connect. Check your connection and try again.",
   invalid_server_response:
     "The server returned an unexpected response. Please try again.",
@@ -50,6 +61,11 @@ const controlledRpcMessages = new Map<string, TripErrorCode>([
     "duplicate_display_name",
   ],
   ["Trip is not active.", "trip_unavailable"],
+  ["captcha_required", "captcha_required"],
+  ["captcha_invalid", "captcha_invalid"],
+  ["captcha_expired", "captcha_expired"],
+  ["captcha_unavailable", "captcha_unavailable"],
+  ["rate_limited", "rate_limited"],
 ]);
 
 type DatabaseErrorLike = { code?: string; message?: string };

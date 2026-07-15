@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseCaptchaEnv,
+  parseCleanupEnv,
   parseOpenAIEnv,
+  parseRecoveryEnv,
   parseServerSupabaseEnv,
   requireAiGeneration,
 } from "./env";
@@ -61,6 +64,54 @@ describe("server environment validation", () => {
     expect(() => parseOpenAIEnv({})).toThrow();
     expect(() =>
       parseOpenAIEnv({ TRAILIE_AI_PROVIDER: "fake", NODE_ENV: "production" }),
+    ).toThrow();
+  });
+
+  it("requires hosted CAPTCHA configuration and forbids Production test mode", () => {
+    expect(() => parseCaptchaEnv({ NODE_ENV: "production" })).toThrow();
+    expect(
+      parseCaptchaEnv({
+        TURNSTILE_SECRET_KEY: "turnstile-secret",
+        SUPABASE_AUTH_CAPTCHA_ENABLED: "true",
+        NODE_ENV: "production",
+      }),
+    ).toMatchObject({ authCaptchaEnabled: true, testMode: false });
+    expect(() =>
+      parseCaptchaEnv({ CAPTCHA_TEST_MODE: "true", NODE_ENV: "production" }),
+    ).toThrow();
+    expect(
+      parseCaptchaEnv({
+        CAPTCHA_TEST_MODE: "true",
+        NODE_ENV: "production",
+        VERCEL_ENV: "preview",
+      }),
+    ).toMatchObject({ testMode: true });
+    expect(
+      parseCaptchaEnv({ CAPTCHA_TEST_MODE: "true", NODE_ENV: "test" }),
+    ).toMatchObject({ testMode: true });
+  });
+
+  it("accepts distinct or shared cron secrets and bounds cleanup settings", () => {
+    expect(parseRecoveryEnv({ CRON_SECRET: "c".repeat(32) })).toEqual({
+      secret: "c".repeat(32),
+    });
+    expect(parseCleanupEnv({ RECOVERY_SECRET: "r".repeat(32) })).toEqual({
+      secret: "r".repeat(32),
+      retentionDays: 30,
+      batchSize: 25,
+    });
+    expect(
+      parseCleanupEnv({
+        CLEANUP_SECRET: "d".repeat(32),
+        ANONYMOUS_RETENTION_DAYS: "45",
+        ANONYMOUS_CLEANUP_BATCH_SIZE: "10",
+      }),
+    ).toEqual({ secret: "d".repeat(32), retentionDays: 45, batchSize: 10 });
+    expect(() =>
+      parseCleanupEnv({
+        CLEANUP_SECRET: "d".repeat(32),
+        ANONYMOUS_CLEANUP_BATCH_SIZE: "1000",
+      }),
     ).toThrow();
   });
 });

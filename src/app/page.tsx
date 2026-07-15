@@ -2,6 +2,7 @@ import { ArrowRight, UsersRound } from "lucide-react";
 import Link from "next/link";
 
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { TrustLinks } from "@/components/shared/trust-links";
 
 export default function Home() {
   return (
@@ -85,8 +86,9 @@ export default function Home() {
           </aside>
         </section>
 
-        <footer className="border-border text-muted-foreground flex items-center justify-between border-t pt-5 font-mono text-[0.625rem] tracking-[0.16em] uppercase">
+        <footer className="border-border text-muted-foreground flex flex-wrap items-center justify-between gap-4 border-t pt-5 font-mono text-[0.625rem] tracking-[0.16em] uppercase">
           <span>Build Week 2026</span>
+          <TrustLinks className="flex flex-wrap gap-4" />
           <span>Apps for Your Life</span>
         </footer>
       </div>

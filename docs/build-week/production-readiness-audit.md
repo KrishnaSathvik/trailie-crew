@@ -193,6 +193,14 @@ Final `git status --short --branch` is clean relative to the starting branch exc
 3. **Vercel Preview readiness: `ready_with_conditions`.** Proceed only after the Preview blocker list is addressed in a non-production environment; do not expose an unrestricted anonymous Preview.
 4. **Production readiness: `not_ready`.** Durable recovery, abuse/cost controls, lifecycle/privacy/legal operations, observability, backup/restore, accessibility, load, and hosted/live acceptance are blocking.
 
+## Phase 5B remediation update — July 14, 2026
+
+Implemented locally: officially supported Turnstile/Supabase Auth CAPTCHA boundary; non-bypassable receipt-protected create/join RPCs; transactionally reserved user/room/global/model AI token and invocation limits; environment/database AI disable; scheduled recovery and cleanup configuration with leases; conservative anonymous cleanup; locked host transfer; room/account deletion; personal export; structured redacted logs; health signal; trust pages; accessible lifecycle UI; and Production runbooks.
+
+The following are no longer code-absence blockers but still require final hosted evidence: real CAPTCHA configuration, disposable share-revoking room deletion, account/session deletion, cleanup dry-run/destructive synthetic case, AI-disable no-provider proof, cron manual invocation, log redaction/alert signal, and selected axe/manual accessibility flows.
+
+Production remains `not_ready`. Blocking external/manual work: platform/WAF abuse configuration; named alert/incident owners and delivered Vercel/Supabase/OpenAI alerts; provider-level monetary cap evidence; selected paid Supabase Production backup/PITR plan and isolated restore drill with approved RPO/RTO; professional legal/privacy/support review; private security-reporting path; full manual VoiceOver/zoom/contrast record; and limited-public load/abuse acceptance. Local dumps and token budgets are not described as automatic backups or hard monetary caps.
+
 ## Phase 5A release update
 
 The dedicated protected custom Preview environment and non-production hosted Supabase project completed controlled acceptance. Cleared Preview blockers include hosted migrations/RLS/grants, scoped environment configuration, server/client env separation, structured redacted logs, real hosted OpenAI/Realtime workflow verification, explicit runtime ceilings, manual protected recovery, public header/cache behavior, and historical sharing/exports. Local final gates are 333 unit/component assertions, 391 pgTAP assertions, and 12 passing Playwright scenarios with the hosted-only spec skipped locally.

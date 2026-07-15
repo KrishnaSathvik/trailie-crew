@@ -9,6 +9,8 @@ import {
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
+import { resolveAiQuotaSubject } from "@/server/ai/quota";
+import { generationProviderSwitches } from "@/server/operations/provider-switches";
 import { createOpenAIRevisionProvider } from "./openai-provider";
 import { createFakeRevisionProvider } from "./provider";
 import { createRevisionRepository } from "./repository";
@@ -44,11 +46,13 @@ export async function drainPlanChange(id: string) {
           scenario: (process.env.TRAILIE_FAKE_TRAVEL_SCENARIO ??
             "valid") as FakeTravelScenario,
         })
-      : process.env.MAPBOX_ACCESS_TOKEN
+      : generationProviderSwitches().travelProvidersEnabled &&
+          process.env.MAPBOX_ACCESS_TOKEN
         ? createMapboxTravelProvider({
             accessToken: process.env.MAPBOX_ACCESS_TOKEN,
           })
         : createUnavailableTravelProvider("unconfigured-live-provider");
+  const quotaSubject = await resolveAiQuotaSubject("revision", id);
   await processPlanChange(id, {
     repository: createRevisionRepository(),
     provider,
@@ -58,6 +62,7 @@ export async function drainPlanChange(id: string) {
       env.safetyHmacSecret,
     ),
     timeoutMs: env.itineraryTimeoutMs,
+    quotaSubject,
   });
 }
 

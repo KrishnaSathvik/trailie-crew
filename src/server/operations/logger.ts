@@ -52,11 +52,25 @@ export function createCorrelationId() {
   return crypto.randomUUID();
 }
 
+const alertEvents = [
+  /\.configuration_failed$/,
+  /\.failed$/,
+  /^auth\.session_refresh_failed$/,
+  /^recovery\.stale_jobs_remaining$/,
+  /^security\./,
+  /^quota\.global_limit_reached$/,
+];
+
+export function classifyOperationalEvent(event: string) {
+  return alertEvents.some((pattern) => pattern.test(event)) ? "alert" : "info";
+}
+
 export function logOperation(event: string, metadata: OperationalMetadata) {
   const safeMetadata = sanitize(metadata) as OperationalMetadata;
   console.info(
     JSON.stringify({
       timestamp: new Date().toISOString(),
+      classification: classifyOperationalEvent(event),
       ...safeMetadata,
       event,
     }),

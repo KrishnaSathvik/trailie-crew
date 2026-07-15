@@ -8,6 +8,8 @@ import {
 } from "@trailie/travel-tools";
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
+import { resolveAiQuotaSubject } from "@/server/ai/quota";
+import { generationProviderSwitches } from "@/server/operations/provider-switches";
 import { createOpenAIItineraryProvider } from "./openai-provider";
 import { createFakeItineraryProvider } from "./provider";
 import { createItineraryRepository } from "./repository";
@@ -51,11 +53,13 @@ export async function drainItineraryGeneration(id: string) {
           scenario: (process.env.TRAILIE_FAKE_TRAVEL_SCENARIO ??
             "valid") as FakeTravelScenario,
         })
-      : process.env.MAPBOX_ACCESS_TOKEN
+      : generationProviderSwitches().travelProvidersEnabled &&
+          process.env.MAPBOX_ACCESS_TOKEN
         ? createMapboxTravelProvider({
             accessToken: process.env.MAPBOX_ACCESS_TOKEN,
           })
         : createUnavailableTravelProvider("unconfigured-live-provider");
+  const quotaSubject = await resolveAiQuotaSubject("itinerary", id);
   await processItineraryGeneration(id, {
     repository: createItineraryRepository(),
     provider,
@@ -66,6 +70,7 @@ export async function drainItineraryGeneration(id: string) {
     ),
     model: env.itineraryModel,
     timeoutMs: env.itineraryTimeoutMs,
+    quotaSubject,
   });
 }
 

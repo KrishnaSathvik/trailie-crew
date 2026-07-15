@@ -2,6 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
+grant execute on function public.create_trip_unprotected(text,text,integer),public.join_trip_unprotected(text,text) to authenticated;
 select plan(31);
 
 select has_table('private', 'message_extractions', 'message extractions are private');
@@ -28,7 +29,7 @@ insert into auth.users (id, instance_id, aud, role, created_at, updated_at, is_a
 values ('60000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', now(), now(), true);
 select set_config('request.jwt.claim.sub', '60000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
-create temporary table memory_trip as select * from public.create_trip('Memory Trip', 'Maya', null);
+create temporary table memory_trip as select * from public.create_trip_unprotected('Memory Trip', 'Maya', null);
 create temporary table memory_message as select public.send_message(
   (select room_id from memory_trip), (select participant_id from memory_trip),
   'I prefer hiking', '61000000-0000-4000-8000-000000000001', null
