@@ -21,6 +21,12 @@ import {
   validateItinerary,
   type NormalizedToolEvidence,
 } from "./validation/validate-itinerary";
+import {
+  classifyProviderFailure,
+  parseWorkflowReliabilityPolicy,
+  remainingProviderTimeout,
+  type WorkflowReliabilityPolicy,
+} from "@/server/ai/reliability-policy";
 
 export type TravelEvidenceDependencies = {
   repository: Pick<ItineraryRepository, "recordEvidence">;
@@ -34,6 +40,7 @@ type Dependencies = TravelEvidenceDependencies & {
   model?: string;
   timeoutMs?: number;
   quotaSubject?: AiQuotaSubject;
+  reliabilityPolicy?: WorkflowReliabilityPolicy;
 };
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
@@ -255,6 +262,9 @@ export async function processItineraryGeneration(
   id: string,
   dependencies: Dependencies,
 ) {
+  const policy =
+    dependencies.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
+  const workflowStartedAt = Date.now();
   try {
     const firstClaim = await dependencies.repository.claim(id);
     if (!firstClaim.claimed || !firstClaim.stage) return;
@@ -275,7 +285,16 @@ export async function processItineraryGeneration(
             validation: repairValidation,
             evidence: context.evidence,
           }),
-          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+          signal: AbortSignal.timeout(
+            Math.min(
+              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+              remainingProviderTimeout(
+                policy,
+                "itineraryRepair",
+                workflowStartedAt,
+              ),
+            ),
+          ),
         }),
       );
     } else if (firstClaim.stage === "validate" && context.draft) {
@@ -287,7 +306,16 @@ export async function processItineraryGeneration(
           model: dependencies.model ?? "gpt-5.6-sol",
           safetyIdentifier: dependencies.safetyIdentifier,
           context: buildItineraryContext(context),
-          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+          signal: AbortSignal.timeout(
+            Math.min(
+              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+              remainingProviderTimeout(
+                policy,
+                "itineraryGeneration",
+                workflowStartedAt,
+              ),
+            ),
+          ),
         }),
       );
     }
@@ -327,7 +355,16 @@ export async function processItineraryGeneration(
           validation: result.report,
           evidence: result.evidence,
         }),
-        signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+        signal: AbortSignal.timeout(
+          Math.min(
+            dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+            remainingProviderTimeout(
+              policy,
+              "itineraryRepair",
+              workflowStartedAt,
+            ),
+          ),
+        ),
       }),
     );
     draft = repaired.itinerary;
@@ -347,7 +384,13 @@ export async function processItineraryGeneration(
         ? new ItineraryProviderError(error.code as never, false)
         : error instanceof ItineraryProviderError
           ? error
-          : new ItineraryProviderError("unknown_error", false);
+          : (() => {
+              const classified = classifyProviderFailure(error);
+              return new ItineraryProviderError(
+                classified.code,
+                classified.retryable,
+              );
+            })();
     await dependencies.repository.fail(id, failure.code);
   }
 }

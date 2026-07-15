@@ -5,6 +5,7 @@ import {
   classifyProviderFailure,
   computeRetryDelay,
   parseWorkflowReliabilityPolicy,
+  remainingProviderTimeout,
   runProviderOperation,
 } from "./reliability-policy";
 
@@ -134,6 +135,19 @@ describe("workflow reliability policy", () => {
     expect(computeRetryDelay(policy, 20, () => 0.5)).toBe(5_000);
     expect(computeRetryDelay(policy, 1, () => 0)).toBe(400);
     expect(computeRetryDelay(policy, 1, () => 1)).toBe(600);
+  });
+
+  it("caps each stage by the remaining total workflow deadline", () => {
+    const policy = parseWorkflowReliabilityPolicy({});
+    expect(
+      remainingProviderTimeout(policy, "itineraryGeneration", 0, 250_000),
+    ).toBe(50_000);
+    expect(
+      remainingProviderTimeout(policy, "itineraryRepair", 0, 100_000),
+    ).toBe(120_000);
+    expect(() =>
+      remainingProviderTimeout(policy, "revisionGeneration", 0, 300_001),
+    ).toThrow("workflow_deadline_exceeded");
   });
 
   it("retries a transient failure once and exposes safe attempt metadata", async () => {

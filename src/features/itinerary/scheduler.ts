@@ -45,7 +45,10 @@ export async function drainItineraryGeneration(id: string) {
         })
       : createOpenAIItineraryProvider({
           apiKey: env.apiKey!,
-          timeoutMs: env.itineraryTimeoutMs,
+          timeoutMs: Math.max(
+            env.reliabilityPolicy.timeoutsMs.itineraryGeneration,
+            env.reliabilityPolicy.timeoutsMs.itineraryRepair,
+          ),
         });
   const travelProvider =
     env.provider === "fake"
@@ -69,8 +72,8 @@ export async function drainItineraryGeneration(id: string) {
       env.safetyHmacSecret,
     ),
     model: env.itineraryModel,
-    timeoutMs: env.itineraryTimeoutMs,
     quotaSubject,
+    reliabilityPolicy: env.reliabilityPolicy,
   });
 }
 

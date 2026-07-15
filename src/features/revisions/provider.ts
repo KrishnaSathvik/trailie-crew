@@ -12,7 +12,11 @@ export type RevisionProviderErrorCode =
   | "candidate_generation_failed"
   | "invalid_candidate"
   | "model_timeout"
+  | "model_rate_limited"
   | "model_unavailable"
+  | "invalid_model_output"
+  | "workflow_deadline_exceeded"
+  | "recovery_required"
   | "retry_exhausted";
 export class RevisionProviderError extends Error {
   constructor(

@@ -12,6 +12,12 @@ import {
   runWithAiQuota,
   type AiQuotaSubject,
 } from "@/server/ai/quota";
+import {
+  computeRetryDelay,
+  parseWorkflowReliabilityPolicy,
+  remainingProviderTimeout,
+  type WorkflowReliabilityPolicy,
+} from "@/server/ai/reliability-policy";
 
 type Dependencies = {
   repository: PlanningRepository;
@@ -20,9 +26,18 @@ type Dependencies = {
   model?: string;
   timeoutMs?: number;
   quotaSubject?: AiQuotaSubject;
+  reliabilityPolicy?: WorkflowReliabilityPolicy;
+  retry?: {
+    sleep: (milliseconds: number) => Promise<void>;
+    random?: () => number;
+  };
 };
+const sleep = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 export async function processPlanningSummary(id: string, deps: Dependencies) {
-  for (let pass = 0; pass < 2; pass += 1) {
+  const policy = deps.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
+  const workflowStartedAt = Date.now();
+  for (;;) {
     const claim = await deps.repository.claim(id);
     if (!claim.claimed) return;
     const context = await deps.repository.loadContext(id);
@@ -34,7 +49,16 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
           model: deps.model ?? "gpt-5.6-sol",
           safetyIdentifier: deps.safetyIdentifier,
           context: buildPlanningContext(context),
-          signal: AbortSignal.timeout(deps.timeoutMs ?? 45_000),
+          signal: AbortSignal.timeout(
+            Math.min(
+              deps.timeoutMs ?? Number.POSITIVE_INFINITY,
+              remainingProviderTimeout(
+                policy,
+                "planningProvider",
+                workflowStartedAt,
+              ),
+            ),
+          ),
         });
       const result = deps.quotaSubject
         ? await runWithAiQuota(
@@ -98,8 +122,28 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
           : error instanceof PlanningProviderError
             ? error
             : new PlanningProviderError("unknown_error", false);
+      if (!failure.retryable) {
+        await deps.repository.fail(id, failure.code);
+        return;
+      }
+      if (claim.attemptCount >= policy.maximumAttempts) {
+        await deps.repository.fail(id, "retry_exhausted");
+        return;
+      }
+      const delay = computeRetryDelay(
+        policy,
+        claim.attemptCount,
+        deps.retry?.random,
+      );
+      if (
+        Date.now() - workflowStartedAt + delay >=
+        policy.totalWorkflowDeadlineMs
+      ) {
+        await deps.repository.fail(id, "workflow_deadline_exceeded");
+        return;
+      }
       await deps.repository.fail(id, failure.code);
-      if (!failure.retryable || claim.attemptCount >= 2) return;
+      await (deps.retry?.sleep ?? sleep)(delay);
     }
   }
 }

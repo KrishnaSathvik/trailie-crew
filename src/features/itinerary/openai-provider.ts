@@ -85,7 +85,7 @@ export function createOpenAIItineraryProvider(configuration: {
   apiKey: string;
   timeoutMs: number;
 }): ItineraryProvider {
-  const client = createOpenAIClient({ ...configuration, maxRetries: 0 });
+  const client = createOpenAIClient(configuration);
   async function callOnce(
     input: ItineraryProviderInput,
     repair: boolean,

@@ -16,6 +16,12 @@ import {
 } from "./provider";
 import { createMemoryRepository, type MemoryRepository } from "./repository";
 import { validateMemoryPatch } from "./validation";
+import {
+  computeRetryDelay,
+  parseWorkflowReliabilityPolicy,
+  remainingProviderTimeout,
+  type WorkflowReliabilityPolicy,
+} from "@/server/ai/reliability-policy";
 
 type Dependencies = {
   repository: MemoryRepository;
@@ -24,7 +30,15 @@ type Dependencies = {
   timeoutMs?: number;
   model?: string;
   quotaSubject?: AiQuotaSubject;
+  reliabilityPolicy?: WorkflowReliabilityPolicy;
+  retry?: {
+    sleep: (milliseconds: number) => Promise<void>;
+    random?: () => number;
+  };
 };
+
+const sleep = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 function safeFailure(error: unknown) {
   if (error instanceof MemoryProviderError) return error;
@@ -54,7 +68,10 @@ export async function processMemoryExtraction(
   messageId: string,
   dependencies: Dependencies,
 ) {
-  for (let pass = 0; pass < 2; pass += 1) {
+  const policy =
+    dependencies.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
+  const workflowStartedAt = Date.now();
+  for (;;) {
     const claim = await dependencies.repository.claim(messageId);
     if (!claim.claimed || claim.status !== "running") return;
     const context = await dependencies.repository.loadContext(messageId);
@@ -67,7 +84,12 @@ export async function processMemoryExtraction(
     }
     const startedAt = Date.now();
     try {
-      const signal = AbortSignal.timeout(dependencies.timeoutMs ?? 20_000);
+      const signal = AbortSignal.timeout(
+        Math.min(
+          dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+          remainingProviderTimeout(policy, "memoryProvider", workflowStartedAt),
+        ),
+      );
       const extract = () =>
         dependencies.provider.extract({
           operationKey: messageId,
@@ -111,8 +133,31 @@ export async function processMemoryExtraction(
       return;
     } catch (error) {
       const failure = safeFailure(error);
+      if (!failure.retryable) {
+        await dependencies.repository.fail(messageId, failure.code);
+        return;
+      }
+      if (claim.attemptCount >= policy.maximumAttempts) {
+        await dependencies.repository.fail(messageId, "retry_exhausted");
+        return;
+      }
+      const delay = computeRetryDelay(
+        policy,
+        claim.attemptCount,
+        dependencies.retry?.random,
+      );
+      if (
+        Date.now() - workflowStartedAt + delay >=
+        policy.totalWorkflowDeadlineMs
+      ) {
+        await dependencies.repository.fail(
+          messageId,
+          "workflow_deadline_exceeded",
+        );
+        return;
+      }
       await dependencies.repository.fail(messageId, failure.code);
-      if (!failure.retryable || claim.attemptCount >= 2) return;
+      await (dependencies.retry?.sleep ?? sleep)(delay);
     }
   }
 }
@@ -124,7 +169,7 @@ export async function drainMemoryExtraction(messageId: string) {
       ? createFakeMemoryExtractionProvider()
       : createOpenAIMemoryExtractionProvider({
           apiKey: environment.apiKey!,
-          timeoutMs: environment.memoryTimeoutMs,
+          timeoutMs: environment.reliabilityPolicy.timeoutsMs.memoryProvider,
         });
   const repository = createMemoryRepository({
     model: environment.memoryModel,
@@ -139,8 +184,8 @@ export async function drainMemoryExtraction(messageId: string) {
       `memory:${messageId}`,
       environment.safetyHmacSecret,
     ),
-    timeoutMs: environment.memoryTimeoutMs,
     model: environment.memoryModel,
     quotaSubject,
+    reliabilityPolicy: environment.reliabilityPolicy,
   });
 }

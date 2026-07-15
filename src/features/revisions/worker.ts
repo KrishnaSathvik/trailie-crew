@@ -37,6 +37,12 @@ import {
   validateChangeBoundary,
   type ChangeBoundaryReport,
 } from "./validation/change-boundary";
+import {
+  classifyProviderFailure,
+  parseWorkflowReliabilityPolicy,
+  remainingProviderTimeout,
+  type WorkflowReliabilityPolicy,
+} from "@/server/ai/reliability-policy";
 
 export type RevisionContext = {
   request: {
@@ -105,6 +111,7 @@ type Dependencies = {
   timeoutMs?: number;
   now?: string;
   quotaSubject?: AiQuotaSubject;
+  reliabilityPolicy?: WorkflowReliabilityPolicy;
 };
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
@@ -223,6 +230,9 @@ export async function processPlanChange(
   id: string,
   dependencies: Dependencies,
 ) {
+  const policy =
+    dependencies.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
+  const workflowStartedAt = Date.now();
   try {
     const context = await dependencies.repository.loadContext(id);
     if (
@@ -263,7 +273,16 @@ export async function processPlanChange(
               basePlan: context.basePlan,
             }),
             basePlan: context.basePlan,
-            signal: AbortSignal.timeout(dependencies.timeoutMs ?? 60_000),
+            signal: AbortSignal.timeout(
+              Math.min(
+                dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+                remainingProviderTimeout(
+                  policy,
+                  "revisionAnalysis",
+                  workflowStartedAt,
+                ),
+              ),
+            ),
           }),
       );
       await dependencies.repository.completeAnalysis(
@@ -299,7 +318,16 @@ export async function processPlanChange(
           }),
           basePlan: context.basePlan,
           analysis: approvedAnalysis,
-          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+          signal: AbortSignal.timeout(
+            Math.min(
+              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+              remainingProviderTimeout(
+                policy,
+                "revisionGeneration",
+                workflowStartedAt,
+              ),
+            ),
+          ),
         }),
     );
     const candidate = await dependencies.repository.attachCandidate(
@@ -366,7 +394,16 @@ export async function processPlanChange(
           }),
           basePlan: result.itinerary,
           analysis: approvedAnalysis,
-          signal: AbortSignal.timeout(dependencies.timeoutMs ?? 90_000),
+          signal: AbortSignal.timeout(
+            Math.min(
+              dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
+              remainingProviderTimeout(
+                policy,
+                "revisionGeneration",
+                workflowStartedAt,
+              ),
+            ),
+          ),
         }),
     );
     await dependencies.repository.recordRunUsage(
@@ -400,7 +437,7 @@ export async function processPlanChange(
         ? error.code
         : error instanceof RevisionProviderError
           ? error.code
-          : "unknown_error",
+          : classifyProviderFailure(error).code,
     );
   }
 }

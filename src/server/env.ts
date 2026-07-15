@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { parsePublicSupabaseEnv } from "@/lib/env-public";
+import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 type EnvironmentSource = Record<string, string | undefined>;
 
@@ -27,12 +28,6 @@ const openAIEnvSchema = z.object({
     .max(100)
     .default("trailie-focused-v1"),
   OPENAI_SAFETY_HMAC_SECRET: z.string().min(32).optional(),
-  OPENAI_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .min(5_000)
-    .max(120_000)
-    .default(30_000),
   OPENAI_MEMORY_MODEL: z.string().trim().min(1).default("gpt-5.6-luna"),
   OPENAI_MEMORY_PROMPT_VERSION: z
     .string()
@@ -41,12 +36,6 @@ const openAIEnvSchema = z.object({
     .max(100)
     .default("trailie-memory-v1"),
   OPENAI_MEMORY_SCHEMA_VERSION: z.string().trim().min(1).max(100).default("1"),
-  OPENAI_MEMORY_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .min(5_000)
-    .max(60_000)
-    .default(20_000),
   OPENAI_PLANNING_MODEL: z.string().trim().min(1).default("gpt-5.6-sol"),
   OPENAI_PLANNING_PROMPT_VERSION: z
     .string()
@@ -60,12 +49,6 @@ const openAIEnvSchema = z.object({
     .min(1)
     .max(100)
     .default("1"),
-  OPENAI_PLANNING_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .min(5_000)
-    .max(120_000)
-    .default(90_000),
   OPENAI_ITINERARY_MODEL: z.string().trim().min(1).default("gpt-5.6-sol"),
   OPENAI_ITINERARY_PROMPT_VERSION: z
     .string()
@@ -85,12 +68,6 @@ const openAIEnvSchema = z.object({
     .min(1)
     .max(100)
     .default("trailie-itinerary-validator-v1"),
-  OPENAI_ITINERARY_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .min(5_000)
-    .max(240_000)
-    .default(180_000),
   TRAILIE_AI_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
@@ -158,6 +135,7 @@ export function parseServerSupabaseEnv(source: EnvironmentSource) {
 
 export function parseOpenAIEnv(source: EnvironmentSource) {
   const values = openAIEnvSchema.parse(source);
+  const reliabilityPolicy = parseWorkflowReliabilityPolicy(source);
   if (values.TRAILIE_AI_PROVIDER === "fake" && values.NODE_ENV === "production")
     throw new Error("The fake AI provider is disabled in production.");
   if (
@@ -176,20 +154,17 @@ export function parseOpenAIEnv(source: EnvironmentSource) {
     safetyHmacSecret:
       values.OPENAI_SAFETY_HMAC_SECRET ??
       "generation-disabled-or-fake-provider-secret",
-    timeoutMs: values.OPENAI_TIMEOUT_MS,
     memoryModel: values.OPENAI_MEMORY_MODEL,
     memoryPromptVersion: values.OPENAI_MEMORY_PROMPT_VERSION,
     memorySchemaVersion: values.OPENAI_MEMORY_SCHEMA_VERSION,
-    memoryTimeoutMs: values.OPENAI_MEMORY_TIMEOUT_MS,
     planningModel: values.OPENAI_PLANNING_MODEL,
     planningPromptVersion: values.OPENAI_PLANNING_PROMPT_VERSION,
     planningSchemaVersion: values.OPENAI_PLANNING_SCHEMA_VERSION,
-    planningTimeoutMs: values.OPENAI_PLANNING_TIMEOUT_MS,
     itineraryModel: values.OPENAI_ITINERARY_MODEL,
     itineraryPromptVersion: values.OPENAI_ITINERARY_PROMPT_VERSION,
     itinerarySchemaVersion: values.OPENAI_ITINERARY_SCHEMA_VERSION,
     itineraryValidatorVersion: values.ITINERARY_VALIDATOR_VERSION,
-    itineraryTimeoutMs: values.OPENAI_ITINERARY_TIMEOUT_MS,
+    reliabilityPolicy,
   } as const;
 }
 

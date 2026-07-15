@@ -1,39 +1,20 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildChangeAnalysisRequest,
-  buildItineraryRevisionRequest,
-} from "./openai-provider";
 
-describe("OpenAI revision requests", () => {
-  it("uses strict Terra structured output without storage or tools", () => {
-    const request = buildChangeAnalysisRequest({
-      model: "gpt-5.6-terra",
-      safetyIdentifier: "safe",
-      context: "bounded",
-    });
-    expect(request).toMatchObject({
-      model: "gpt-5.6-terra",
-      store: false,
-      reasoning: { effort: "medium" },
-      max_output_tokens: 6000,
-    });
-    expect(request).not.toHaveProperty("tools");
-    expect(request.instructions).toContain("trailie-change-analysis-v1");
-    expect(request.instructions).toMatch(/exactly match/i);
-  });
-  it("uses exact Sol and high reasoning for a complete candidate", () => {
-    const request = buildItineraryRevisionRequest({
-      model: "gpt-5.6-sol",
-      safetyIdentifier: "safe",
-      context: "bounded",
-      repair: false,
-    });
-    expect(request).toMatchObject({
-      model: "gpt-5.6-sol",
-      store: false,
-      reasoning: { effort: "high" },
-      max_output_tokens: 12000,
-    });
-    expect(request.instructions).toContain("complete candidate itinerary");
+import { mapRevisionProviderError } from "./openai-provider";
+
+describe("revision OpenAI failure mapping", () => {
+  it("maps both timeout and abort deadlines to a retryable model timeout", () => {
+    expect(
+      mapRevisionProviderError(
+        new DOMException("timed out", "TimeoutError"),
+        "analysis",
+      ),
+    ).toMatchObject({ code: "model_timeout", retryable: true });
+    expect(
+      mapRevisionProviderError(
+        new DOMException("aborted", "AbortError"),
+        "candidate",
+      ),
+    ).toMatchObject({ code: "model_timeout", retryable: true });
   });
 });

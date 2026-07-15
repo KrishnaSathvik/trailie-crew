@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 describe("focused-answer OpenAI boundary", () => {
+  it("classifies a provider deadline as timeout instead of unavailable", async () => {
+    const providerModule = (await import("./openai-provider")) as Record<
+      string,
+      unknown
+    >;
+    const mapError = providerModule.mapFocusedProviderError as (
+      error: unknown,
+    ) => { code: string; retryable: boolean };
+    expect(mapError).toBeTypeOf("function");
+    expect(
+      mapError(new DOMException("The operation timed out", "TimeoutError")),
+    ).toMatchObject({ code: "openai_timeout", retryable: true });
+  });
+
   it("builds a strict model schema with nullable optional app fields", async () => {
     const providerModule = (await import("./openai-provider")) as Record<
       string,

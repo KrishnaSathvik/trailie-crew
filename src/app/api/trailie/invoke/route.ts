@@ -50,7 +50,7 @@ function providerFor(
   if (!environment.apiKey) throw new Error("missing_openai_configuration");
   return createOpenAIFocusedAnswerProvider({
     apiKey: environment.apiKey,
-    timeoutMs: environment.timeoutMs,
+    timeoutMs: environment.reliabilityPolicy.timeoutsMs.focusedProvider,
   });
 }
 
@@ -263,7 +263,12 @@ export async function POST(request: Request) {
                 authData.user.id,
                 environment.safetyHmacSecret,
               ),
-              signal: request.signal,
+              signal: AbortSignal.any([
+                request.signal,
+                AbortSignal.timeout(
+                  environment.reliabilityPolicy.timeoutsMs.focusedProvider,
+                ),
+              ]),
             });
             for await (const delta of providerStream.textDeltas)
               emit({ type: "text_delta", delta });

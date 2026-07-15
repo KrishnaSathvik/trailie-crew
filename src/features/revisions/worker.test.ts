@@ -6,6 +6,7 @@ import {
   revisionItinerary,
   revisionPlanningSummary,
 } from "./test-fixtures";
+import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 function analysisContext(): RevisionContext {
   return {
@@ -180,5 +181,44 @@ describe("revision worker", () => {
       expect.objectContaining({ status: "pass" }),
       expect.objectContaining({ candidateVersion: 2 }),
     );
+  });
+
+  it("classifies an analysis deadline separately from invalid model output", async () => {
+    const repository = {
+      loadContext: vi.fn().mockResolvedValue(analysisContext()),
+      claimAnalysis: vi.fn().mockResolvedValue({ claimed: true }),
+      completeAnalysis: vi.fn(),
+      claimCandidate: vi.fn(),
+      attachCandidate: vi.fn(),
+      recordEvidence: vi.fn(),
+      updateCandidate: vi.fn(),
+      recordValidation: vi.fn(),
+      startRepair: vi.fn(),
+      recordRunUsage: vi.fn(),
+      completeCandidate: vi.fn(),
+      block: vi.fn(),
+      fail: vi.fn(),
+    };
+    await processPlanChange("request-timeout", {
+      repository,
+      provider: {
+        analyze: vi
+          .fn()
+          .mockRejectedValue(
+            new DOMException("The operation timed out", "TimeoutError"),
+          ),
+        generate: vi.fn(),
+        repair: vi.fn(),
+      },
+      travelProvider: {} as never,
+      safetyIdentifier: "safe",
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    expect(repository.fail).toHaveBeenCalledWith(
+      "request-timeout",
+      "model_timeout",
+    );
+    expect(repository.completeAnalysis).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { processMemoryExtraction } from "./worker";
 import { createFakeMemoryExtractionProvider } from "./provider";
+import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 const messageId = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 const participantId = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a3";
@@ -48,6 +49,7 @@ describe("memory extraction worker", () => {
       repository: store,
       provider,
       safetyIdentifier: "safe",
+      retry: { sleep: vi.fn().mockResolvedValue(undefined) },
     });
     expect(provider.extract).not.toHaveBeenCalled();
     expect(store.skip).toHaveBeenCalledWith(messageId, "non_durable_chatter");
@@ -104,5 +106,35 @@ describe("memory extraction worker", () => {
     expect(provider.extract).toHaveBeenCalledTimes(2);
     expect(store.fail).toHaveBeenCalledTimes(2);
     expect(store.complete).not.toHaveBeenCalled();
+  });
+
+  it("uses the central attempt cap and bounded backoff between durable claims", async () => {
+    const store = repository("I prefer hiking", [
+      { status: "running", claimed: true, attemptCount: 1 },
+      { status: "running", claimed: true, attemptCount: 2 },
+      { status: "running", claimed: true, attemptCount: 3 },
+    ]);
+    const provider = {
+      extract: vi.fn().mockRejectedValue(
+        Object.assign(new Error("unavailable"), {
+          code: "model_unavailable",
+          retryable: true,
+        }),
+      ),
+    };
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    await processMemoryExtraction(messageId, {
+      repository: store,
+      provider,
+      safetyIdentifier: "safe",
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({
+        AI_MAXIMUM_ATTEMPTS: "3",
+      }),
+      retry: { sleep, random: () => 0.5 },
+    });
+    expect(provider.extract).toHaveBeenCalledTimes(3);
+    expect(store.claim).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenNthCalledWith(1, 500);
+    expect(sleep).toHaveBeenNthCalledWith(2, 1_000);
   });
 });

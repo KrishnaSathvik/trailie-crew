@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createFakeTravelProvider,
   createUnavailableTravelProvider,
@@ -10,6 +10,7 @@ import type {
   ItineraryGenerationContext,
   ItineraryRepository,
 } from "./repository";
+import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 function summary(): PlanningSummary {
   const item = (id: string, label: string, detail: string) => ({
@@ -194,5 +195,25 @@ describe("itinerary worker", () => {
     });
     expect(calls.failed).toEqual(["model_unavailable"]);
     expect(calls.published).toBe(0);
+  });
+
+  it("classifies a provider deadline as model_timeout rather than validation failure", async () => {
+    const { repo, calls } = repository();
+    const generate = vi
+      .fn()
+      .mockRejectedValue(
+        new DOMException("The operation timed out", "TimeoutError"),
+      );
+    await processItineraryGeneration("plan-timeout", {
+      repository: repo,
+      provider: { generate, repair: vi.fn() },
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    expect(generate).toHaveBeenCalledOnce();
+    expect(calls.failed).toEqual(["model_timeout"]);
+    expect(calls.reports).toEqual([]);
   });
 });

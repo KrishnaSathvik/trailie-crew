@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { processPlanningSummary } from "./worker";
 import { createFakePlanningSummaryProvider } from "./provider";
+import { PlanningProviderError } from "./provider";
+import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 const context = {
   requestId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2",
@@ -70,5 +72,54 @@ describe("planning worker", () => {
       safetyIdentifier: "safe",
     });
     expect(repository.loadContext).not.toHaveBeenCalled();
+  });
+
+  it("uses central retry limits and backoff for retryable durable attempts", async () => {
+    const repository = {
+      claim: vi
+        .fn()
+        .mockResolvedValueOnce({
+          claimed: true,
+          status: "generating_summary",
+          attemptCount: 1,
+          summaryVersion: 1,
+        })
+        .mockResolvedValueOnce({
+          claimed: true,
+          status: "generating_summary",
+          attemptCount: 2,
+          summaryVersion: 1,
+        })
+        .mockResolvedValueOnce({
+          claimed: true,
+          status: "generating_summary",
+          attemptCount: 3,
+          summaryVersion: 1,
+        }),
+      loadContext: vi.fn().mockResolvedValue(context),
+      complete: vi.fn(),
+      fail: vi.fn(),
+    };
+    const provider = {
+      summarize: vi
+        .fn()
+        .mockRejectedValue(
+          new PlanningProviderError("model_rate_limited", true),
+        ),
+    };
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    await processPlanningSummary(context.requestId, {
+      repository,
+      provider,
+      safetyIdentifier: "safe",
+      reliabilityPolicy: parseWorkflowReliabilityPolicy({
+        AI_MAXIMUM_ATTEMPTS: "3",
+      }),
+      retry: { sleep, random: () => 0.5 },
+    });
+    expect(provider.summarize).toHaveBeenCalledTimes(3);
+    expect(repository.fail).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenNthCalledWith(1, 500);
+    expect(sleep).toHaveBeenNthCalledWith(2, 1_000);
   });
 });

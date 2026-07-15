@@ -57,11 +57,17 @@ export function buildItineraryRevisionRequest(input: {
     store: false,
   };
 }
-function mapped(error: unknown, code: "analysis" | "candidate") {
+export function mapRevisionProviderError(
+  error: unknown,
+  code: "analysis" | "candidate",
+) {
   if (error instanceof RevisionProviderError) return error;
   if (
     error instanceof OpenAI.APIConnectionTimeoutError ||
-    (error instanceof Error && error.name === "AbortError")
+    (typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      (error.name === "AbortError" || error.name === "TimeoutError"))
   )
     return new RevisionProviderError("model_timeout", true);
   if (
@@ -78,7 +84,7 @@ export function createOpenAIRevisionProvider(configuration: {
   apiKey: string;
   timeoutMs: number;
 }): RevisionProvider {
-  const client = createOpenAIClient({ ...configuration, maxRetries: 0 });
+  const client = createOpenAIClient(configuration);
   async function call(
     input: RevisionProviderInput,
     mode: "analysis" | "generate" | "repair",
@@ -113,7 +119,10 @@ export function createOpenAIRevisionProvider(configuration: {
         ? { analysis: parsed.data, ...meta }
         : { itinerary: parsed.data, ...meta };
     } catch (error) {
-      throw mapped(error, mode === "analysis" ? "analysis" : "candidate");
+      throw mapRevisionProviderError(
+        error,
+        mode === "analysis" ? "analysis" : "candidate",
+      );
     }
   }
   return {

@@ -51,7 +51,7 @@ export function createOpenAIPlanningSummaryProvider(configuration: {
   apiKey: string;
   timeoutMs: number;
 }): PlanningSummaryProvider {
-  const client = createOpenAIClient({ ...configuration, maxRetries: 0 });
+  const client = createOpenAIClient(configuration);
   return {
     async summarize(input) {
       try {

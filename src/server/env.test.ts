@@ -45,6 +45,36 @@ describe("server environment validation", () => {
       memoryModel: "gpt-5.6-luna",
       planningModel: "gpt-5.6-sol",
       itineraryModel: "gpt-5.6-sol",
+      reliabilityPolicy: {
+        timeoutsMs: {
+          focusedProvider: 30_000,
+          memoryProvider: 20_000,
+          planningProvider: 90_000,
+          itineraryGeneration: 180_000,
+          itineraryRepair: 120_000,
+          revisionAnalysis: 60_000,
+          revisionGeneration: 180_000,
+        },
+        maximumAttempts: 2,
+      },
+    });
+  });
+
+  it("passes legacy hosted timeouts through the central reliability policy", () => {
+    expect(
+      parseOpenAIEnv({
+        OPENAI_API_KEY: "sk-test",
+        OPENAI_SAFETY_HMAC_SECRET: "x".repeat(32),
+        OPENAI_PLANNING_TIMEOUT_MS: "70000",
+        AI_TIMEOUT_ITINERARY_REPAIR_MS: "140000",
+        AI_MAXIMUM_ATTEMPTS: "3",
+      }).reliabilityPolicy,
+    ).toMatchObject({
+      timeoutsMs: {
+        planningProvider: 70_000,
+        itineraryRepair: 140_000,
+      },
+      maximumAttempts: 3,
     });
   });
 

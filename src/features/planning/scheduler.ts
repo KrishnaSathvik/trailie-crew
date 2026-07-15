@@ -29,7 +29,7 @@ export async function drainPlanningSummary(id: string) {
       ? createFakePlanningSummaryProvider()
       : createOpenAIPlanningSummaryProvider({
           apiKey: env.apiKey!,
-          timeoutMs: env.planningTimeoutMs,
+          timeoutMs: env.reliabilityPolicy.timeoutsMs.planningProvider,
         });
   const quotaSubject = await resolveAiQuotaSubject("planning", id);
   await processPlanningSummary(id, {
@@ -44,8 +44,8 @@ export async function drainPlanningSummary(id: string) {
       env.safetyHmacSecret,
     ),
     model: env.planningModel,
-    timeoutMs: env.planningTimeoutMs,
     quotaSubject,
+    reliabilityPolicy: env.reliabilityPolicy,
   });
 }
 export function schedulePlanningSummary(id: string) {

@@ -7,6 +7,10 @@ export type ItineraryErrorCode =
   | "model_rate_limited"
   | "model_unavailable"
   | "repair_failed"
+  | "invalid_model_output"
+  | "workflow_deadline_exceeded"
+  | "retry_exhausted"
+  | "recovery_required"
   | "unknown_error";
 
 export class ItineraryProviderError extends Error {

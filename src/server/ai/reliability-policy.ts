@@ -134,6 +134,18 @@ export function computeRetryDelay(
   return Math.round(exponential * jitterMultiplier);
 }
 
+export function remainingProviderTimeout(
+  policy: WorkflowReliabilityPolicy,
+  stage: WorkflowProviderStage,
+  workflowStartedAt: number,
+  now = Date.now(),
+) {
+  const remaining =
+    policy.totalWorkflowDeadlineMs - Math.max(now - workflowStartedAt, 0);
+  if (remaining <= 0) throw new ProviderFailure("workflow_deadline_exceeded");
+  return Math.min(policy.timeoutsMs[stage], remaining);
+}
+
 type ProviderOperationInput<T> = {
   policy: WorkflowReliabilityPolicy;
   stage: WorkflowProviderStage;
@@ -166,14 +178,14 @@ export async function runProviderOperation<T>(
 
     attempt += 1;
     const elapsedBeforeAttempt = attempt === 1 ? 0 : now() - startedAt;
-    const remainingMs =
-      input.policy.totalWorkflowDeadlineMs - elapsedBeforeAttempt;
-    if (remainingMs <= 0)
-      throw new ProviderFailure("workflow_deadline_exceeded");
-
-    const timeoutSignal = AbortSignal.timeout(
-      Math.max(1, Math.min(input.policy.timeoutsMs[input.stage], remainingMs)),
+    const remainingMs = remainingProviderTimeout(
+      input.policy,
+      input.stage,
+      startedAt,
+      startedAt + elapsedBeforeAttempt,
     );
+
+    const timeoutSignal = AbortSignal.timeout(Math.max(1, remainingMs));
     const signal = input.signal
       ? AbortSignal.any([input.signal, timeoutSignal])
       : timeoutSignal;

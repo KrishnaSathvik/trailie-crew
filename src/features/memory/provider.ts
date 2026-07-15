@@ -16,6 +16,8 @@ export type MemoryErrorCode =
   | "model_unavailable"
   | "model_timeout"
   | "model_rate_limited"
+  | "workflow_deadline_exceeded"
+  | "recovery_required"
   | "retry_exhausted"
   | "unknown_error";
 

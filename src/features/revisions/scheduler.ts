@@ -38,7 +38,10 @@ export async function drainPlanChange(id: string) {
       ? createFakeRevisionProvider()
       : createOpenAIRevisionProvider({
           apiKey: env.apiKey!,
-          timeoutMs: env.itineraryTimeoutMs,
+          timeoutMs: Math.max(
+            env.reliabilityPolicy.timeoutsMs.revisionAnalysis,
+            env.reliabilityPolicy.timeoutsMs.revisionGeneration,
+          ),
         });
   const travelProvider =
     env.provider === "fake"
@@ -61,8 +64,8 @@ export async function drainPlanChange(id: string) {
       `revision:${id}`,
       env.safetyHmacSecret,
     ),
-    timeoutMs: env.itineraryTimeoutMs,
     quotaSubject,
+    reliabilityPolicy: env.reliabilityPolicy,
   });
 }
 

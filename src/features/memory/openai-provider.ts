@@ -112,7 +112,7 @@ export function createOpenAIMemoryExtractionProvider(configuration: {
   apiKey: string;
   timeoutMs: number;
 }): MemoryExtractionProvider {
-  const client = createOpenAIClient({ ...configuration, maxRetries: 0 });
+  const client = createOpenAIClient(configuration);
   return {
     async extract(input) {
       try {

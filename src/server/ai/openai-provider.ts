@@ -61,7 +61,7 @@ export function normalizeFocusedAnswerModelOutput(value: unknown) {
   });
 }
 
-function mapOpenAIError(error: unknown) {
+export function mapFocusedProviderError(error: unknown) {
   if (error instanceof TrailieProviderError) return error;
   let code: SafeAiErrorCode = "openai_unavailable";
   let retryable = true;
@@ -81,7 +81,19 @@ function mapOpenAIError(error: unknown) {
   ) {
     code = "invalid_model_response";
     retryable = false;
-  } else if (error instanceof Error && error.name === "AbortError") {
+  } else if (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "TimeoutError"
+  ) {
+    code = "openai_timeout";
+  } else if (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  ) {
     code = "invocation_cancelled";
     retryable = false;
   }
@@ -107,7 +119,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
           { signal: input.signal },
         );
       } catch (error) {
-        throw mapOpenAIError(error);
+        throw mapFocusedProviderError(error);
       }
 
       const completed = stream
@@ -129,7 +141,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
           };
         })
         .catch((error) => {
-          throw mapOpenAIError(error);
+          throw mapFocusedProviderError(error);
         });
 
       return {
@@ -142,7 +154,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
               if (safeDelta) yield safeDelta;
             }
           } catch (error) {
-            throw mapOpenAIError(error);
+            throw mapFocusedProviderError(error);
           }
         })(),
         completed,
