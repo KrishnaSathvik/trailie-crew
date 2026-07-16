@@ -31,6 +31,7 @@
     "test:provider:acceptance": "node scripts/provider-reliability-acceptance.mjs",
     "test:interruption:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/workflow-interruption-acceptance.mjs",
     "test:quota:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/quota-acceptance.mjs",
+    "test:infrastructure:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/infrastructure-acceptance.mjs",
     "test:load:chat": "psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -f scripts/sql/phase-5c-chat-load.sql",
     "test:share:smoke": "vitest run src/features/sharing",
     "test:pdf:smoke": "vitest run src/features/sharing/components/public-itinerary.test.tsx src/app/trips/[roomId]/plans/[version]/print/page.test.tsx",
