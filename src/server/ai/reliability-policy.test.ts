@@ -209,6 +209,25 @@ describe("workflow reliability policy", () => {
     expect(unavailable).toHaveBeenCalledTimes(2);
   });
 
+  it("preserves quota rejection without a provider retry", async () => {
+    const rejection = Object.assign(new Error("ai_disabled"), {
+      code: "ai_disabled",
+    });
+    const operation = vi
+      .fn<() => Promise<never>>()
+      .mockRejectedValue(rejection);
+
+    await expect(
+      runProviderOperation({
+        policy: parseWorkflowReliabilityPolicy({}),
+        stage: "focusedProvider",
+        operation,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      }),
+    ).rejects.toBe(rejection);
+    expect(operation).toHaveBeenCalledTimes(1);
+  });
+
   it("stops before retry when the total workflow deadline is exhausted", async () => {
     const unavailable = vi
       .fn<() => Promise<never>>()

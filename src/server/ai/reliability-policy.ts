@@ -22,6 +22,24 @@ const retryableFailureCodes = new Set<ProviderFailureCode>([
   "model_rate_limited",
 ]);
 
+const quotaRejectionCodes = new Set([
+  "ai_disabled",
+  "user_ai_limit_reached",
+  "room_ai_limit_reached",
+  "global_ai_limit_reached",
+  "provider_budget_unavailable",
+]);
+
+function isQuotaRejection(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    quotaRejectionCodes.has(error.code)
+  );
+}
+
 export class ProviderFailure extends Error {
   readonly retryable: boolean;
 
@@ -219,6 +237,7 @@ export async function runProviderOperation<T>(
         throw new ProviderFailure("recovery_required", {
           cause: input.signal.reason,
         });
+      if (isQuotaRejection(error)) throw error;
       const failure = timeoutSignal.aborted
         ? new ProviderFailure("model_timeout", { cause: error })
         : classifyProviderFailure(error);
