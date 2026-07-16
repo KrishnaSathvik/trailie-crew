@@ -271,11 +271,7 @@ test("controlled hosted Preview completes the Phase 5A product flow", async ({
   });
 
   await member.getByRole("tab", { name: "Day-by-day" }).click();
-  await member
-    .getByRole("heading", { name: /kayaking-focused outing/i })
-    .locator("xpath=ancestor::li")
-    .getByRole("button", { name: "Change this" })
-    .click();
+  await member.getByRole("button", { name: "Change this" }).first().click();
   await member
     .getByLabel("Request details")
     .fill(
