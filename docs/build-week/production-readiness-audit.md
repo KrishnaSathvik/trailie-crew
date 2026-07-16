@@ -206,3 +206,11 @@ Production remains `not_ready`. Blocking external/manual work: platform/WAF abus
 The dedicated protected custom Preview environment and non-production hosted Supabase project completed controlled acceptance. Cleared Preview blockers include hosted migrations/RLS/grants, scoped environment configuration, server/client env separation, structured redacted logs, real hosted OpenAI/Realtime workflow verification, explicit runtime ceilings, manual protected recovery, public header/cache behavior, and historical sharing/exports. Local final gates are 333 unit/component assertions, 391 pgTAP assertions, and 12 passing Playwright scenarios with the hosted-only spec skipped locally.
 
 The Preview verdict is **`ready_with_conditions`**: Vercel Authentication must remain enabled; CAPTCHA and unrestricted anonymous exposure are not accepted; Mapbox remains unavailable; OpenAI usage-alert ownership is not independently verified; recovery is manual; Supabase Free has no automatic backup/PITR; and the full manual accessibility matrix is incomplete. Production remains **`not_ready`** and was not deployed.
+
+## Phase 5C audit addendum — July 16, 2026
+
+The Phase 5C exact local gate passes: formatting, lint, typecheck, production build, 98 unit/component files with 436 tests, 13 pgTAP files with 472 assertions, 16 local Playwright scenarios, dependency audit, route/client-secret scans, database lint/advisors, interruption/quota harnesses, and a bounded local load exercise. The linked database has no error-level advisor finding; its documented warnings remain review items rather than silently cleared controls.
+
+The protected hosted regression did not pass. Real providers reached validated Version 1 and an approved revision candidate attempt, but deterministic scope validation rejected that candidate with `change_scope_exceeded`. No Version 2 was published. Real Turnstile, WAF/bot controls, external alert receipt, provider monetary budget evidence, isolated restore/RPO/RTO, and the manual accessibility matrix remain blocked.
+
+Updated independent verdicts: feature completeness `complete_for_phase_5c_implementation`; local product quality `pass`; protected Preview `not_accepted_for_release`; Production `not_ready`. See the [complete 23-gate Phase 5C report](./phase-5c-provider-infrastructure.md).

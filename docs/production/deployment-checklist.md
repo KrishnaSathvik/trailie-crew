@@ -12,6 +12,7 @@ Status: operational draft. Production deployment is not authorized by Phase 5B.
 - [ ] Privacy, terms, accuracy, retention, support, and abuse copy has professional review.
 - [ ] Accessibility acceptance has a dated manual screen-reader/zoom record.
 - [ ] Security release checklist and migration review are signed off.
+- [ ] The exact protected real-provider regression publishes the intended revision without a scope-validation rejection; the Phase 5C run failed `change_scope_exceeded`.
 
 ## Controlled rollout
 
@@ -23,3 +24,7 @@ Status: operational draft. Production deployment is not authorized by Phase 5B.
 6. Start limited access, observe error/rate/quota/recovery signals, and widen only after the incident owner accepts the evidence.
 
 Rollback favors application rollback only when schema compatibility is documented. Database incidents use a forward fix or an isolated restore; never run destructive reset commands against Production.
+
+## Phase 5C release hold
+
+Local implementation evidence passes, but every release checkbox above remains independent. Do not release from the July 16 Phase 5C hosted run: real Turnstile, WAF/bot controls, external alert delivery, provider monetary-budget evidence, isolated restore/RPO/RTO, and manual accessibility are absent, and the full hosted regression failed before Version 2 publication. Vercel Authentication must stay enabled on retained acceptance deployments.

@@ -6,6 +6,8 @@ Base commit: `8bafcdd` on `main`
 
 Scope: repository, final local schema, tests, production build, and credential-free local runtime. No hosted deployment was inspected.
 
+> Phase 5C addendum (July 16, 2026): provider timeout/retry, durable attempt recovery, exactly-once quota/application reconciliation, safe alerts, and bounded acceptance harnesses are implemented and locally passing. Protected Preview is not accepted because the full real-provider regression ended `change_scope_exceeded` before Version 2 publication. Production remains not ready. See [Phase 5C provider infrastructure](./phase-5c-provider-infrastructure.md).
+
 ## Executive assessment
 
 Trailie Crew is **complete for the current Build Week product scope**. The advertised path from anonymous Trip creation through collaboration, focused Trailie help, silent memory, approval-gated planning, validated itinerary publication, revisions, immutable history, sharing, ICS, and print/Save as PDF is connected through UI, server code, PostgreSQL, authorization, failure states, and automated tests.

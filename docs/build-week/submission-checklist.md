@@ -89,6 +89,18 @@
 - [ ] Professional legal/privacy review and manual assistive-technology acceptance
 - [ ] Production deployment (explicitly forbidden in Phase 5B)
 
+## Phase 5C provider reliability
+
+- [x] Central bounded timeout/retry/deadline policy and failure classification
+- [x] Durable provider attempts, leases, validated-result replay, and exactly-once application
+- [x] Provider, interruption, quota, bounded-load, and protected-infrastructure harnesses
+- [x] Full local static, unit, database, browser, security, dependency, and bounded-load gates
+- [x] One-run hosted automation bypass isolation and verified revocation
+- [ ] Passing full protected real-provider regression (`change_scope_exceeded` blocked Version 2)
+- [ ] Real Turnstile, WAF/bot/rate-limit, external alert, and provider-budget acceptance
+- [ ] Isolated hosted restore with measured RPO/RTO and complete manual accessibility acceptance
+- [ ] Production deployment (not authorized; remains undeployed)
+
 ## Phase 4B sharing and exports
 
 - [x] Host-only create, rotate, expire, and idempotent revoke

@@ -42,3 +42,9 @@ Commit `e997af4` is pushed to `origin/main`. Its migration is applied to the lin
 - Limited-public load/abuse exercise and real-provider reliability acceptance; the focused protected-Preview lifecycle/controlled-CAPTCHA drill passes, but real Turnstile on a final public domain remains unverified.
 
 Verdict remains **not Production ready** until these external and manual requirements are cleared. The implementation materially reduces the blocker set but does not justify unrestricted public access.
+
+## Phase 5C reliability addendum — July 16, 2026
+
+Phase 5C closes the code-level durable provider/retry/recovery, quota replay, bounded-load, and safe-alert gaps described above. The exact local release gates pass. External alert delivery, OpenAI monetary-budget evidence, real Turnstile, Vercel WAF/bot controls, isolated backup restore, and manual accessibility remain blocked.
+
+The protected real-provider regression reached a feasible two-person-approved removal revision, but candidate validation rejected the generated result as `change_scope_exceeded`; no Version 2 published. This preserves the fail-closed contract but means protected Preview is not accepted for release. See [Phase 5C provider infrastructure](./phase-5c-provider-infrastructure.md).

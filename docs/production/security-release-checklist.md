@@ -13,3 +13,6 @@
 - [ ] No service-role/Turnstile/OpenAI/Cron secret exists in browser bundles or route output.
 - [ ] Legal-page content is static React content without unsafe HTML injection.
 - [ ] Dependency audit, secret scan, route manifest, Supabase security/performance advisors, and hosted protected-Preview acceptance are attached to the exact commit.
+- [x] Durable provider attempt identity, lease ownership, provider-response uniqueness, quota reconciliation, interruption replay, and fail-closed scope validation pass locally.
+- [ ] A protected real-provider run completes through revision publication; the Phase 5C candidate was rejected as `change_scope_exceeded` and no Version 2 published.
+- [ ] Temporary automation bypass count is zero after acceptance (verified for Phase 5C; reverify for the release run).
