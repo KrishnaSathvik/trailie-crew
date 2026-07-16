@@ -1,4 +1,5 @@
 import { planningSummarySchema, type PlanningSummary } from "@trailie/schemas";
+import { createFakeProviderId } from "@/server/ai/fake-provider-id";
 import type { ProviderUsage } from "@/server/ai/provider";
 
 export type PlanningErrorCode =
@@ -115,8 +116,11 @@ export function createFakePlanningSummaryProvider(): PlanningSummaryProvider {
       });
       return {
         summary,
-        responseId: "fake_planning_response",
-        requestId: "fake_planning_request",
+        responseId: createFakeProviderId(
+          "planning_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId("planning_request", input.operationKey),
         usage: {
           inputTokens: 120,
           outputTokens: 80,

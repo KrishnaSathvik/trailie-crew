@@ -4,6 +4,7 @@ import {
   type Itinerary,
   type PlanChangeAnalysis,
 } from "@trailie/schemas";
+import { createFakeProviderId } from "@/server/ai/fake-provider-id";
 import type { ProviderUsage } from "@/server/ai/provider";
 
 export type RevisionProviderErrorCode =
@@ -110,8 +111,14 @@ export function createFakeRevisionProvider(): RevisionProvider {
           blockers: [],
           approvalSummary: "Configured crew approval is required.",
         }),
-        responseId: "fake_change_analysis",
-        requestId: "fake_change_request",
+        responseId: createFakeProviderId(
+          "revision_analysis_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId(
+          "revision_analysis_request",
+          input.operationKey,
+        ),
         usage,
       };
     },
@@ -127,8 +134,14 @@ export function createFakeRevisionProvider(): RevisionProvider {
       }
       return {
         itinerary: itinerarySchema.parse(itinerary),
-        responseId: "fake_revision_candidate",
-        requestId: "fake_revision_request",
+        responseId: createFakeProviderId(
+          "revision_candidate_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId(
+          "revision_candidate_request",
+          input.operationKey,
+        ),
         usage,
       };
     },
@@ -144,8 +157,14 @@ export function createFakeRevisionProvider(): RevisionProvider {
       }
       return {
         itinerary: itinerarySchema.parse(itinerary),
-        responseId: "fake_revision_repair",
-        requestId: "fake_revision_repair_request",
+        responseId: createFakeProviderId(
+          "revision_repair_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId(
+          "revision_repair_request",
+          input.operationKey,
+        ),
         usage,
       };
     },

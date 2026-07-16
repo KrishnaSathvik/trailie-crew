@@ -13,6 +13,13 @@ type Rpc = (
   parameters: Record<string, unknown>,
 ) => Promise<unknown>;
 
+type SupabaseRpcClient = {
+  rpc(
+    functionName: string,
+    args: Record<string, unknown>,
+  ): Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
 const claimSchema = z
   .object({
     attemptId: z.uuid(),
@@ -41,17 +48,18 @@ const stagedSchema = z
   })
   .passthrough();
 
-function productionRpc(): Rpc {
-  const admin = createAdminSupabaseClient();
+export function createSupabaseRpc(client: SupabaseRpcClient): Rpc {
   return async (name, parameters) => {
-    const invoke = admin.rpc as unknown as (
-      functionName: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: { message: string } | null }>;
-    const { data, error } = await invoke(name, parameters);
+    const { data, error } = await client.rpc(name, parameters);
     if (error) throw new Error(error.message);
     return data;
   };
+}
+
+function productionRpc(): Rpc {
+  return createSupabaseRpc(
+    createAdminSupabaseClient() as unknown as SupabaseRpcClient,
+  );
 }
 
 export function createProviderAttemptRepository<T>(

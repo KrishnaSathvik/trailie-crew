@@ -1,11 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createProviderAttemptRepository } from "./provider-attempt-repository";
+import {
+  createProviderAttemptRepository,
+  createSupabaseRpc,
+} from "./provider-attempt-repository";
 
 const attemptId = "5c000000-0000-4000-8000-000000000001";
 const leaseOwner = "5c000000-0000-4000-8000-000000000002";
 
 describe("provider attempt repository", () => {
+  it("preserves the Supabase client receiver when invoking RPCs", async () => {
+    const client = {
+      rest: { marker: "bound" },
+      async rpc(this: { rest?: { marker: string } }) {
+        expect(this.rest?.marker).toBe("bound");
+        return { data: { status: "ok" }, error: null };
+      },
+    };
+
+    await expect(createSupabaseRpc(client)("test_rpc", {})).resolves.toEqual({
+      status: "ok",
+    });
+  });
+
   it("maps a bounded durable claim without content fields", async () => {
     const rpc = vi.fn().mockResolvedValue({
       attemptId,

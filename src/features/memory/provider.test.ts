@@ -26,6 +26,18 @@ function input(body: string) {
 }
 
 describe("deterministic memory provider", () => {
+  it("returns provider identifiers unique to each operation", async () => {
+    const provider = createFakeMemoryExtractionProvider();
+    const first = await provider.extract(input("I prefer hiking"));
+    const second = await provider.extract({
+      ...input("I prefer hiking"),
+      operationKey: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950ff",
+    });
+
+    expect(first.responseId).not.toBe(second.responseId);
+    expect(first.requestId).not.toBe(second.requestId);
+  });
+
   it.each([
     ["no durable facts", "lol", 0, undefined],
     ["participant preference", "I prefer hiking", 1, "activity_preference"],

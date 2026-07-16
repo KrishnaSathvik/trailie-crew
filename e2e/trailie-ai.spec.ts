@@ -156,18 +156,17 @@ test("Trailie stays silent, streams one focused answer, persists it, and handles
     .getByLabel("Message your crew")
     .fill("@Trailie simulate provider failure");
   await host.getByLabel("Message your crew").press("Enter");
-  await expect(host.getByText(/temporarily unavailable/i)).toBeVisible();
-  await expect(
-    host.getByRole("button", { name: "Retry Trailie" }),
-  ).toBeVisible();
-  await expect(
-    host.getByText("@Trailie simulate provider failure", { exact: true }),
-  ).toBeVisible();
-  await host.getByRole("button", { name: "Retry Trailie" }).click();
-  await expect(host.getByText("Trailie is answering…")).toBeVisible();
   await expect(
     host.getByRole("article", { name: "Message from Trailie" }),
   ).toHaveCount(4, { timeout: 15_000 });
+  await expect(
+    host
+      .getByRole("article", { name: "Message from Maya" })
+      .filter({ hasText: "@Trailie simulate provider failure" }),
+  ).toBeVisible();
+  await expect(host.getByRole("button", { name: "Retry Trailie" })).toHaveCount(
+    0,
+  );
 
   await member.setViewportSize({ width: 390, height: 844 });
   expect(

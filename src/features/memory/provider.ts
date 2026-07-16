@@ -1,6 +1,7 @@
 import { memoryPatchSchema, type MemoryPatch } from "@trailie/schemas";
 
 import type { MemoryProviderContext } from "./context";
+import { createFakeProviderId } from "@/server/ai/fake-provider-id";
 import type { ProviderUsage } from "@/server/ai/provider";
 
 export type MemoryErrorCode =
@@ -57,11 +58,11 @@ const usage = {
   totalTokens: 42,
 };
 
-function output(patch: unknown): MemoryExtractionOutput {
+function output(patch: unknown, operationKey: string): MemoryExtractionOutput {
   return {
     patch: memoryPatchSchema.parse(patch),
-    responseId: "fake_memory_response",
-    requestId: "fake_memory_request",
+    responseId: createFakeProviderId("memory_response", operationKey),
+    requestId: createFakeProviderId("memory_request", operationKey),
     usage,
   };
 }
@@ -78,7 +79,7 @@ export function createFakeMemoryExtractionProvider(): MemoryExtractionProvider {
         /ignore your instructions/i.test(body) ||
         /^(lol|okay)$/i.test(body.trim())
       )
-        return output({ facts: [], supersessions: [] });
+        return output({ facts: [], supersessions: [] }, input.operationKey);
 
       if (
         /prefer hiking/i.test(body) &&
@@ -93,23 +94,26 @@ export function createFakeMemoryExtractionProvider(): MemoryExtractionProvider {
           sourceMessageId: input.sourceMessage.id,
           supersedesFactId: null,
         };
-        return output({
-          facts: [
-            {
-              ...base,
-              factType: "activity_preference",
-              canonicalKey: "participant:activity_preference",
-              value: { text: "hiking" },
-            },
-            {
-              ...base,
-              factType: "date_constraint",
-              canonicalKey: "participant:date_constraint",
-              value: { text: "cannot travel before Friday" },
-            },
-          ],
-          supersessions: [],
-        });
+        return output(
+          {
+            facts: [
+              {
+                ...base,
+                factType: "activity_preference",
+                canonicalKey: "participant:activity_preference",
+                value: { text: "hiking" },
+              },
+              {
+                ...base,
+                factType: "date_constraint",
+                canonicalKey: "participant:date_constraint",
+                value: { text: "cannot travel before Friday" },
+              },
+            ],
+            supersessions: [],
+          },
+          input.operationKey,
+        );
       }
 
       let factType:
@@ -153,24 +157,29 @@ export function createFakeMemoryExtractionProvider(): MemoryExtractionProvider {
           fact.factType === factType &&
           fact.subjectParticipantId === input.sourceParticipant.id,
       );
-      return output({
-        facts: [
-          {
-            factType,
-            subjectType,
-            subjectParticipantId:
-              subjectType === "participant" ? input.sourceParticipant.id : null,
-            canonicalKey: `${subjectType}:${factType}`,
-            value,
-            status,
-            confidence: evidenceStrength === "explicit" ? 0.95 : 0.65,
-            evidenceStrength,
-            sourceMessageId: input.sourceMessage.id,
-            supersedesFactId: prior?.id ?? null,
-          },
-        ],
-        supersessions: [],
-      });
+      return output(
+        {
+          facts: [
+            {
+              factType,
+              subjectType,
+              subjectParticipantId:
+                subjectType === "participant"
+                  ? input.sourceParticipant.id
+                  : null,
+              canonicalKey: `${subjectType}:${factType}`,
+              value,
+              status,
+              confidence: evidenceStrength === "explicit" ? 0.95 : 0.65,
+              evidenceStrength,
+              sourceMessageId: input.sourceMessage.id,
+              supersedesFactId: prior?.id ?? null,
+            },
+          ],
+          supersessions: [],
+        },
+        input.operationKey,
+      );
     },
   };
 }

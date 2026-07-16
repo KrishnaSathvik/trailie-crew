@@ -1,4 +1,5 @@
 import { itinerarySchema, type Itinerary } from "@trailie/schemas";
+import { createFakeProviderId } from "@/server/ai/fake-provider-id";
 import type { ProviderUsage } from "@/server/ai/provider";
 
 export type ItineraryErrorCode =
@@ -191,10 +192,17 @@ export function createFakeItineraryProvider(configuration?: {
   const output = (
     itinerary: Itinerary,
     suffix: string,
+    operationKey: string,
   ): ItineraryProviderOutput => ({
     itinerary,
-    responseId: `fake_itinerary_${suffix}`,
-    requestId: `fake_request_${suffix}`,
+    responseId: createFakeProviderId(
+      `itinerary_${suffix}_response`,
+      operationKey,
+    ),
+    requestId: createFakeProviderId(
+      `itinerary_${suffix}_request`,
+      operationKey,
+    ),
     usage: {
       inputTokens: 800,
       outputTokens: 1200,
@@ -204,18 +212,23 @@ export function createFakeItineraryProvider(configuration?: {
     },
   });
   return {
-    async generate() {
+    async generate(input) {
       if (scenario === "provider_failure")
         throw new ItineraryProviderError("model_unavailable", true);
       return output(
         fixture("16:00", scenario === "unrepairable"),
         "generation",
+        input.operationKey,
       );
     },
-    async repair() {
+    async repair(input) {
       if (scenario === "provider_failure")
         throw new ItineraryProviderError("repair_failed", false);
-      return output(fixture("17:30", scenario === "unrepairable"), "repair");
+      return output(
+        fixture("17:30", scenario === "unrepairable"),
+        "repair",
+        input.operationKey,
+      );
     },
   };
 }

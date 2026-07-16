@@ -134,7 +134,7 @@ test("crew reviews, approves, stales, and regenerates an immutable planning summ
   await Promise.all([hostContext.close(), memberContext.close()]);
 });
 
-test("summary generation failure is safe and retryable without affecting chat", async ({
+test("summary generation failure stops safely at the retry cap without affecting chat", async ({
   browser,
 }) => {
   const { hostContext, host, memberContext } = await createCrew(browser);
@@ -151,12 +151,13 @@ test("summary generation failure is safe and retryable without affecting chat", 
     }),
   ).toBeVisible();
   await openPlan(host);
-  await host.getByRole("button", { name: "Retry summary" }).click();
   await expect(
-    host.getByText("Trailie is organizing what the crew has decided."),
+    host.getByText(
+      "The summary reached its safe retry limit. Chat and prior plans remain available.",
+    ),
   ).toBeVisible();
-  await expect(
-    host.getByRole("heading", { name: "The summary could not be prepared." }),
-  ).toBeVisible({ timeout: 20_000 });
+  await expect(host.getByRole("button", { name: "Retry summary" })).toHaveCount(
+    0,
+  );
   await Promise.all([hostContext.close(), memberContext.close()]);
 });

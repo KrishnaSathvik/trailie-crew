@@ -3,6 +3,8 @@ import {
   type TrailieFocusedAnswer,
 } from "@trailie/schemas";
 
+import { createFakeProviderId } from "@/server/ai/fake-provider-id";
+
 export type SafeAiErrorCode =
   | "openai_authentication_failed"
   | "openai_rate_limited"
@@ -113,8 +115,11 @@ export function createFakeFocusedAnswerProvider(
       );
       const result = {
         answer,
-        responseId: "fake_response",
-        requestId: "fake_request",
+        responseId: createFakeProviderId(
+          "focused_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId("focused_request", input.operationKey),
         usage: {
           inputTokens: 20,
           outputTokens: 30,
