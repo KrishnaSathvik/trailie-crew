@@ -10,6 +10,8 @@
 
 Review Vercel structured logs for alert-classified events, recovery remaining/failed counts, cleanup failures, auth refresh failures, rate-limit events, share verification failures, and deletion events. Review Supabase Auth/database/API usage and provider usage grouped by model/workflow through the service-only `get_ai_usage_report` RPC. Never paste prompts, room content, tokens, or user identifiers into an incident record.
 
+Review OpenAI usage limits/spend alerts and Supabase backup availability from their owner dashboards during the staffed operations review. Application quota evidence is available through `pnpm test:quota:acceptance`; it does not substitute for provider billing controls. Escalate immediately if the latest expected backup is absent or PITR/retention differs from the approved recovery target.
+
 ## Emergency AI shutdown
 
 1. Set `AI_GENERATION_ENABLED=false` in the affected server environment and redeploy.

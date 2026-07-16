@@ -1,15 +1,15 @@
 # Backup and restore
 
-Status: Production blocker until verified on the selected hosted Supabase plan.
+Status on July 16, 2026: Production blocker; hosted capability inspected but no recovery point or restore drill is available.
 
 Supabase capabilities and retention depend on the hosted plan and enabled add-ons. Local `db dump` or `db reset` evidence is not an automatic backup and must not be represented as one. The intended Production project must enable and verify the plan’s automatic backup or PITR capability before launch.
 
 ## Required decision record
 
-- Selected hosted plan and region: unselected.
-- Automatic backup/PITR mode and retention: unverified.
+- Selected source and region: healthy `trailie-crew` project in `us-east-1`; plan name was not exposed by the CLI inventory.
+- Automatic backup/PITR mode and retention: physical/WAL backup infrastructure reports enabled, no physical backup entries are currently listed, and PITR reports disabled.
 - Target RPO and RTO: owner must approve after plan selection and a timed drill.
-- Restore isolation project and drill date: not yet completed.
+- Restore isolation project and drill date: no target exists; restore was not initiated. See `restore-drill.md`.
 
 ## Migration and restore procedure
 

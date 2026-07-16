@@ -12,3 +12,7 @@ Status: owner and paging channel must be assigned before Production.
 Record timestamps, safe error codes, correlation IDs, counts, decisions, and responders. Do not record messages, prompts, memory, raw model responses, share/invite tokens, auth headers, cookies, keys, IP addresses, or private traveler data.
 
 Contain first; then determine scope, rotate/revoke, restore service conservatively, verify isolation, and write a no-secret retrospective. Use the Support page for ordinary/abuse reports. A private security-reporting channel and on-call owner remain Production requirements.
+
+For unexpected provider spend, disable application generation first, confirm quota rejection causes zero provider calls, and rotate the OpenAI project key if compromise is possible. Account-level budget and spend-alert configuration remains unverified; see `cost-controls.md`.
+
+For database loss or corruption, do not restore over the only active project without an approved outage plan. Prefer restore-to-new-project, disable outbound operations on the clone, validate security/application behavior, and measure RPO/RTO before any cutover. The July 16 inventory found no available backup entry or isolated restore target; see `restore-drill.md`.
