@@ -278,8 +278,11 @@ test("controlled hosted Preview completes the Phase 5A product flow", async ({
     .getByRole("button", { name: "Change this" })
     .click();
   await member
+    .getByLabel("Change type")
+    .selectOption({ label: "Remove an item" });
+  await member
     .getByLabel("Request details")
-    .fill("Move this item 30 minutes later without changing another day.");
+    .fill("Remove this proposed kayaking item without changing another day.");
   await timed(timings, "revision_analysis_ms", async () => {
     await member.getByRole("button", { name: "Submit change request" }).click();
     await expect(
