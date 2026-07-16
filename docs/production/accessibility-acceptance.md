@@ -14,3 +14,5 @@ Manual acceptance matrix (must be dated and signed before Production):
 - [ ] Public share, print, privacy, terms, accuracy, and support pages.
 
 Remaining gap: automated checks do not replace assistive-technology usability. The complete manual record and any WCAG exceptions are not yet professionally accepted, so Production remains blocked.
+
+The dated Phase 5C automated result and unperformed manual matrix are recorded in `manual-accessibility-report.md`.
