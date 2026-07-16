@@ -271,12 +271,15 @@ test("controlled hosted Preview completes the Phase 5A product flow", async ({
   });
 
   await member.getByRole("tab", { name: "Day-by-day" }).click();
-  await member.getByRole("button", { name: "Change this" }).first().click();
+  await member
+    .getByRole("heading", { level: 3, name: /kayak/i })
+    .first()
+    .locator("xpath=ancestor::li")
+    .getByRole("button", { name: "Change this" })
+    .click();
   await member
     .getByLabel("Request details")
-    .fill(
-      "Shorten this activity by 30 minutes so it ends at noon, without changing another day.",
-    );
+    .fill("Move this item 30 minutes later without changing another day.");
   await timed(timings, "revision_analysis_ms", async () => {
     await member.getByRole("button", { name: "Submit change request" }).click();
     await expect(
