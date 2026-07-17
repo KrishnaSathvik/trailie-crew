@@ -3,6 +3,11 @@ export const workflowInterruptionPoints = [
   "after_provider_persistence",
   "before_candidate_ready",
   "concurrent_recovery",
+  "revision_patch_persisted_not_applied",
+  "revision_patch_applied_not_validated",
+  "revision_candidate_persisted_without_scope_report",
+  "revision_scope_repair_persisted_not_finalized",
+  "revision_final_pass_not_published",
 ] as const;
 
 export type WorkflowInterruptionPoint =
@@ -47,16 +52,18 @@ export function buildWorkflowInterruptionReport(
   )
     throw new Error("interruption_matrix_incomplete");
 
-  const exactlyOnce = evidence.every(
-    (item) =>
+  const exactlyOnce = evidence.every((item) => {
+    const publicationRequired =
+      item.point === "before_candidate_ready" ||
+      item.point === "revision_final_pass_not_published";
+    return (
       item.recovered &&
       item.providerCalls === 1 &&
       item.applications === 1 &&
-      item.publications >= 0 &&
-      item.publications <= 1 &&
-      item.recoveryInvocations >=
-        (item.point === "concurrent_recovery" ? 2 : 1),
-  );
+      item.publications === (publicationRequired ? 1 : 0) &&
+      item.recoveryInvocations >= (item.point === "concurrent_recovery" ? 2 : 1)
+    );
+  });
   if (!exactlyOnce) throw new Error("interruption_exactly_once_failed");
 
   return {

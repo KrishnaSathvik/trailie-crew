@@ -87,6 +87,10 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
   await expect(
     member.getByRole("heading", { name: "Request a Change" }),
   ).toBeVisible();
+  if (process.env.TRAILIE_FAKE_REVISION_SCENARIO)
+    await member
+      .getByLabel("Change type")
+      .selectOption({ label: "Replace an item" });
   await member
     .getByLabel("Request details")
     .fill("Move Glacier Point sunset later without changing another day");
@@ -106,10 +110,39 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     member.getByRole("dialog").getByText("Maya", { exact: true }).locator(".."),
   ).toContainText("pending");
   await host.getByRole("button", { name: "Approve analysis" }).click();
+  if (process.env.TRAILIE_FAKE_REVISION_SCENARIO === "scope_drift_always") {
+    await expect(
+      member.getByText(
+        "Trailie could not make this change without altering more of the trip than the crew approved. The current itinerary was not changed.",
+      ),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      member.getByText("Published itinerary · Version 1"),
+    ).toBeVisible();
+    await expect(
+      member.getByRole("heading", { name: "Ready to publish Version 2" }),
+    ).toHaveCount(0);
+    await Promise.all([hostContext.close(), memberContext.close()]);
+    return;
+  }
   await expect(
     member.getByRole("heading", { name: "Ready to publish Version 2" }),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(member.getByText(/rescheduled/i).first()).toBeVisible();
+  if (process.env.TRAILIE_FAKE_REVISION_SCENARIO === "scope_drift_once")
+    await expect(
+      member.getByText(
+        "Trailie removed unrelated changes and kept the revision within the approved scope.",
+      ),
+    ).toBeVisible();
+  await expect(
+    member
+      .getByText(
+        process.env.TRAILIE_FAKE_REVISION_SCENARIO
+          ? /replaced/i
+          : /rescheduled/i,
+      )
+      .first(),
+  ).toBeVisible();
   await expect(
     host.getByRole("heading", { name: "Ready to publish Version 2" }),
   ).toBeVisible({ timeout: 15_000 });

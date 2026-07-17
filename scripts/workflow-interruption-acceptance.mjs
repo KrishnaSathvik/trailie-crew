@@ -40,7 +40,8 @@ const report = {
       providerCalls: 1,
       applications: 1,
       publications:
-        point === "before_candidate_ready" || point === "concurrent_recovery"
+        point === "before_candidate_ready" ||
+        point === "revision_final_pass_not_published"
           ? 1
           : 0,
       recovered: true,

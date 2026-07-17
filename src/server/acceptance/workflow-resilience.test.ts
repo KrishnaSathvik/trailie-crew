@@ -14,6 +14,11 @@ describe("workflow resilience acceptance evidence", () => {
       "after_provider_persistence",
       "before_candidate_ready",
       "concurrent_recovery",
+      "revision_patch_persisted_not_applied",
+      "revision_patch_applied_not_validated",
+      "revision_candidate_persisted_without_scope_report",
+      "revision_scope_repair_persisted_not_finalized",
+      "revision_final_pass_not_published",
     ]);
     const report = buildWorkflowInterruptionReport(
       workflowInterruptionPoints.map((point) => ({
@@ -21,7 +26,11 @@ describe("workflow resilience acceptance evidence", () => {
         recoveryInvocations: point === "concurrent_recovery" ? 2 : 1,
         providerCalls: 1,
         applications: 1,
-        publications: point === "before_candidate_ready" ? 1 : 0,
+        publications:
+          point === "before_candidate_ready" ||
+          point === "revision_final_pass_not_published"
+            ? 1
+            : 0,
         recovered: true,
         prompt: "must not be copied",
       })),
@@ -29,7 +38,7 @@ describe("workflow resilience acceptance evidence", () => {
     expect(report).toMatchObject({
       schemaVersion: "1",
       evidenceClass: "deterministic_local",
-      completedPointCount: 4,
+      completedPointCount: 9,
       exactlyOnce: true,
     });
     expect(JSON.stringify(report)).not.toMatch(
@@ -58,6 +67,18 @@ describe("workflow resilience acceptance evidence", () => {
           providerCalls: point === "concurrent_recovery" ? 2 : 1,
           applications: 1,
           publications: 0,
+          recovered: true,
+        })),
+      ),
+    ).toThrow("interruption_exactly_once_failed");
+    expect(() =>
+      buildWorkflowInterruptionReport(
+        workflowInterruptionPoints.map((point) => ({
+          point,
+          recoveryInvocations: point === "concurrent_recovery" ? 2 : 1,
+          providerCalls: 1,
+          applications: 1,
+          publications: point === "before_candidate_ready" ? 1 : 0,
           recovered: true,
         })),
       ),
