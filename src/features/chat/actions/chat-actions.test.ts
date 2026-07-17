@@ -13,6 +13,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: vi.fn(),
 }));
 vi.mock("@/features/memory/scheduler", () => ({
+  enqueueMemoryExtraction: vi.fn(),
   scheduleMemoryExtraction: vi.fn(),
 }));
 

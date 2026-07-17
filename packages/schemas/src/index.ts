@@ -904,6 +904,7 @@ export const planChangeTypeSchema = z.enum([
   "reschedule_item",
   "shorten_item",
   "extend_item",
+  "update_note",
   "change_route",
   "change_lodging",
   "change_food",
@@ -963,6 +964,8 @@ export const planChangeEventTypeSchema = z.enum([
   "candidate_generation_started",
   "candidate_validation_started",
   "repair_started",
+  "scope_repair_started",
+  "scope_repair_succeeded",
   "candidate_ready",
   "confirmation_changed",
   "published",
@@ -1077,6 +1080,173 @@ export const planChangeAnalysisSchema = z
     }
   });
 
+export const revisionAllowedOperationSchema = z.enum([
+  "add",
+  "remove",
+  "replace",
+  "move",
+  "reschedule",
+  "update",
+  "route_adjustment",
+  "cost_recalculation",
+  "evidence_refresh",
+]);
+
+export const revisionEditableFieldSchema = z.enum([
+  "type",
+  "startTime",
+  "endTime",
+  "title",
+  "description",
+  "location",
+  "reservation",
+  "cost",
+  "evidenceRefs",
+  "notes",
+  "dayId",
+  "travelSegments",
+  "estimatedDailyCost",
+]);
+
+export const revisionDownstreamEffectSchema = z
+  .object({
+    effect: z.enum([
+      "route_cleanup",
+      "same_day_timing_adjustment",
+      "day_cost_recalculation",
+      "evidence_refresh",
+    ]),
+    dayId: itineraryIdSchema,
+    itemIds: z.array(itineraryIdSchema).max(40),
+    allowedFields: z.array(revisionEditableFieldSchema).max(20),
+  })
+  .strict();
+
+export const revisionProtectedTopLevelFieldSchema = z.enum([
+  "title",
+  "destinationSummary",
+  "timezone",
+  "startDate",
+  "endDate",
+  "travelers",
+  "arrivals",
+  "departures",
+  "lodging",
+  "restaurants",
+  "unresolvedItems",
+  "assumptions",
+  "validationMetadata",
+]);
+
+export const revisionAllowedChangeManifestV1Schema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    changeRequestId: z.uuid(),
+    basePlanId: z.uuid(),
+    baseVersion: z.number().int().positive(),
+    basePlanHash: z.string().regex(/^[a-f0-9]{64}$/),
+    analysisVersion: z.number().int().positive(),
+    requestType: planChangeTypeSchema,
+    targetItemIds: z.array(itineraryIdSchema).max(20),
+    affectedDayIds: z.array(itineraryIdSchema).max(60),
+    allowedOperations: z.array(revisionAllowedOperationSchema).max(20),
+    allowedFieldsByItem: z.record(
+      itineraryIdSchema,
+      z.array(revisionEditableFieldSchema).max(20),
+    ),
+    allowedDownstreamEffects: z.array(revisionDownstreamEffectSchema).max(100),
+    protectedItemIds: z.array(itineraryIdSchema).max(2400),
+    protectedDayIds: z.array(itineraryIdSchema).max(60),
+    protectedTopLevelFields: z
+      .array(revisionProtectedTopLevelFieldSchema)
+      .max(20),
+    editableTopLevelFields: z
+      .array(revisionProtectedTopLevelFieldSchema)
+      .max(10),
+    maximumAffectedTopLevelEntries: z.number().int().min(0).max(100),
+    requiredPreservations: z
+      .array(
+        z.enum([
+          "stable_ids",
+          "item_order",
+          "confirmed_decisions",
+          "hard_constraints",
+          "rejected_options_absent",
+        ]),
+      )
+      .max(20),
+    forbiddenChanges: z
+      .array(
+        z.enum([
+          "destination",
+          "date_range",
+          "request_type",
+          "confirmed_decisions",
+          "hard_constraints",
+          "rejected_options",
+          "unapproved_lodging",
+          "unapproved_traveler_logistics",
+          "whole_plan_rewrite",
+        ]),
+      )
+      .max(20),
+    evidenceRefreshTargets: z.array(itineraryIdSchema).max(100),
+    maximumAffectedItems: z.number().int().min(1).max(300),
+    maximumAffectedDays: z.number().int().min(1).max(60),
+  })
+  .strict();
+
+const revisionPatchValueSchema = z.union([
+  z.string().max(4000),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string().max(1000)).max(100),
+]);
+
+export const revisionPatchOperationSchema = z
+  .object({
+    operation: revisionAllowedOperationSchema,
+    targetId: itineraryIdSchema,
+    dayId: itineraryIdSchema,
+    fieldChanges: z.partialRecord(
+      revisionEditableFieldSchema,
+      revisionPatchValueSchema,
+    ),
+    reason: safeRevisionText(500),
+    downstreamEffects: z
+      .array(revisionDownstreamEffectSchema.shape.effect)
+      .max(20),
+  })
+  .strict();
+
+export const revisionPatchV1Schema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    status: z.enum(["ready", "blocked"]),
+    blockers: z.array(safeRevisionText(500)).max(20),
+    baseVersion: z.number().int().positive(),
+    manifestHash: z.string().regex(/^[a-f0-9]{64}$/),
+    operations: z.array(revisionPatchOperationSchema).max(300),
+    preservedItemIds: z.array(itineraryIdSchema).max(2400),
+    evidenceRefreshTargets: z.array(itineraryIdSchema).max(100),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status === "ready" && value.operations.length === 0)
+      context.addIssue({
+        code: "custom",
+        path: ["operations"],
+        message: "A ready patch requires at least one operation.",
+      });
+    if (value.status === "blocked" && value.blockers.length === 0)
+      context.addIssue({
+        code: "custom",
+        path: ["blockers"],
+        message: "A blocked patch requires a safe blocker.",
+      });
+  });
+
 export const planChangeApprovalStateSchema = z
   .object({
     requiredParticipants: z.array(planningParticipantSchema).max(50),
@@ -1161,6 +1331,8 @@ export const planChangeRequestSchema = z
     currentAnalysisVersion: z.number().int().nonnegative(),
     approvedAnalysisVersion: z.number().int().positive().nullable(),
     candidateTripPlanId: z.uuid().nullable(),
+    scopeRepairCount: z.number().int().min(0).max(1),
+    conflictRepairCount: z.number().int().min(0).max(1),
     isStale: z.boolean(),
     materiality: changeMaterialitySchema.nullable(),
     feasibility: changeFeasibilitySchema.nullable(),
@@ -1479,6 +1651,17 @@ export type ChangeReservationImpact = z.infer<
   typeof changeReservationImpactSchema
 >;
 export type PlanChangeAnalysis = z.infer<typeof planChangeAnalysisSchema>;
+export type RevisionAllowedOperation = z.infer<
+  typeof revisionAllowedOperationSchema
+>;
+export type RevisionEditableField = z.infer<typeof revisionEditableFieldSchema>;
+export type RevisionAllowedChangeManifestV1 = z.infer<
+  typeof revisionAllowedChangeManifestV1Schema
+>;
+export type RevisionPatchOperation = z.infer<
+  typeof revisionPatchOperationSchema
+>;
+export type RevisionPatchV1 = z.infer<typeof revisionPatchV1Schema>;
 export type PlanChangeApprovalState = z.infer<
   typeof planChangeApprovalStateSchema
 >;

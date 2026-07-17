@@ -4,6 +4,7 @@ import {
   type ItineraryItem,
   type PlanVersionDiff,
 } from "@trailie/schemas";
+import { revisionValuesEqual } from "./semantic-comparison";
 
 type ItemLocation = { item: ItineraryItem; dayId: string; date: string };
 function items(plan: Itinerary) {
@@ -49,6 +50,10 @@ export function buildPlanVersionDiff(
     baseVersion: number;
     candidateVersion: number;
     reasons: Record<string, string>;
+    expectedOperations?: Record<
+      string,
+      PlanVersionDiff["items"][number]["operation"]
+    >;
   },
 ): PlanVersionDiff {
   const before = items(base);
@@ -89,34 +94,37 @@ export function buildPlanVersionDiff(
     if (!left || !right) continue;
     if (
       left.dayId === right.dayId &&
-      JSON.stringify(materialItem(left.item)) ===
-        JSON.stringify(materialItem(right.item))
+      revisionValuesEqual(materialItem(left.item), materialItem(right.item))
     )
       continue;
     const moved = left.dayId !== right.dayId;
     const timesChanged =
       left.item.startTime !== right.item.startTime ||
       left.item.endTime !== right.item.endTime;
-    const onlyTimes =
-      JSON.stringify({
+    const onlyTimes = revisionValuesEqual(
+      {
         ...materialItem(left.item),
         startTime: null,
         endTime: null,
-      }) ===
-      JSON.stringify({
+      },
+      {
         ...materialItem(right.item),
         startTime: null,
         endTime: null,
-      });
+      },
+    );
+    const expectedOperation = options.expectedOperations?.[id];
     changes.push({
       itemId: id,
       dayId: right.dayId,
       date: right.date,
       operation: moved
         ? "moved"
-        : timesChanged && onlyTimes
-          ? "rescheduled"
-          : "updated",
+        : expectedOperation === "replaced" && !onlyTimes
+          ? "replaced"
+          : timesChanged && onlyTimes
+            ? "rescheduled"
+            : "updated",
       beforeSummary: summary(left.item),
       afterSummary: summary(right.item),
       reason: options.reasons[id] ?? "Required by the approved change",
@@ -129,10 +137,9 @@ export function buildPlanVersionDiff(
   const changedDays = [...new Set(changes.map((change) => change.date))].sort();
   const baseRoutes = base.days.flatMap((day) => day.travelSegments);
   const candidateRoutes = candidate.days.flatMap((day) => day.travelSegments);
-  const routeChanges =
-    JSON.stringify(baseRoutes) === JSON.stringify(candidateRoutes)
-      ? []
-      : ["Travel segments changed and were revalidated"];
+  const routeChanges = revisionValuesEqual(baseRoutes, candidateRoutes)
+    ? []
+    : ["Travel segments changed and were revalidated"];
   const beforeAmount = amount(base);
   const afterAmount = amount(candidate);
   return planVersionDiffSchema.parse({

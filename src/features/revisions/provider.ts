@@ -1,8 +1,11 @@
 import {
   itinerarySchema,
   planChangeAnalysisSchema,
+  revisionPatchV1Schema,
   type Itinerary,
   type PlanChangeAnalysis,
+  type RevisionAllowedChangeManifestV1,
+  type RevisionPatchV1,
 } from "@trailie/schemas";
 import { createFakeProviderId } from "@/server/ai/fake-provider-id";
 import type { ProviderUsage } from "@/server/ai/provider";
@@ -36,6 +39,8 @@ export type RevisionProviderInput = {
   signal: AbortSignal;
   basePlan?: Itinerary;
   analysis?: PlanChangeAnalysis;
+  manifest?: RevisionAllowedChangeManifestV1;
+  manifestHash?: string;
 };
 export type ProviderMeta = {
   responseId: string | null;
@@ -44,9 +49,12 @@ export type ProviderMeta = {
 };
 export type AnalysisOutput = ProviderMeta & { analysis: PlanChangeAnalysis };
 export type CandidateOutput = ProviderMeta & { itinerary: Itinerary };
+export type PatchOutput = ProviderMeta & { patch: RevisionPatchV1 };
 export interface RevisionProvider {
   analyze(input: RevisionProviderInput): Promise<AnalysisOutput>;
+  generatePatch(input: RevisionProviderInput): Promise<PatchOutput>;
   generate(input: RevisionProviderInput): Promise<CandidateOutput>;
+  repairScope(input: RevisionProviderInput): Promise<CandidateOutput>;
   repair(input: RevisionProviderInput): Promise<CandidateOutput>;
 }
 
@@ -57,12 +65,35 @@ const usage: ProviderUsage = {
   cachedInputTokens: 0,
   totalTokens: 1300,
 };
+
+function applyFakeApprovedChange(
+  itinerary: Itinerary,
+  input: RevisionProviderInput,
+) {
+  const targetId = input.analysis?.requestedChange.targetItemIds[0];
+  const target = itinerary.days
+    .flatMap((day) => day.items)
+    .find((item) => item.id === targetId);
+  if (!target) return;
+  target.startTime = "18:00";
+  target.endTime = "19:30";
+  if (input.manifest?.requestType === "replace_item") {
+    target.title = `${target.title} alternative`;
+    target.description =
+      "An approved semantic replacement that preserves the original must-do.";
+  }
+}
+
 export function createFakeRevisionProvider(): RevisionProvider {
   return {
     async analyze(input) {
       const explicitTarget = input.context.match(
         /<EXPLICIT_CHANGE_REQUEST>.*?"targetItemId":"([^"]+)"/,
       )?.[1];
+      const explicitType =
+        input.context.match(
+          /<EXPLICIT_CHANGE_REQUEST>.*?"type":"([^"]+)"/,
+        )?.[1] ?? "move_item";
       const target = input.basePlan?.days
         .flatMap((day) => day.items)
         .find((item) => item.id === explicitTarget);
@@ -72,7 +103,7 @@ export function createFakeRevisionProvider(): RevisionProvider {
           title: "Move an itinerary item later",
           requestSummary: "Move the selected item later.",
           requestedChange: {
-            type: "move_item",
+            type: explicitType,
             targetItemIds: target ? [target.id] : [],
             normalizedInstruction: "Move the selected item later.",
           },
@@ -122,15 +153,67 @@ export function createFakeRevisionProvider(): RevisionProvider {
         usage,
       };
     },
+    async generatePatch(input) {
+      const manifest = input.manifest;
+      if (!manifest)
+        throw new RevisionProviderError("invalid_candidate", false);
+      const targetId = manifest.targetItemIds[0];
+      const dayId = manifest.affectedDayIds[0];
+      const operation = manifest.allowedOperations[0];
+      const fieldChanges =
+        operation === "move" || operation === "reschedule"
+          ? { startTime: "18:00", endTime: "19:30" }
+          : {};
+      return {
+        patch: revisionPatchV1Schema.parse({
+          schemaVersion: "1",
+          status: targetId && dayId ? "ready" : "blocked",
+          blockers:
+            targetId && dayId ? [] : ["Approved target is unavailable."],
+          baseVersion: manifest.baseVersion,
+          manifestHash: input.manifestHash ?? "0".repeat(64),
+          operations:
+            targetId && dayId
+              ? [
+                  {
+                    operation,
+                    targetId,
+                    dayId,
+                    fieldChanges,
+                    reason:
+                      input.analysis?.requestSummary ?? "Approved revision",
+                    downstreamEffects: manifest.allowedDownstreamEffects.map(
+                      (effect) => effect.effect,
+                    ),
+                  },
+                ]
+              : [],
+          preservedItemIds: manifest.protectedItemIds,
+          evidenceRefreshTargets: manifest.evidenceRefreshTargets,
+        }),
+        responseId: createFakeProviderId(
+          "revision_patch_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId(
+          "revision_patch_request",
+          input.operationKey,
+        ),
+        usage,
+      };
+    },
     async generate(input) {
       const itinerary = structuredClone(input.basePlan!);
-      const targetId = input.analysis?.requestedChange.targetItemIds[0];
-      const target = itinerary.days
-        .flatMap((day) => day.items)
-        .find((item) => item.id === targetId);
-      if (target) {
-        target.startTime = "16:00";
-        target.endTime = "19:30";
+      applyFakeApprovedChange(itinerary, input);
+      if (
+        process.env.TRAILIE_FAKE_REVISION_SCENARIO === "scope_drift_once" ||
+        process.env.TRAILIE_FAKE_REVISION_SCENARIO === "scope_drift_always"
+      ) {
+        const protectedItem = itinerary.days
+          .flatMap((day) => day.items)
+          .find((item) => input.manifest?.protectedItemIds.includes(item.id));
+        if (protectedItem)
+          protectedItem.description = "Unauthorized fake-provider drift.";
       }
       return {
         itinerary: itinerarySchema.parse(itinerary),
@@ -147,14 +230,7 @@ export function createFakeRevisionProvider(): RevisionProvider {
     },
     async repair(input) {
       const itinerary = structuredClone(input.basePlan!);
-      const targetId = input.analysis?.requestedChange.targetItemIds[0];
-      const target = itinerary.days
-        .flatMap((day) => day.items)
-        .find((item) => item.id === targetId);
-      if (target) {
-        target.startTime = "18:00";
-        target.endTime = "19:30";
-      }
+      applyFakeApprovedChange(itinerary, input);
       return {
         itinerary: itinerarySchema.parse(itinerary),
         responseId: createFakeProviderId(
@@ -163,6 +239,29 @@ export function createFakeRevisionProvider(): RevisionProvider {
         ),
         requestId: createFakeProviderId(
           "revision_repair_request",
+          input.operationKey,
+        ),
+        usage,
+      };
+    },
+    async repairScope(input) {
+      const itinerary = structuredClone(input.basePlan!);
+      applyFakeApprovedChange(itinerary, input);
+      if (process.env.TRAILIE_FAKE_REVISION_SCENARIO === "scope_drift_always") {
+        const protectedItem = itinerary.days
+          .flatMap((day) => day.items)
+          .find((item) => input.manifest?.protectedItemIds.includes(item.id));
+        if (protectedItem)
+          protectedItem.description = "Unauthorized fake-provider drift.";
+      }
+      return {
+        itinerary: itinerarySchema.parse(itinerary),
+        responseId: createFakeProviderId(
+          "revision_scope_repair_response",
+          input.operationKey,
+        ),
+        requestId: createFakeProviderId(
+          "revision_scope_repair_request",
           input.operationKey,
         ),
         usage,

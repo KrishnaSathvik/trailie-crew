@@ -26,6 +26,7 @@ const types: Array<{ value: PlanChangeType; label: string }> = [
   { value: "reschedule_item", label: "Reschedule an item" },
   { value: "replace_item", label: "Replace an item" },
   { value: "remove_item", label: "Remove an item" },
+  { value: "update_note", label: "Update an item note" },
   { value: "add_item", label: "Add an item" },
   { value: "change_route", label: "Change a route" },
   { value: "change_lodging", label: "Change lodging" },
@@ -60,6 +61,8 @@ const revisionFailureCopy: Record<string, string> = {
     "This request reached its safe retry limit. The published plan remains unchanged.",
   workflow_deadline_exceeded:
     "This request reached its total deadline and stopped without publishing partial work.",
+  change_scope_exceeded:
+    "Trailie could not make this change without altering more of the trip than the crew approved. The current itinerary was not changed.",
 };
 
 function ApprovalList({
@@ -224,10 +227,17 @@ function ReviewPanel({
       <p className="mt-5 font-semibold">
         {progress[request.status] ?? request.status.replaceAll("_", " ")}
       </p>
-      {request.status === "failed" ? (
+      {["failed", "blocked"].includes(request.status) ? (
         <p className="text-muted-foreground mt-2 text-sm" role="status">
           {revisionFailureCopy[request.errorCode ?? ""] ??
             "The revision stopped safely. The published plan remains available and unchanged."}
+        </p>
+      ) : null}
+      {request.scopeRepairCount === 1 &&
+      ["awaiting_confirmation", "published"].includes(request.status) ? (
+        <p className="text-muted-foreground mt-2 text-sm" role="status">
+          Trailie removed unrelated changes and kept the revision within the
+          approved scope.
         </p>
       ) : null}
       {analysis ? (
@@ -314,6 +324,32 @@ function ReviewPanel({
             The complete candidate passed itinerary and change-boundary
             validation.
           </p>
+        </div>
+      ) : null}
+      {request.status === "blocked" &&
+      request.errorCode === "change_scope_exceeded" ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={close}
+            className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
+          >
+            Retry analysis
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
+          >
+            Edit request
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
+          >
+            View protected current plan
+          </button>
         </div>
       ) : null}
       {[

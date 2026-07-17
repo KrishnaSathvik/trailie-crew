@@ -16,7 +16,9 @@ export type DurableProviderWorkflow =
   | "itinerary_generation"
   | "itinerary_repair"
   | "revision_analysis"
+  | "revision_patch"
   | "revision_candidate"
+  | "revision_scope_repair"
   | "revision_repair";
 
 export type ProviderAttemptExecutionResult<T> = {

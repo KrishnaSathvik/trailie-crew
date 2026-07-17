@@ -1,14 +1,20 @@
 import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { itinerarySchema, planChangeAnalysisSchema } from "@trailie/schemas";
+import {
+  itinerarySchema,
+  planChangeAnalysisSchema,
+  revisionPatchV1Schema,
+} from "@trailie/schemas";
 import { createOpenAIClient } from "@/server/ai/openai-client";
 import { extractUsage } from "@/server/ai/usage";
 import { CHANGE_ANALYSIS_PROMPT } from "./prompts/change-analysis";
 import {
   ITINERARY_REVISION_PROMPT,
   ITINERARY_REVISION_REPAIR_PROMPT,
+  REVISION_SCOPE_REPAIR_PROMPT,
 } from "./prompts/itinerary-revision";
+import { REVISION_PATCH_PROMPT } from "./prompts/revision-patch";
 import {
   RevisionProviderError,
   type RevisionProvider,
@@ -40,19 +46,40 @@ export function buildItineraryRevisionRequest(input: {
   model: string;
   safetyIdentifier: string;
   context: string;
-  repair: boolean;
+  mode: "generate" | "scope_repair" | "conflict_repair";
 }) {
   return {
     model: input.model,
-    instructions: input.repair
-      ? ITINERARY_REVISION_REPAIR_PROMPT
-      : ITINERARY_REVISION_PROMPT,
+    instructions:
+      input.mode === "scope_repair"
+        ? REVISION_SCOPE_REPAIR_PROMPT
+        : input.mode === "conflict_repair"
+          ? ITINERARY_REVISION_REPAIR_PROMPT
+          : ITINERARY_REVISION_PROMPT,
     input: input.context,
     reasoning: { effort: "high" as const },
     text: {
       format: zodTextFormat(itinerarySchema, "trailie_itinerary_revision"),
     },
     max_output_tokens: 12000,
+    safety_identifier: input.safetyIdentifier,
+    store: false,
+  };
+}
+export function buildRevisionPatchRequest(input: {
+  model: string;
+  safetyIdentifier: string;
+  context: string;
+}) {
+  return {
+    model: input.model,
+    instructions: REVISION_PATCH_PROMPT,
+    input: input.context,
+    reasoning: { effort: "medium" as const },
+    text: {
+      format: zodTextFormat(revisionPatchV1Schema, "trailie_revision_patch"),
+    },
+    max_output_tokens: 6000,
     safety_identifier: input.safetyIdentifier,
     store: false,
   };
@@ -87,22 +114,24 @@ export function createOpenAIRevisionProvider(configuration: {
   const client = createOpenAIClient(configuration);
   async function call(
     input: RevisionProviderInput,
-    mode: "analysis" | "generate" | "repair",
+    mode:
+      "analysis" | "patch" | "generate" | "scope_repair" | "conflict_repair",
   ) {
     try {
       const response = await client.responses.parse(
         mode === "analysis"
           ? buildChangeAnalysisRequest(input)
-          : buildItineraryRevisionRequest({
-              ...input,
-              repair: mode === "repair",
-            }),
+          : mode === "patch"
+            ? buildRevisionPatchRequest(input)
+            : buildItineraryRevisionRequest({ ...input, mode }),
         { signal: input.signal },
       );
       const parsed =
         mode === "analysis"
           ? planChangeAnalysisSchema.safeParse(response.output_parsed)
-          : itinerarySchema.safeParse(response.output_parsed);
+          : mode === "patch"
+            ? revisionPatchV1Schema.safeParse(response.output_parsed)
+            : itinerarySchema.safeParse(response.output_parsed);
       if (!parsed.success)
         throw new RevisionProviderError(
           mode === "analysis" ? "invalid_change_analysis" : "invalid_candidate",
@@ -117,7 +146,9 @@ export function createOpenAIRevisionProvider(configuration: {
       };
       return mode === "analysis"
         ? { analysis: parsed.data, ...meta }
-        : { itinerary: parsed.data, ...meta };
+        : mode === "patch"
+          ? { patch: parsed.data, ...meta }
+          : { itinerary: parsed.data, ...meta };
     } catch (error) {
       throw mapRevisionProviderError(
         error,
@@ -128,9 +159,15 @@ export function createOpenAIRevisionProvider(configuration: {
   return {
     analyze: (input) =>
       call(input, "analysis") as ReturnType<RevisionProvider["analyze"]>,
+    generatePatch: (input) =>
+      call(input, "patch") as ReturnType<RevisionProvider["generatePatch"]>,
     generate: (input) =>
       call(input, "generate") as ReturnType<RevisionProvider["generate"]>,
+    repairScope: (input) =>
+      call(input, "scope_repair") as ReturnType<
+        RevisionProvider["repairScope"]
+      >,
     repair: (input) =>
-      call(input, "repair") as ReturnType<RevisionProvider["repair"]>,
+      call(input, "conflict_repair") as ReturnType<RevisionProvider["repair"]>,
   };
 }

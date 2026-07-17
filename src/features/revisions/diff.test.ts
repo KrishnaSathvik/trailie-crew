@@ -39,4 +39,18 @@ describe("plan version diff", () => {
       expect.arrayContaining(["removed", "added"]),
     );
   });
+
+  it("ignores formatting and evidence timestamp-only normalization", () => {
+    const base = revisionItinerary();
+    const candidate = structuredClone(base);
+    candidate.days[0].items[0].description = "  A relaxed   orientation walk. ";
+    candidate.days[0].items[0].cost.retrievedAt = "2026-07-16T20:00:00.000Z";
+    const diff = buildPlanVersionDiff(base, candidate, {
+      baseVersion: 1,
+      candidateVersion: 2,
+      reasons: {},
+    });
+    expect(diff.items).toEqual([]);
+    expect(diff.summary).toBe("0 itinerary items changed.");
+  });
 });

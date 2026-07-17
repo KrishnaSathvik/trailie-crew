@@ -6,6 +6,8 @@ import {
   planChangeAnalysisSchema,
   planChangeStatusSchema,
   planningSummarySchema,
+  revisionAllowedChangeManifestV1Schema,
+  revisionPatchV1Schema,
   validationReportSchema,
   type Itinerary,
   type PlanChangeAnalysis,
@@ -40,6 +42,8 @@ const contextSchema = z.object({
   request: z.object({
     id: z.uuid(),
     roomId: z.uuid(),
+    baseTripPlanId: z.uuid(),
+    basePlanHash: z.string().regex(/^[a-f0-9]{64}$/),
     status: planChangeStatusSchema,
     requestType: z.enum([
       "add_item",
@@ -49,6 +53,7 @@ const contextSchema = z.object({
       "reschedule_item",
       "shorten_item",
       "extend_item",
+      "update_note",
       "change_route",
       "change_lodging",
       "change_food",
@@ -63,11 +68,16 @@ const contextSchema = z.object({
     currentAnalysisVersion: z.number().int().nonnegative(),
     approvedAnalysisVersion: z.number().int().positive().nullable(),
     candidateTripPlanId: z.uuid().nullable(),
+    candidateAttemptCount: z.number().int().nonnegative(),
+    scopeRepairCount: z.number().int().min(0).max(1),
+    conflictRepairCount: z.number().int().min(0).max(1),
   }),
   basePlan: itinerarySchema,
   approvedSummary: planningSummarySchema,
   analysis: planChangeAnalysisSchema.nullable(),
   candidatePlan: itinerarySchema.nullable(),
+  manifest: revisionAllowedChangeManifestV1Schema.nullable(),
+  patch: revisionPatchV1Schema.nullable(),
   evidence: z.array(evidenceSchema),
 });
 
@@ -140,12 +150,27 @@ export function createRevisionRepository(): RevisionRepository {
       ensure(error, "candidate_generation_failed");
       return claimSchema.parse(data);
     },
-    async attachCandidate(id, itinerary) {
+    async persistManifest(id, manifest, manifestHash) {
+      const { error } = await admin.rpc("persist_plan_change_manifest", {
+        target_change_request_id: id,
+        target_manifest: manifest as unknown as Json,
+        target_manifest_hash: manifestHash,
+      });
+      ensure(error, "change_scope_exceeded");
+    },
+    async persistPatch(id, patch) {
+      const { error } = await admin.rpc("persist_plan_change_patch", {
+        target_change_request_id: id,
+        target_patch: patch as unknown as Json,
+      });
+      ensure(error, "change_scope_exceeded");
+    },
+    async attachCandidate(id, itinerary, _output, provenance) {
       const { data, error } = await admin.rpc("attach_candidate_trip_plan", {
         target_change_request_id: id,
         validated_itinerary: itinerary as unknown as Json,
-        target_model: "gpt-5.6-sol",
-        target_prompt_version: "trailie-itinerary-revision-v1",
+        target_model: provenance.model,
+        target_prompt_version: provenance.promptVersion,
         target_schema_version: "1",
       });
       ensure(error, "invalid_candidate");
@@ -194,6 +219,23 @@ export function createRevisionRepository(): RevisionRepository {
       });
       ensure(error, "candidate_blocked");
       return claimSchema.parse(data);
+    },
+    async startScopeRepair(id, report) {
+      const { data, error } = await admin.rpc(
+        "start_plan_change_scope_repair",
+        {
+          target_change_request_id: id,
+          target_boundary_report: report as unknown as Json,
+        },
+      );
+      ensure(error, "change_scope_exceeded");
+      return claimSchema.parse(data);
+    },
+    async completeScopeRepair(id) {
+      const { error } = await admin.rpc("complete_plan_change_scope_repair", {
+        target_change_request_id: id,
+      });
+      ensure(error, "change_scope_exceeded");
     },
     async recordRunUsage(id, runType, output) {
       const { error } = await admin.rpc(

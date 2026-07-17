@@ -50,13 +50,13 @@ const modelMemoryPatchSchema = z
               "general_constraint",
             ]),
             subjectType: z.enum(["participant", "group", "trip"]),
-            subjectParticipantId: z.uuid().nullable(),
+            subjectParticipantId: z.uuid().nullable().optional(),
             canonicalKey: z.string().max(160),
             value: modelFactValueSchema,
             status: z.enum(["active", "superseded", "rejected", "unresolved"]),
             confidence: z.number().min(0).max(1),
             evidenceStrength: z.enum(["explicit", "strong", "tentative"]),
-            sourceMessageId: z.uuid(),
+            sourceMessageId: z.uuid().nullable().optional(),
             supersedesFactId: z.uuid().nullable(),
           })
           .strict(),
@@ -129,6 +129,12 @@ export function createOpenAIMemoryExtractionProvider(configuration: {
           ? memoryPatchSchema.safeParse({
               facts: raw.data.facts.map((fact) => ({
                 ...fact,
+                sourceMessageId: fact.sourceMessageId ?? input.sourceMessage.id,
+                subjectParticipantId:
+                  fact.subjectParticipantId ??
+                  (fact.subjectType === "participant"
+                    ? input.sourceParticipant.id
+                    : null),
                 value: Object.fromEntries(
                   Object.entries(fact.value).filter(
                     ([, value]) => value !== null,

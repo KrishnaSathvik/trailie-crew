@@ -63,6 +63,7 @@ const contextSchema = z.object({
 export type MessageExtractionContext = z.infer<typeof contextSchema>;
 
 export interface MemoryRepository {
+  enqueue?(messageId: string): Promise<void>;
   claim(messageId: string): Promise<z.infer<typeof claimSchema>>;
   loadContext(messageId: string): Promise<MessageExtractionContext>;
   skip(messageId: string, reason: string): Promise<void>;
@@ -86,6 +87,15 @@ export function createMemoryRepository(configuration: {
 }): MemoryRepository {
   const admin = createAdminSupabaseClient();
   return {
+    async enqueue(messageId) {
+      const { error } = await admin.rpc("enqueue_message_extraction", {
+        target_message_id: messageId,
+        target_model: configuration.model,
+        target_prompt_version: configuration.promptVersion,
+        target_schema_version: configuration.schemaVersion,
+      });
+      ensure(error, "extraction_failed");
+    },
     async claim(messageId) {
       const { data, error } = await admin.rpc("claim_message_extraction", {
         target_message_id: messageId,

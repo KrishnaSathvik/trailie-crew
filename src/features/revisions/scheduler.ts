@@ -13,7 +13,11 @@ import { resolveAiQuotaSubject } from "@/server/ai/quota";
 import { generationProviderSwitches } from "@/server/operations/provider-switches";
 import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
-import type { Itinerary, PlanChangeAnalysis } from "@trailie/schemas";
+import type {
+  Itinerary,
+  PlanChangeAnalysis,
+  RevisionPatchV1,
+} from "@trailie/schemas";
 import { createOpenAIRevisionProvider } from "./openai-provider";
 import { createFakeRevisionProvider } from "./provider";
 import { createRevisionRepository } from "./repository";
@@ -74,6 +78,9 @@ export async function drainPlanChange(id: string) {
     ),
     candidateAttempts: createDurableProviderAttemptController(
       createProviderAttemptRepository<Itinerary>(),
+    ),
+    patchAttempts: createDurableProviderAttemptController(
+      createProviderAttemptRepository<RevisionPatchV1>(),
     ),
   });
 }

@@ -112,7 +112,7 @@ where workflow='memory_extraction' and operation_key='memory:message-1';
 set local role service_role;
 select is(
   (select count(*) from public.list_recoverable_ai_provider_attempts(10) where operation_key='memory:message-1'),
-  1::bigint,'retryable failed work appears in the bounded recovery backlog'
+  0::bigint,'failed provider audit history is retried through its parent job, not the provider recovery backlog'
 );
 reset role;
 

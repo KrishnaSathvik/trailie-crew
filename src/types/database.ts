@@ -184,6 +184,8 @@ export type PlanChangeRequestRow = {
   idempotency_key: string;
   analysis_attempt_count: number;
   candidate_attempt_count: number;
+  scope_repair_count: number;
+  conflict_repair_count: number;
   created_at: string;
   updated_at: string;
   approved_at: string | null;
@@ -504,6 +506,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      enqueue_message_extraction: {
+        Args: {
+          target_message_id: string;
+          target_model: string;
+          target_prompt_version: string;
+          target_schema_version: string;
+        };
+        Returns: Json;
+      };
       get_message_extraction_context: {
         Args: { target_message_id: string };
         Returns: Json;
@@ -800,6 +811,36 @@ export type Database = {
       claim_candidate_generation: {
         Args: { target_change_request_id: string };
         Returns: Json;
+      };
+      persist_plan_change_manifest: {
+        Args: {
+          target_change_request_id: string;
+          target_manifest: Json;
+          target_manifest_hash: string;
+        };
+        Returns: Json;
+      };
+      persist_plan_change_patch: {
+        Args: {
+          target_change_request_id: string;
+          target_patch: Json;
+        };
+        Returns: Json;
+      };
+      start_plan_change_scope_repair: {
+        Args: {
+          target_change_request_id: string;
+          target_boundary_report: Json;
+        };
+        Returns: Json;
+      };
+      complete_plan_change_scope_repair: {
+        Args: { target_change_request_id: string };
+        Returns: undefined;
+      };
+      prepare_revision_ai_recovery: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
       };
       attach_candidate_trip_plan: {
         Args: {

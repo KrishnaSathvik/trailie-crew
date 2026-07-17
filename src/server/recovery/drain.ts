@@ -106,6 +106,10 @@ export function createDefaultRecoveryDependencies(): RecoveryDependencies {
     async prepare() {
       const { error } = await admin.rpc("prepare_ai_recovery" as never);
       if (error) throw new Error("recovery_preparation_failed");
+      const { error: revisionError } = await admin.rpc(
+        "prepare_revision_ai_recovery" as never,
+      );
+      if (revisionError) throw new Error("recovery_preparation_failed");
     },
     async list(category, batchSize) {
       const rpc = rpcByCategory[category];

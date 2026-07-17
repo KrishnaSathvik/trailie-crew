@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeChangeAnalysisModel } from "./routing";
+import { routeChangeAnalysisModel, routeRevisionExecution } from "./routing";
 
 describe("change analysis routing", () => {
   it("uses Terra for a bounded one-day item revision", () => {
@@ -38,5 +38,58 @@ describe("change analysis routing", () => {
         touchesConfirmedDecision: true,
       }),
     ).toBe("gpt-5.6-sol");
+  });
+});
+
+describe("revision execution routing", () => {
+  it("uses deterministic patching for narrow remove_item", () => {
+    expect(
+      routeRevisionExecution({
+        requestType: "remove_item",
+        affectedItemCount: 1,
+        affectedDayCount: 1,
+      }),
+    ).toBe("deterministic");
+  });
+
+  it.each([
+    "move_item",
+    "reschedule_item",
+    "shorten_item",
+    "extend_item",
+    "update_note",
+  ] as const)("uses a constrained Terra patch for narrow %s", (requestType) => {
+    expect(
+      routeRevisionExecution({
+        requestType,
+        affectedItemCount: 1,
+        affectedDayCount: 1,
+      }),
+    ).toBe("constrained_terra");
+  });
+
+  it.each([
+    "replace_item",
+    "change_lodging",
+    "update_traveler_logistics",
+    "general_revision",
+  ] as const)("uses constrained Sol for %s", (requestType) => {
+    expect(
+      routeRevisionExecution({
+        requestType,
+        affectedItemCount: 1,
+        affectedDayCount: 1,
+      }),
+    ).toBe("constrained_sol");
+  });
+
+  it("does not route a broad request through deterministic patching", () => {
+    expect(
+      routeRevisionExecution({
+        requestType: "remove_item",
+        affectedItemCount: 3,
+        affectedDayCount: 2,
+      }),
+    ).toBe("constrained_sol");
   });
 });

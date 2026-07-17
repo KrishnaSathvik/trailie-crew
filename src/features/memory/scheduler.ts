@@ -2,6 +2,8 @@ import "server-only";
 
 import { after } from "next/server";
 import { drainMemoryExtraction } from "./worker";
+import { createMemoryRepository } from "./repository";
+import { parseOpenAIEnv } from "@/server/env";
 
 const MAX_CONCURRENCY = 2;
 let active = 0;
@@ -23,4 +25,14 @@ export function scheduleMemoryExtraction(messageId: string) {
   after(() =>
     withSlot(() => drainMemoryExtraction(messageId)).catch(() => undefined),
   );
+}
+
+export async function enqueueMemoryExtraction(messageId: string) {
+  const environment = parseOpenAIEnv(process.env);
+  const repository = createMemoryRepository({
+    model: environment.memoryModel,
+    promptVersion: environment.memoryPromptVersion,
+    schemaVersion: environment.memorySchemaVersion,
+  });
+  if (repository.enqueue) await repository.enqueue(messageId);
 }

@@ -43,6 +43,8 @@ import {
   planShareModeSchema,
   planShareStatusSchema,
   publicSharedItinerarySchema,
+  revisionAllowedChangeManifestV1Schema,
+  revisionPatchV1Schema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -120,6 +122,7 @@ describe("Phase 4A itinerary revision schemas", () => {
       "reschedule_item",
       "shorten_item",
       "extend_item",
+      "update_note",
       "change_route",
       "change_lodging",
       "change_food",
@@ -612,6 +615,108 @@ describe("Phase 3B itinerary schemas", () => {
     });
     expect(view).not.toHaveProperty("providerResponseId");
     expect(view).not.toHaveProperty("inputTokens");
+  });
+});
+
+describe("Phase 5D revision scope schemas", () => {
+  const manifest = {
+    schemaVersion: "1",
+    changeRequestId: uuid,
+    basePlanId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a3",
+    baseVersion: 1,
+    basePlanHash: "a".repeat(64),
+    analysisVersion: 1,
+    requestType: "remove_item",
+    targetItemIds: ["item:kayaking"],
+    affectedDayIds: ["day:2026-09-12"],
+    allowedOperations: ["remove", "route_adjustment", "cost_recalculation"],
+    allowedFieldsByItem: { "item:kayaking": [] },
+    allowedDownstreamEffects: [
+      {
+        effect: "route_cleanup",
+        dayId: "day:2026-09-12",
+        itemIds: ["item:kayaking"],
+        allowedFields: ["travelSegments"],
+      },
+    ],
+    protectedItemIds: ["item:arrival", "item:dinner"],
+    protectedDayIds: ["day:2026-09-13"],
+    protectedTopLevelFields: [
+      "destinationSummary",
+      "startDate",
+      "endDate",
+      "timezone",
+      "travelers",
+      "arrivals",
+      "departures",
+      "lodging",
+      "restaurants",
+    ],
+    editableTopLevelFields: [],
+    maximumAffectedTopLevelEntries: 0,
+    requiredPreservations: [
+      "stable_ids",
+      "confirmed_decisions",
+      "hard_constraints",
+      "rejected_options_absent",
+    ],
+    forbiddenChanges: [
+      "destination",
+      "date_range",
+      "confirmed_decisions",
+      "request_type",
+    ],
+    evidenceRefreshTargets: ["item:kayaking"],
+    maximumAffectedItems: 1,
+    maximumAffectedDays: 1,
+  } as const;
+
+  it("strictly parses an application-owned allowed-change manifest", () => {
+    expect(revisionAllowedChangeManifestV1Schema.parse(manifest)).toEqual(
+      manifest,
+    );
+    expect(
+      revisionAllowedChangeManifestV1Schema.safeParse({
+        ...manifest,
+        maximumAffectedDays: 2,
+        applicationOwnedMaximumAffectedDays: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      revisionAllowedChangeManifestV1Schema.safeParse({
+        ...manifest,
+        allowedOperations: ["rewrite_plan"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("strictly parses a manifest-bound patch and rejects undeclared shapes", () => {
+    const patch = {
+      schemaVersion: "1",
+      status: "ready",
+      blockers: [],
+      baseVersion: 1,
+      manifestHash: "b".repeat(64),
+      operations: [
+        {
+          operation: "remove",
+          targetId: "item:kayaking",
+          dayId: "day:2026-09-12",
+          fieldChanges: {},
+          reason: "The crew approved removing kayaking.",
+          downstreamEffects: ["route_cleanup"],
+        },
+      ],
+      preservedItemIds: ["item:arrival", "item:dinner"],
+      evidenceRefreshTargets: ["item:kayaking"],
+    } as const;
+    expect(revisionPatchV1Schema.parse(patch)).toEqual(patch);
+    expect(
+      revisionPatchV1Schema.safeParse({
+        ...patch,
+        operations: [{ ...patch.operations[0], operation: "general_revision" }],
+      }).success,
+    ).toBe(false);
   });
 });
 
