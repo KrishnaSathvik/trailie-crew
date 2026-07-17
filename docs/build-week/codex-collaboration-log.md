@@ -1,5 +1,11 @@
 # Codex Collaboration Log
 
+## 2026-07-17 — Phase 5E provider resilience
+
+Started from clean `main` baseline `614cf33`. Upgraded the Vercel CLI to 56.3.1, diagnosed the Phase 5D upstream focused 503 plus independent aggregate recovery failure, and implemented test-first provider normalization, distinct durable focused attempts, stream completion joining, staged focused recovery, Luna retry eligibility, one logical quota reservation, safe recovery summaries, reliability UI, content-free metrics, and private migrations. Revision validation was not changed.
+
+Final local evidence is 527 Vitest tests, 539 pgTAP assertions, 16 local Playwright passes, a successful production build, 9 exactly-once interruption checkpoints, and quota rejection with zero provider calls. Protected drills exposed and fixed wrapper-metadata, stream-error selection, public-share label, hosted-harness, and terminal-attempt cleanup defects. The earlier 429s were traced to exhausted project credits; after replenishment direct probes passed, controlled focused/Luna 503 retries passed, a complete protected flow published immutable Version 2, and a fresh-room repeatability subset passed. The final deployment remained protected on `hosted-acceptance`; the fault variable was removed, all backlogs were zero, and all temporary bypasses were revoked. Production was not deployed.
+
 ## 2026-07-16–17 — Phase 5D revision scope reliability
 
 Starting from `c388ab2` on `main`, Codex diagnosed the Phase 5C failure as excess full-plan model freedom rather than a validator, stable-ID, or diff defect. Test-first work added a strict application-owned allowed-change manifest, protected base snapshot/hashes, patch-first deterministic narrow routing, constrained/versioned prompts, canonical diff comparison, one scope-only repair, durable forced-RLS artifacts, separate counters, safe UX, and interruption recovery. The validator was not weakened.

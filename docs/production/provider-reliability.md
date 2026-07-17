@@ -2,7 +2,7 @@
 
 > Phase 5D: scope violations now have one dedicated repair path separate from provider availability and itinerary conflict repair. Prior protected runs published exact removal Version 2 and independent removal Version 3, but full Preview reacceptance remains blocked by real-provider availability and hosted Luna reliability. See [Revision scope contract](./revision-scope-contract.md).
 
-Status on July 17, 2026: durable application behavior and revision scope control are verified locally, and prior protected runs published constrained Versions 2 and 3. The latest complete hosted rerun stopped earlier at focused-answer provider/recovery availability. Production is not accepted.
+Status on July 17, 2026: durable focused/Luna behavior and revision scope control are verified locally and in protected real-provider acceptance. The earlier 429 incident was exhausted OpenAI project credits.
 
 ## Reliability contract
 
@@ -10,7 +10,9 @@ Every provider operation has a stable workflow/operation key and a durable row i
 
 The state transition is `claimed → provider_completed → applied`. A provider result that arrived before an interruption can be validated and applied by recovery without calling the provider again. Lease ownership, operation identity, provider response uniqueness, and application idempotency prevent concurrent or replayed workers from double-calling, double-charging, or double-publishing. Terminal failure releases unused quota; success reconciles reserved usage to actual usage. Failed provider attempts remain immutable audit history; bounded retry is owned by the parent workflow, so those rows are not counted as directly recoverable provider results.
 
-Only timeout, unavailable, and rate-limit failures are retryable. Invalid model output, workflow deadline, quota rejection, AI disable, and application validation failures are terminal. Recovery never turns an invalid result into a publication.
+Only timeout, unavailable, and rate-limit failures are immediately retryable. Invalid model output, workflow deadline, quota rejection, AI disable, and application validation failures are terminal. Recovery-required state is handled from persisted state rather than blindly replayed. Focused and memory each permit at most two attempts, even when another workflow has a larger shared cap. Recovery never turns an invalid result into a publication.
+
+HTTP 429 retains `model_rate_limited`; HTTP 500/502/503/504 retain `model_unavailable`. Safe provider status, request ID, Retry-After, and correlation ID are persisted when available. Raw bodies and provider payloads are forbidden. Retry-After is capped and constrained by the remaining workflow deadline. A future retry persists `next_retry_at`; recovery skips ineligible work.
 
 ## Operator response
 
@@ -28,7 +30,7 @@ Never manually edit an attempt into `applied`, reuse a provider response for a d
 - `pnpm test:provider:acceptance` covers fail-once recovery, retry exhaustion, timeout/deadline behavior, usage reconciliation, and durable replay.
 - `pnpm test:interruption:acceptance` covers 9 workflow checkpoints, including all five Phase 5D patch/candidate/scope-report/publication boundaries, plus six provider-attempt Vitest scenarios and 35 pgTAP assertions.
 - `pnpm test:quota:acceptance` proves quota rejection produces zero provider calls across 27 Vitest scenarios and 35 pgTAP assertions.
-- The full local Playwright suite passes 16 scenarios with the hosted-only scenario skipped.
-- Prior protected Phase 5D runs published exact removal Version 2 and independent removal Version 3. The latest complete rerun on `dpl_52TpJwK7aReq9CzZJgPJHkwC8pMP` stopped when focused-answer recovery returned HTTP 503; a prior credentialed harness returned HTTP 429 for all 15 bounded operations. The full hosted regression therefore remains unaccepted.
+- The full local Playwright suite passes 16 scenarios with 3 hosted-only scenarios skipped.
+- Prior protected Phase 5D runs published exact removal Version 2 and independent removal Version 3. Phase 5E controlled first-attempt 503s recovered on the bounded second attempts for focused and Luna. A complete protected flow published immutable Version 2 and passed pinned sharing/exports; a fresh-room repeatability subset passed. Final clean recovery and all workflow backlogs are zero.
 
 See [Timeout and retry policy](./timeout-retry-policy.md), [Monitoring and operational alerts](./monitoring-alerts.md), and [Provider cost controls](./cost-controls.md).

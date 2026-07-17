@@ -1,5 +1,24 @@
 # Submission Checklist
 
+## Phase 5E provider resilience
+
+- [x] Vercel CLI upgraded to 56.3.1
+- [x] 429/5xx/network/timeout/abort/invalid-output normalization
+- [x] Focused and Luna capped at two distinct durable attempts
+- [x] Retry-After/backoff bounded by workflow and route ceilings
+- [x] Focused validated-result recovery and exactly-one message
+- [x] Luna durable enqueue, staged result, and idempotent supersession
+- [x] Recovery endpoint returns safe counts without aggregate provider 503
+- [x] Accessible retrying/recovering/terminal UI
+- [x] Local regression, pgTAP, interruption, and quota gates
+- [x] Protected custom-target deployment; no unrestricted Production
+- [x] Fault variable removed, recovery secret rotated, zero bypasses
+- [x] Real-provider focused 503-then-success
+- [x] Real-provider Luna extraction/correction
+- [x] Complete protected Version 2 reacceptance
+- [x] Fresh-room repeatability subset
+- [ ] Production controls: Turnstile, WAF, external alerts, provider cap, restore drill, manual accessibility
+
 ## Phase 5D release gate
 
 - [x] Exact allowed-change manifest and immutable base/hash binding

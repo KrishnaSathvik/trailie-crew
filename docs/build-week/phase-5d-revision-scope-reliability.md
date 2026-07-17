@@ -57,3 +57,7 @@ Repeatability is demonstrated by prior protected runs: the exact kayaking remova
 3. Production readiness: `not_ready`.
 
 Remaining blockers are a clean complete real-provider rerun after the current rate-limit condition clears, reliable hosted Luna extraction, scheduled recovery/cron, real Turnstile, WAF/provider budget controls, external alerts, restore/RPO/RTO, and manual accessibility. A durable service-only enqueue now persists memory work before the serverless `after()` worker is scheduled.
+
+## Phase 5E follow-up
+
+Phase 5E did not alter revision validation or any Phase 5D validator test. It added bounded focused/Luna attempts, durable focused recovery, Retry-After eligibility, safe stream completion handling, and non-503 aggregate recovery semantics. After exhausted API credits were replenished, protected reacceptance completed the existing manifest revision path and published immutable Version 2 with Version 1 unchanged. No new revision-specific defect was observed; revision scope remains the previously established `conditional_pass`.

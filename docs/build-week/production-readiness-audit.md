@@ -1,5 +1,13 @@
 # Phase 4C Production Readiness Audit
 
+## Phase 5E addendum — July 17, 2026
+
+Focused and Luna provider recovery now use at most two distinct durable attempts, one logical quota reservation, safe provider metadata, bounded Retry-After/next eligibility, validated-result staging, exactly-once application, and content-free operational metrics. The recovery endpoint returns HTTP 200 after a successful drain even when a job is safely deferred or exhausted; infrastructure failure alone is 500. Revision validation was not changed.
+
+Local gates pass with 527 Vitest tests, 539 pgTAP assertions, 16 local Playwright scenarios, a production build, interruption exactly-once acceptance, and quota zero-call rejection. The earlier protected 429s were exhausted OpenAI project credits. After replenishment, minimal direct Terra and Luna calls returned HTTP 200; the controlled 503-recovery drill, complete protected Version 2 flow, and fresh-room repeatability subset passed.
+
+The final clean protected deployment is `dpl_81bc4Db2Hp4UejzooFe2Ac9arxdT`. Recovery and all workflow backlogs are zero, the fault variable is absent, Vercel Authentication is enabled, and zero Vercel bypasses remain. Protected Preview is `accepted`. Production is still `not_ready` because the documented Turnstile, WAF/budget, scheduled recovery/external-alert, restore/RPO/RTO, and manual-accessibility controls remain; it was not deployed.
+
 ## Phase 5D addendum — July 16–17, 2026
 
 Revision generation now uses an application-owned manifest, protected hashes, patch-first deterministic routing, and one scope-only repair. Local quality/security gates pass; prior protected evidence published the exact removal as Version 2 and an independent removal as Version 3. This does not change the production verdict: `not_ready`. The complete protected regression remains incomplete, and existing real Turnstile, WAF/budget, cron/external-alert, restore/RPO/RTO, and manual-accessibility blockers remain.

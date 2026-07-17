@@ -1,8 +1,10 @@
 # Monitoring and operational alerts
 
-Status on July 16, 2026: implementation verified locally; hosted delivery **blocked**.
+Status on July 17, 2026: provider-resilience signals are verified locally and through protected hosted acceptance; external alert delivery remains a Production blocker.
 
 The server emits allowlisted operational alerts for provider failure, quota rejection, CAPTCHA failure, recovery backlog/failure, cron failure, and related health/security events. Payloads contain safe codes, environment, owner, severity, correlation ID, latency/age, and numeric counts only. Unit tests cover recursive content/credential rejection and delivery failure isolation.
+
+Phase 5E adds signals for repeated 503, retry exhaustion, focused/Luna backlog, attempt-lease recovery, and application failure after provider success. Focused/Luna logs include provider latency when a result exists, total workflow latency, attempt/retry/recovery counts, safe provider status, quota reconciliation state, and final safe error code. Failed calls correctly report zero provider-result latency rather than fabricating duration. Prompts, message/memory values, cookies, headers, provider bodies, and raw outputs remain prohibited.
 
 ## Hosted configuration
 

@@ -1,6 +1,6 @@
 # Phase 5A Preview Acceptance
 
-> Phase 5D reacceptance update (July 16–17, 2026): the Phase 5C revision-scope defect is conditionally fixed without validator weakening. Prior protected runs published the exact kayaking removal as immutable Version 2 and an independent food-stop removal as Version 3. The latest complete rerun stopped earlier when focused-answer recovery returned HTTP 503, so protected Preview remains `not_accepted_for_release`. Production remains undeployed.
+> Phase 5E reacceptance update (July 17, 2026): bounded focused and Luna recovery passed direct probes, controlled first-call 503 drills, one complete protected Version 2 flow, and a fresh-room repeatability subset. Revision validation remained unchanged. Protected Preview is `accepted`; Production remains undeployed and `not_ready`.
 
 Status: **Preview ready with controlled conditions. Production was not deployed.**
 
@@ -109,3 +109,13 @@ This demonstrates correct fail-closed validation but is a **failed full hosted r
 Phase 5D replaced full-plan freedom for narrow revisions with an application-owned allowed-change manifest, protected snapshot, validated patch, deterministic narrow application, semantic preservation hashes, and one scope-only repair. No validator severity was reduced. Prior protected evidence published exact kayaking removal Version 2 and independent food-stop removal Version 3; Version 1 remained immutable and historical sharing stayed pinned.
 
 The latest worktree deployed Ready as `dpl_52TpJwK7aReq9CzZJgPJHkwC8pMP` only to `hosted-acceptance`. Its complete rerun stopped before planning when focused Terra recovery returned HTTP 503. A prior credentialed 15-operation provider harness returned HTTP 429 for every operation, but the latest 503 is not overclassified as the same exact response. The failed disposable room and temporary environment file were removed, temporary bypass count was verified as zero, and count-only database verification reported zero revision, publication, and provider recovery backlog after the provider-backlog semantics migration. Preview remains `not_accepted_for_release`; Production remains undeployed.
+
+## Phase 5E protected-Preview result
+
+Phase 5E introduced distinct durable attempts, one focused/Luna retry, safe 429/5xx/timeout/network normalization, bounded Retry-After, staged-result recovery, partial-stream suppression, and HTTP 200 aggregate recovery summaries. Local deterministic acceptance passes. The earlier repeated 429s were exhausted OpenAI project credits; after replenishment, minimal direct Terra and Luna calls both returned HTTP 200 without an SDK retry.
+
+The protected controlled drill then passed first-call 503 recovery for both workflows. Focused produced exactly one final response with no partial persistence; Luna extracted and superseded a correction without a visible response or duplicate fact. Quota reconciled once and both provider/recovery backlogs were zero.
+
+One complete protected room passed create/join, Realtime behavior, focused Terra, Luna correction, planning and approvals, validated Version 1, narrow manifest revision, immutable Version 2, pinned Version 1 share/ICS/print, revocation, and refresh. A stale attempt from an older terminal repair was finalized by the service-only recovery migration without replay; the global content-free backlog audit was then zero. A fresh-room focused/Luna/planning repeatability subset also passed with no duplicate output or unresolved work.
+
+Final clean deployment `dpl_81bc4Db2Hp4UejzooFe2Ac9arxdT` is Ready only on `hosted-acceptance`. The fault variable is absent, Vercel Authentication remains enabled, and zero bypasses remain. Protected Preview is `accepted`; Production remains undeployed and `not_ready`.
