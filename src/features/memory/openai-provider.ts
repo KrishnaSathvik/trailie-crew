@@ -10,6 +10,7 @@ import { buildMemoryContext } from "./context";
 import { MemoryProviderError, type MemoryExtractionProvider } from "./provider";
 import { createOpenAIClient } from "@/server/ai/openai-client";
 import { extractUsage } from "@/server/ai/usage";
+import { normalizeProviderError } from "@/server/ai/reliability-policy";
 
 const modelFactValueSchema = z
   .object({
@@ -94,18 +95,28 @@ export function buildMemoryExtractionRequest(input: {
   };
 }
 
-function mapped(error: unknown) {
+export function mapMemoryProviderError(error: unknown) {
   if (error instanceof MemoryProviderError) return error;
-  if (error instanceof OpenAI.RateLimitError)
-    return new MemoryProviderError("model_rate_limited", true);
-  if (error instanceof OpenAI.APIConnectionTimeoutError)
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  )
     return new MemoryProviderError("model_timeout", true);
   if (
     error instanceof OpenAI.BadRequestError ||
     error instanceof OpenAI.UnprocessableEntityError
   )
-    return new MemoryProviderError("invalid_extraction_response", true);
-  return new MemoryProviderError("model_unavailable", true);
+    return new MemoryProviderError("invalid_extraction_response", false);
+  const failure = normalizeProviderError(error);
+  return new MemoryProviderError(
+    failure.code === "invalid_model_output"
+      ? "invalid_extraction_response"
+      : failure.code,
+    failure.retryable,
+    failure,
+  );
 }
 
 export function createOpenAIMemoryExtractionProvider(configuration: {
@@ -155,7 +166,7 @@ export function createOpenAIMemoryExtractionProvider(configuration: {
           usage: extractUsage(response.usage),
         };
       } catch (error) {
-        throw mapped(error);
+        throw mapMemoryProviderError(error);
       }
     },
   };

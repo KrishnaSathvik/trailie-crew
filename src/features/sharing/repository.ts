@@ -19,7 +19,7 @@ const verificationSchema = z
   })
   .strict();
 
-function withRequiredPublicHeadings(value: unknown) {
+function withRequiredPublicLabels(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const envelope = value as Record<string, unknown>;
   if (
@@ -29,6 +29,35 @@ function withRequiredPublicHeadings(value: unknown) {
   )
     return value;
   const itinerary = envelope.itinerary as Record<string, unknown>;
+  const days = Array.isArray(itinerary.days)
+    ? itinerary.days.map((day) => {
+        if (!day || typeof day !== "object" || Array.isArray(day)) return day;
+        const publicDay = day as Record<string, unknown>;
+        const items = Array.isArray(publicDay.items)
+          ? publicDay.items.map((item) => {
+              if (!item || typeof item !== "object" || Array.isArray(item))
+                return item;
+              const publicItem = item as Record<string, unknown>;
+              return {
+                ...publicItem,
+                title:
+                  typeof publicItem.title === "string" &&
+                  publicItem.title.trim()
+                    ? publicItem.title
+                    : "Itinerary item",
+              };
+            })
+          : publicDay.items;
+        return {
+          ...publicDay,
+          title:
+            typeof publicDay.title === "string" && publicDay.title.trim()
+              ? publicDay.title
+              : "Itinerary day",
+          items,
+        };
+      })
+    : itinerary.days;
   return {
     ...envelope,
     itinerary: {
@@ -42,6 +71,7 @@ function withRequiredPublicHeadings(value: unknown) {
         itinerary.destinationSummary.trim()
           ? itinerary.destinationSummary
           : "Trip details shared by the host.",
+      days,
     },
   };
 }
@@ -72,7 +102,7 @@ export async function verifyPlanShareToken(token: string) {
     });
     return null;
   }
-  const result = verificationSchema.safeParse(withRequiredPublicHeadings(data));
+  const result = verificationSchema.safeParse(withRequiredPublicLabels(data));
   if (!result.success) {
     logOperation("share.verification_failed", {
       correlationId,

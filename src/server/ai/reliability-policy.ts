@@ -16,6 +16,12 @@ export const providerFailureCodes = [
 
 export type ProviderFailureCode = (typeof providerFailureCodes)[number];
 
+export type ProviderFailureMetadata = {
+  statusCode: number | null;
+  requestId: string | null;
+  retryAfterMs: number | null;
+};
+
 const retryableFailureCodes = new Set<ProviderFailureCode>([
   "model_timeout",
   "model_unavailable",
@@ -42,14 +48,25 @@ function isQuotaRejection(error: unknown) {
 
 export class ProviderFailure extends Error {
   readonly retryable: boolean;
+  readonly statusCode: number | null;
+  readonly requestId: string | null;
+  readonly retryAfterMs: number | null;
 
   constructor(
     readonly code: ProviderFailureCode,
-    options: { cause?: unknown } = {},
+    options: {
+      cause?: unknown;
+      statusCode?: number | null;
+      requestId?: string | null;
+      retryAfterMs?: number | null;
+    } = {},
   ) {
     super(code, options);
     this.name = "ProviderFailure";
     this.retryable = retryableFailureCodes.has(code);
+    this.statusCode = options.statusCode ?? null;
+    this.requestId = options.requestId ?? null;
+    this.retryAfterMs = options.retryAfterMs ?? null;
   }
 }
 
@@ -126,28 +143,158 @@ export function parseWorkflowReliabilityPolicy(source: EnvironmentSource) {
   } as const;
 }
 
-export function classifyProviderFailure(error: unknown): ProviderFailure {
+function safeStatus(error: unknown) {
+  if (typeof error !== "object" || error === null) return null;
+  const record = error as Record<string, unknown>;
+  const status =
+    typeof record.status === "number"
+      ? record.status
+      : typeof record.statusCode === "number"
+        ? record.statusCode
+        : null;
+  if (
+    status !== null &&
+    Number.isInteger(status) &&
+    status >= 100 &&
+    status <= 599
+  )
+    return status;
+  return null;
+}
+
+function safeRequestId(error: unknown) {
+  if (typeof error !== "object" || error === null) return null;
+  const record = error as Record<string, unknown>;
+  const value =
+    typeof record.requestID === "string"
+      ? record.requestID
+      : typeof record.request_id === "string"
+        ? record.request_id
+        : typeof record.requestId === "string"
+          ? record.requestId
+          : null;
+  return value && value.length <= 200 && /^[a-zA-Z0-9_.:-]+$/.test(value)
+    ? value
+    : null;
+}
+
+function safeRetryAfterMs(error: unknown) {
+  if (typeof error !== "object" || error === null) return null;
+  const value = (error as Record<string, unknown>).retryAfterMs;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.min(Math.round(value), 30_000)
+    : null;
+}
+
+function safeProviderIdentifier(value: unknown) {
+  return typeof value === "string" &&
+    value.length <= 200 &&
+    /^[a-zA-Z0-9_.:-]+$/.test(value)
+    ? value
+    : null;
+}
+
+function errorHeaders(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "headers" in error &&
+    error.headers instanceof Headers
+  )
+    return error.headers;
+  return null;
+}
+
+export function parseRetryAfter(
+  value: string | null | undefined,
+  options: { now?: number; maximumMs: number },
+) {
+  if (value === null || value === undefined || !value.trim()) return null;
+  const now = options.now ?? Date.now();
+  const seconds = Number(value);
+  const rawDelay = Number.isFinite(seconds)
+    ? seconds * 1_000
+    : Date.parse(value) - now;
+  if (!Number.isFinite(rawDelay) || rawDelay < 0) return null;
+  return Math.min(Math.round(rawDelay), Math.max(options.maximumMs, 0));
+}
+
+export function normalizeProviderError(error: unknown): ProviderFailure {
   if (error instanceof ProviderFailure) return error;
+  const statusCode = safeStatus(error);
+  const headers = errorHeaders(error);
+  const retryAfterMilliseconds = Number(headers?.get("retry-after-ms"));
+  const retryAfterMs = headers?.get("retry-after-ms")
+    ? Number.isFinite(retryAfterMilliseconds) && retryAfterMilliseconds >= 0
+      ? Math.min(Math.round(retryAfterMilliseconds), 30_000)
+      : null
+    : (parseRetryAfter(headers?.get("retry-after"), {
+        maximumMs: 30_000,
+      }) ?? safeRetryAfterMs(error));
+  const metadata = {
+    statusCode,
+    requestId:
+      safeRequestId(error) ??
+      safeProviderIdentifier(headers?.get("x-request-id")),
+    retryAfterMs,
+  };
   const code =
     typeof error === "object" && error !== null && "code" in error
       ? String(error.code)
       : null;
+  if (statusCode === 429)
+    return new ProviderFailure("model_rate_limited", {
+      cause: error,
+      ...metadata,
+    });
+  if (statusCode !== null && statusCode >= 500)
+    return new ProviderFailure("model_unavailable", {
+      cause: error,
+      ...metadata,
+    });
   if (code === "openai_timeout")
-    return new ProviderFailure("model_timeout", { cause: error });
+    return new ProviderFailure("model_timeout", { cause: error, ...metadata });
   if (code === "openai_rate_limited")
-    return new ProviderFailure("model_rate_limited", { cause: error });
+    return new ProviderFailure("model_rate_limited", {
+      cause: error,
+      ...metadata,
+    });
   if (code === "invalid_model_response")
-    return new ProviderFailure("invalid_model_output", { cause: error });
+    return new ProviderFailure("invalid_model_output", {
+      cause: error,
+      ...metadata,
+    });
   if (code === "openai_unavailable")
-    return new ProviderFailure("model_unavailable", { cause: error });
-  if (error instanceof DOMException && error.name === "TimeoutError")
-    return new ProviderFailure("model_timeout", { cause: error });
-  if (error instanceof Error && error.name === "TimeoutError")
-    return new ProviderFailure("model_timeout", { cause: error });
-  if (error instanceof Error && error.name === "AbortError")
-    return new ProviderFailure("recovery_required", { cause: error });
-  return new ProviderFailure("model_unavailable", { cause: error });
+    return new ProviderFailure("model_unavailable", {
+      cause: error,
+      ...metadata,
+    });
+  if (providerFailureCodes.includes(code as ProviderFailureCode))
+    return new ProviderFailure(code as ProviderFailureCode, {
+      cause: error,
+      ...metadata,
+    });
+  const errorName =
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    typeof error.name === "string"
+      ? error.name
+      : null;
+  if (errorName === "TimeoutError")
+    return new ProviderFailure("model_timeout", { cause: error, ...metadata });
+  if (errorName === "AbortError")
+    return new ProviderFailure("recovery_required", {
+      cause: error,
+      ...metadata,
+    });
+  return new ProviderFailure("model_unavailable", {
+    cause: error,
+    ...metadata,
+  });
 }
+
+export const classifyProviderFailure = normalizeProviderError;
 
 export function computeRetryDelay(
   policy: WorkflowReliabilityPolicy,
@@ -162,6 +309,26 @@ export function computeRetryDelay(
     1 +
     (Math.min(Math.max(random(), 0), 1) * 2 - 1) * policy.backoff.jitterRatio;
   return Math.round(exponential * jitterMultiplier);
+}
+
+export function computeProviderRetryDelay(input: {
+  policy: WorkflowReliabilityPolicy;
+  attempt: number;
+  retryAfterMs?: number | null;
+  remainingWorkflowMs: number;
+  random?: () => number;
+}) {
+  const advised =
+    input.retryAfterMs === null || input.retryAfterMs === undefined
+      ? null
+      : Math.min(
+          Math.max(Math.round(input.retryAfterMs), 0),
+          input.policy.backoff.maximumMs,
+        );
+  const delay =
+    advised ??
+    computeRetryDelay(input.policy, input.attempt, input.random ?? Math.random);
+  return delay >= input.remainingWorkflowMs ? null : delay;
 }
 
 export function remainingProviderTimeout(

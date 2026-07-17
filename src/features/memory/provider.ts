@@ -23,12 +23,24 @@ export type MemoryErrorCode =
   | "unknown_error";
 
 export class MemoryProviderError extends Error {
+  readonly statusCode: number | null;
+  readonly requestId: string | null;
+  readonly retryAfterMs: number | null;
+
   constructor(
     readonly code: MemoryErrorCode,
     readonly retryable: boolean,
+    metadata: {
+      statusCode?: number | null;
+      requestId?: string | null;
+      retryAfterMs?: number | null;
+    } = {},
   ) {
     super(code);
     this.name = "MemoryProviderError";
+    this.statusCode = metadata.statusCode ?? null;
+    this.requestId = metadata.requestId ?? null;
+    this.retryAfterMs = metadata.retryAfterMs ?? null;
   }
 }
 
@@ -74,7 +86,7 @@ export function createFakeMemoryExtractionProvider(): MemoryExtractionProvider {
       if (/simulate extraction failure/i.test(body))
         throw new MemoryProviderError("extraction_failed", true);
       if (/simulate invalid schema/i.test(body))
-        throw new MemoryProviderError("invalid_extraction_response", true);
+        throw new MemoryProviderError("invalid_extraction_response", false);
       if (
         /ignore your instructions/i.test(body) ||
         /^(lol|okay)$/i.test(body.trim())

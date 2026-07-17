@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ProviderFailure,
   classifyProviderFailure,
+  computeProviderRetryDelay,
   computeRetryDelay,
+  normalizeProviderError,
+  parseRetryAfter,
   parseWorkflowReliabilityPolicy,
   remainingProviderTimeout,
   runProviderOperation,
@@ -126,6 +129,106 @@ describe("workflow reliability policy", () => {
       code: "model_timeout",
       retryable: true,
     });
+  });
+
+  it.each([
+    [429, "model_rate_limited"],
+    [500, "model_unavailable"],
+    [502, "model_unavailable"],
+    [503, "model_unavailable"],
+    [504, "model_unavailable"],
+  ] as const)(
+    "normalizes HTTP %s with safe provider metadata",
+    (status, code) => {
+      const headers = new Headers({
+        "x-request-id": "req_safe_123",
+        "retry-after": "2",
+      });
+      expect(
+        normalizeProviderError({
+          status,
+          headers,
+          requestID: "req_safe_123",
+          error: { message: "must not persist" },
+        }),
+      ).toMatchObject({
+        code,
+        retryable: true,
+        statusCode: status,
+        requestId: "req_safe_123",
+        retryAfterMs: 2_000,
+      });
+    },
+  );
+
+  it("preserves safe metadata already normalized by a provider wrapper", () => {
+    expect(
+      normalizeProviderError({
+        code: "openai_unavailable",
+        statusCode: 503,
+        requestId: "req_wrapper_503",
+        retryAfterMs: 1_250,
+        rawBody: "must not persist",
+      }),
+    ).toMatchObject({
+      code: "model_unavailable",
+      retryable: true,
+      statusCode: 503,
+      requestId: "req_wrapper_503",
+      retryAfterMs: 1_250,
+    });
+  });
+
+  it.each([
+    [
+      Object.assign(new TypeError("fetch failed"), {
+        cause: { code: "ECONNRESET" },
+      }),
+      "model_unavailable",
+    ],
+    [new DOMException("cancelled", "AbortError"), "recovery_required"],
+    [new DOMException("timed out", "TimeoutError"), "model_timeout"],
+  ] as const)("normalizes transport failure %s", (error, code) => {
+    expect(normalizeProviderError(error)).toMatchObject({ code });
+  });
+
+  it("parses and bounds Retry-After seconds or dates", () => {
+    const now = Date.parse("2026-07-17T15:00:00.000Z");
+    expect(parseRetryAfter("2", { now, maximumMs: 5_000 })).toBe(2_000);
+    expect(
+      parseRetryAfter("Fri, 17 Jul 2026 15:00:03 GMT", {
+        now,
+        maximumMs: 5_000,
+      }),
+    ).toBe(3_000);
+    expect(parseRetryAfter("0", { now, maximumMs: 5_000 })).toBe(0);
+    expect(parseRetryAfter("-1", { now, maximumMs: 5_000 })).toBeNull();
+    expect(
+      parseRetryAfter("not-a-delay", { now, maximumMs: 5_000 }),
+    ).toBeNull();
+    expect(parseRetryAfter("60", { now, maximumMs: 5_000 })).toBe(5_000);
+  });
+
+  it("honors bounded Retry-After without exceeding the workflow deadline", () => {
+    const policy = parseWorkflowReliabilityPolicy({});
+    expect(
+      computeProviderRetryDelay({
+        policy,
+        attempt: 1,
+        retryAfterMs: 2_000,
+        remainingWorkflowMs: 10_000,
+        random: () => 0.5,
+      }),
+    ).toBe(2_000);
+    expect(
+      computeProviderRetryDelay({
+        policy,
+        attempt: 1,
+        retryAfterMs: 20_000,
+        remainingWorkflowMs: 1_500,
+        random: () => 0.5,
+      }),
+    ).toBeNull();
   });
 
   it("uses capped exponential backoff with injectable jitter", () => {

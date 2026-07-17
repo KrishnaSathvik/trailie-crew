@@ -10,7 +10,13 @@ type SafeAiLog = {
   status?: string;
   errorCode?: string;
   latencyMs?: number;
+  providerLatencyMs?: number;
+  totalWorkflowLatencyMs?: number;
   retryCount?: number;
+  attemptCount?: number;
+  providerStatus?: string | number | null;
+  recoveryCount?: number;
+  quotaStatus?: string;
 };
 
 export function logAiEvent(event: string, metadata: SafeAiLog) {
@@ -19,9 +25,15 @@ export function logAiEvent(event: string, metadata: SafeAiLog) {
     status: metadata.status ?? event,
     errorCode: metadata.errorCode ?? null,
     latencyMs: metadata.latencyMs,
+    providerLatencyMs: metadata.providerLatencyMs,
+    totalWorkflowLatencyMs: metadata.totalWorkflowLatencyMs,
     model: metadata.model,
     promptVersion: metadata.promptVersion,
     runId: metadata.runId,
     retryCount: metadata.retryCount,
+    attemptCount: metadata.attemptCount,
+    providerStatus: metadata.providerStatus,
+    recoveryCount: metadata.recoveryCount,
+    quotaStatus: metadata.quotaStatus,
   });
 }

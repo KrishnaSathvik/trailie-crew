@@ -1,0 +1,11 @@
+.env*
+.git/
+.next/
+.playwright-cli/
+.pnpm-store/
+.vercel/
+coverage/
+node_modules/
+output/
+supabase/.temp/
+*.log

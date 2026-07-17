@@ -5,8 +5,8 @@ import { memoryPatchSchema, type MemoryPatch } from "@trailie/schemas";
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import {
+  createDurableAiQuotaReservation,
   resolveAiQuotaSubject,
-  runWithAiQuota,
   type AiQuotaSubject,
 } from "@/server/ai/quota";
 import { classifyMemoryEligibility } from "./eligibility";
@@ -19,7 +19,7 @@ import {
 import { createMemoryRepository, type MemoryRepository } from "./repository";
 import { validateMemoryPatch } from "./validation";
 import {
-  computeRetryDelay,
+  computeProviderRetryDelay,
   parseWorkflowReliabilityPolicy,
   remainingProviderTimeout,
   type WorkflowReliabilityPolicy,
@@ -30,6 +30,8 @@ import {
   type ProviderAttemptExecutionResult,
 } from "@/server/ai/provider-attempts";
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
+import { logOperation } from "@/server/operations/logger";
+import { withHostedMemoryFault } from "@/server/ai/hosted-acceptance-faults";
 
 type Dependencies = {
   repository: MemoryRepository;
@@ -44,6 +46,12 @@ type Dependencies = {
     random?: () => number;
   };
   providerAttempts?: DurableProviderAttemptController<MemoryPatch>;
+  quotaReservation?: {
+    id: string;
+    reserve(): Promise<void>;
+    reconcile(actualTokens: number): Promise<void>;
+    release(): Promise<void>;
+  };
 };
 
 const sleep = (milliseconds: number) =>
@@ -59,6 +67,20 @@ function safeFailure(error: unknown) {
     return new MemoryProviderError(
       error.code as never,
       "retryable" in error && error.retryable === true,
+      {
+        statusCode:
+          "statusCode" in error && typeof error.statusCode === "number"
+            ? error.statusCode
+            : null,
+        requestId:
+          "requestId" in error && typeof error.requestId === "string"
+            ? error.requestId
+            : null,
+        retryAfterMs:
+          "retryAfterMs" in error && typeof error.retryAfterMs === "number"
+            ? error.retryAfterMs
+            : null,
+      },
     );
   if (
     error instanceof Error &&
@@ -77,9 +99,26 @@ export async function processMemoryExtraction(
   messageId: string,
   dependencies: Dependencies,
 ) {
-  const policy =
+  const configuredPolicy =
     dependencies.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
+  const policy = {
+    ...configuredPolicy,
+    maximumAttempts: Math.min(configuredPolicy.maximumAttempts, 2),
+  };
   const workflowStartedAt = Date.now();
+  const model = dependencies.model ?? "gpt-5.6-luna";
+  const quota =
+    dependencies.quotaReservation ??
+    (dependencies.quotaSubject
+      ? createDurableAiQuotaReservation({
+          ...dependencies.quotaSubject,
+          workflow: "memory_extraction",
+          model,
+          estimatedTokens: 3_000,
+          reservationId: messageId,
+        })
+      : null);
+  let providerResultStaged = false;
   for (;;) {
     const claim = await dependencies.repository.claim(messageId);
     if (!claim.claimed || claim.status !== "running") return;
@@ -93,6 +132,7 @@ export async function processMemoryExtraction(
     }
     const startedAt = Date.now();
     try {
+      await quota?.reserve();
       const signal = AbortSignal.timeout(
         Math.min(
           dependencies.timeoutMs ?? Number.POSITIVE_INFINITY,
@@ -102,7 +142,7 @@ export async function processMemoryExtraction(
       const extract = () =>
         dependencies.provider.extract({
           operationKey: messageId,
-          model: dependencies.model ?? "gpt-5.6-luna",
+          model,
           safetyIdentifier: dependencies.safetyIdentifier,
           sourceMessage: context.sourceMessage,
           sourceParticipant: context.sourceParticipant,
@@ -112,20 +152,9 @@ export async function processMemoryExtraction(
           activeFacts: context.activeFacts,
           signal,
         });
-      const execute = async (reservationId?: string) => {
+      const execute = async () => {
         const providerStartedAt = Date.now();
-        const result = dependencies.quotaSubject
-          ? await runWithAiQuota(
-              {
-                ...dependencies.quotaSubject,
-                workflow: "memory_extraction",
-                model: dependencies.model ?? "gpt-5.6-luna",
-                estimatedTokens: 3_000,
-                ...(reservationId ? { reservationId } : {}),
-              },
-              extract,
-            )
-          : await extract();
+        const result = await extract();
         const providerDurationMs = Date.now() - providerStartedAt;
         const patch = validateMemoryPatch(result.patch, {
           roomId: context.roomId,
@@ -163,37 +192,99 @@ export async function processMemoryExtraction(
           workflow: "memory_extraction",
           operationKey: `memory:${messageId}`,
           attempt: claim.attemptCount,
-          model: dependencies.model ?? "gpt-5.6-luna",
+          model,
           leaseMs: policy.recoveryLeaseMs,
-          execute: ({ attemptId }) => execute(attemptId),
+          quotaReservationId: quota?.id,
+          workflowStartedAt,
+          execute,
           parse: (value) => memoryPatchSchema.parse(value),
+          afterStage: async (result) => {
+            providerResultStaged = true;
+            await quota?.reconcile(result.usage.totalTokens ?? 3_000);
+          },
           apply,
         });
         if (outcome.status !== "applied") return;
+        logOperation("memory.extraction_completed", {
+          correlationId: messageId,
+          workflow: "memory_extraction",
+          status: "completed",
+          model,
+          providerLatencyMs: outcome.result.providerDurationMs,
+          totalWorkflowLatencyMs: Date.now() - workflowStartedAt,
+          attemptCount: claim.attemptCount,
+          retryCount: Math.max(claim.attemptCount - 1, 0),
+          providerStatus: "completed",
+          recoveryCount: outcome.recovered ? 1 : 0,
+          quotaStatus: quota ? "reconciled" : "not_applicable",
+        });
       } else {
         const result = await execute();
+        providerResultStaged = true;
+        await quota?.reconcile(result.usage.totalTokens ?? 3_000);
         await apply(result.value, result);
+        logOperation("memory.extraction_completed", {
+          correlationId: messageId,
+          workflow: "memory_extraction",
+          status: "completed",
+          model,
+          providerLatencyMs: result.providerDurationMs,
+          totalWorkflowLatencyMs: Date.now() - workflowStartedAt,
+          attemptCount: claim.attemptCount,
+          retryCount: Math.max(claim.attemptCount - 1, 0),
+          providerStatus: "completed",
+          recoveryCount: 0,
+          quotaStatus: quota ? "reconciled" : "not_applicable",
+        });
       }
       return;
     } catch (error) {
       const failure = safeFailure(error);
       if (!failure.retryable) {
+        if (!providerResultStaged)
+          await quota?.release().catch(() => undefined);
         await dependencies.repository.fail(messageId, failure.code);
+        logOperation("memory.extraction_failed", {
+          correlationId: messageId,
+          workflow: "memory_extraction",
+          status: "failed",
+          model,
+          errorCode: failure.code,
+          providerStatus: failure.statusCode,
+          attemptCount: claim.attemptCount,
+          retryCount: Math.max(claim.attemptCount - 1, 0),
+          totalWorkflowLatencyMs: Date.now() - workflowStartedAt,
+        });
         return;
       }
       if (claim.attemptCount >= policy.maximumAttempts) {
+        if (!providerResultStaged)
+          await quota?.release().catch(() => undefined);
         await dependencies.repository.fail(messageId, "retry_exhausted");
+        logOperation("memory.extraction_failed", {
+          correlationId: messageId,
+          workflow: "memory_extraction",
+          status: "failed",
+          model,
+          errorCode: "retry_exhausted",
+          providerStatus: failure.statusCode,
+          attemptCount: claim.attemptCount,
+          retryCount: Math.max(claim.attemptCount - 1, 0),
+          totalWorkflowLatencyMs: Date.now() - workflowStartedAt,
+        });
         return;
       }
-      const delay = computeRetryDelay(
+      const delay = computeProviderRetryDelay({
         policy,
-        claim.attemptCount,
-        dependencies.retry?.random,
-      );
-      if (
-        Date.now() - workflowStartedAt + delay >=
-        policy.totalWorkflowDeadlineMs
-      ) {
+        attempt: claim.attemptCount,
+        retryAfterMs: failure.retryAfterMs,
+        remainingWorkflowMs:
+          policy.totalWorkflowDeadlineMs - (Date.now() - workflowStartedAt),
+        random: dependencies.retry?.random,
+      });
+      if (delay === null) {
+        if (!providerResultStaged)
+          await quota?.release().catch(() => undefined);
         await dependencies.repository.fail(
           messageId,
           "workflow_deadline_exceeded",
@@ -211,10 +302,12 @@ export async function drainMemoryExtraction(messageId: string) {
   const provider =
     environment.provider === "fake"
       ? createFakeMemoryExtractionProvider()
-      : createOpenAIMemoryExtractionProvider({
-          apiKey: environment.apiKey!,
-          timeoutMs: environment.reliabilityPolicy.timeoutsMs.memoryProvider,
-        });
+      : withHostedMemoryFault(
+          createOpenAIMemoryExtractionProvider({
+            apiKey: environment.apiKey!,
+            timeoutMs: environment.reliabilityPolicy.timeoutsMs.memoryProvider,
+          }),
+        );
   const repository = createMemoryRepository({
     model: environment.memoryModel,
     promptVersion: environment.memoryPromptVersion,

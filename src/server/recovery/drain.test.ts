@@ -5,6 +5,7 @@ import { runRecovery, type RecoveryCategory } from "./drain";
 describe("bounded recovery drain", () => {
   it("lists bounded work and executes no more than the global job cap", async () => {
     const work: Record<RecoveryCategory, string[]> = {
+      focused: ["focused-1"],
       memory: ["memory-1"],
       planning: ["planning-1"],
       itinerary: ["itinerary-1"],
@@ -25,33 +26,40 @@ describe("bounded recovery drain", () => {
       { batchSize: 1, maxJobs: 2 },
     );
 
-    expect(list).toHaveBeenCalledTimes(5);
+    expect(list).toHaveBeenCalledTimes(6);
     expect(prepare).toHaveBeenCalledOnce();
     expect(list.mock.calls.every((call) => call[1] === 1)).toBe(true);
     expect(drain).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
       selected: {
+        focused: 1,
         memory: 1,
-        planning: 1,
+        planning: 0,
         itinerary: 0,
         revision: 0,
         revisionPublication: 0,
       },
       completed: {
+        focused: 1,
         memory: 1,
-        planning: 1,
+        planning: 0,
         itinerary: 0,
         revision: 0,
         revisionPublication: 0,
       },
       failed: {
+        focused: 0,
         memory: 0,
         planning: 0,
         itinerary: 0,
         revision: 0,
         revisionPublication: 0,
       },
-      remainingEligible: 3,
+      claimed: 2,
+      deferred: 4,
+      retryExhausted: 0,
+      skipped: 0,
+      remainingEligible: 4,
     });
   });
 
@@ -70,6 +78,7 @@ describe("bounded recovery drain", () => {
       { batchSize: 1, maxJobs: 2 },
     );
     expect(result.failed.itinerary).toBe(1);
+    expect(result.claimed).toBe(1);
     expect(JSON.stringify(result)).not.toContain("private-job-id");
     expect(JSON.stringify(result)).not.toContain(
       "raw private provider failure",

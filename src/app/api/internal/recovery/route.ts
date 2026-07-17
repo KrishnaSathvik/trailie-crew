@@ -31,7 +31,7 @@ async function handle(request: Request) {
     });
     return Response.json(
       { status: "error", code: "recovery_unavailable" },
-      { status: 503, headers: responseHeaders },
+      { status: 500, headers: responseHeaders },
     );
   }
   if (!recoveryRequestIsAuthorized(request, secret)) {
@@ -75,8 +75,24 @@ async function handle(request: Request) {
       latencyMs: Date.now() - startedAt,
       counts,
     });
+    const completedCount = Object.values(counts.completed).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
     return Response.json(
-      { status: "ok", counts, correlationId },
+      {
+        status: "ok",
+        counts: {
+          claimed: counts.claimed,
+          completed: completedCount,
+          deferred: counts.deferred,
+          retry_exhausted: counts.retryExhausted,
+          failed: failedCount,
+          skipped: counts.skipped,
+          remaining_eligible: counts.remainingEligible,
+        },
+        correlationId,
+      },
       { headers: responseHeaders },
     );
   } catch (error) {
@@ -107,7 +123,7 @@ async function handle(request: Request) {
     });
     return Response.json(
       { status: "error", code: "recovery_unavailable" },
-      { status: 503, headers: responseHeaders },
+      { status: 500, headers: responseHeaders },
     );
   }
 }

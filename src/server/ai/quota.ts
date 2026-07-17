@@ -54,6 +54,37 @@ function quotaCode(error: unknown): AiQuotaErrorCode | null {
 
 export function createAiQuotaController(dependencies: QuotaDependencies) {
   return {
+    reservation(metadata: QuotaMetadata) {
+      const { reservationId, ...reservationMetadata } = metadata;
+      const id = reservationId ?? dependencies.createId();
+      let reconciled = false;
+      return {
+        id,
+        async reserve() {
+          try {
+            await dependencies.reserve(id, reservationMetadata);
+          } catch (error) {
+            throw new AiQuotaError(
+              quotaCode(error) ?? "provider_budget_unavailable",
+            );
+          }
+        },
+        async reconcile(actualTokens: number) {
+          if (reconciled) return;
+          await dependencies.reconcile(
+            id,
+            Math.max(Math.round(actualTokens), 0),
+            "used",
+          );
+          reconciled = true;
+        },
+        async release() {
+          if (reconciled) return;
+          await dependencies.reconcile(id, 0, "released");
+          reconciled = true;
+        },
+      };
+    },
     async run<T extends { usage?: { totalTokens?: number | null } }>(
       metadata: QuotaMetadata,
       operation: () => Promise<T>,
@@ -84,6 +115,12 @@ export function createAiQuotaController(dependencies: QuotaDependencies) {
       }
     },
   };
+}
+
+export function createDurableAiQuotaReservation(metadata: QuotaMetadata) {
+  if (!generationProviderSwitches().aiGenerationEnabled)
+    throw new AiQuotaError("ai_disabled");
+  return productionController().reservation(metadata);
 }
 
 function productionController() {

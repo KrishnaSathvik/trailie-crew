@@ -79,6 +79,52 @@ describe("public share repository", () => {
     });
   });
 
+  it("uses a privacy-safe label when redaction removes an item title", async () => {
+    const redacted = {
+      ...itinerary,
+      days: [
+        {
+          ...itinerary.days[0]!,
+          items: [
+            {
+              key: "item:kayak",
+              type: "activity",
+              startTime: "09:30",
+              endTime: "12:00",
+              description: "A provisional water activity.",
+              reservationStatus: "unknown",
+              dataStatus: "unknown",
+            },
+          ],
+        },
+      ],
+    };
+    rpc.mockResolvedValue({
+      data: {
+        itinerary: redacted,
+        snapshotHash: "c".repeat(64),
+        mode: "public_link",
+        expiresAt: null,
+      },
+      error: null,
+    });
+
+    await expect(verifyPlanShareToken("C".repeat(43))).resolves.toMatchObject({
+      itinerary: {
+        days: [
+          {
+            items: [
+              {
+                title: "Itinerary item",
+                description: "A provisional water activity.",
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
   it.each(["short", "+".repeat(43)])(
     "collapses malformed token %s to unavailable without a query",
     async (token) => {

@@ -13,6 +13,7 @@ import {
 } from "@/server/ai/provider";
 import { StructuredBodyExtractor } from "@/server/ai/streaming-body";
 import { extractUsage } from "@/server/ai/usage";
+import { normalizeProviderError } from "@/server/ai/reliability-policy";
 
 const focusedAnswerModelSchema = trailieFocusedAnswerSchema
   .extend({
@@ -63,7 +64,7 @@ export function normalizeFocusedAnswerModelOutput(value: unknown) {
 
 export function mapFocusedProviderError(error: unknown) {
   if (error instanceof TrailieProviderError) return error;
-  let code: SafeAiErrorCode = "openai_unavailable";
+  let code: SafeAiErrorCode | null = null;
   let retryable = true;
   if (
     error instanceof OpenAI.AuthenticationError ||
@@ -94,10 +95,24 @@ export function mapFocusedProviderError(error: unknown) {
     "name" in error &&
     error.name === "AbortError"
   ) {
-    code = "invocation_cancelled";
-    retryable = false;
+    code = "openai_timeout";
   }
-  return new TrailieProviderError(code, retryable);
+  if (code) {
+    const normalized = normalizeProviderError(error);
+    return new TrailieProviderError(code, retryable, normalized);
+  }
+  const normalized = normalizeProviderError(error);
+  return new TrailieProviderError(
+    normalized.code === "model_rate_limited"
+      ? "openai_rate_limited"
+      : normalized.code === "model_timeout"
+        ? "openai_timeout"
+        : normalized.code === "invalid_model_output"
+          ? "invalid_model_response"
+          : "openai_unavailable",
+    normalized.retryable,
+    normalized,
+  );
 }
 
 export function createOpenAIFocusedAnswerProvider(configuration: {
@@ -129,7 +144,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
           try {
             answer = normalizeFocusedAnswerModelOutput(response.output_parsed);
           } catch {
-            throw new TrailieProviderError("invalid_model_response", true);
+            throw new TrailieProviderError("invalid_model_response", false);
           }
           return {
             answer,

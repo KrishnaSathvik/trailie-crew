@@ -18,16 +18,21 @@ import {
   type FocusedAnswerProvider,
 } from "@/server/ai/provider";
 import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
-import { AiQuotaError, runWithAiQuota } from "@/server/ai/quota";
+import {
+  AiQuotaError,
+  createDurableAiQuotaReservation,
+} from "@/server/ai/quota";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import { createCorrelationId, logOperation } from "@/server/operations/logger";
-import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
+import {
+  createDurableProviderAttemptController,
+  runDurableProviderOperation,
+} from "@/server/ai/provider-attempts";
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
 import type { ProviderAttemptExecutionResult } from "@/server/ai/provider-attempts";
-import {
-  ProviderFailure,
-  runProviderOperation,
-} from "@/server/ai/reliability-policy";
+import { ProviderFailure } from "@/server/ai/reliability-policy";
+import { consumeFocusedStream } from "@/server/ai/focused-stream";
+import { withHostedFocusedFault } from "@/server/ai/hosted-acceptance-faults";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -55,10 +60,12 @@ function providerFor(
   if (environment.provider === "fake")
     return createFakeFocusedAnswerProvider({ failOnce: true });
   if (!environment.apiKey) throw new Error("missing_openai_configuration");
-  return createOpenAIFocusedAnswerProvider({
-    apiKey: environment.apiKey,
-    timeoutMs: environment.reliabilityPolicy.timeoutsMs.focusedProvider,
-  });
+  return withHostedFocusedFault(
+    createOpenAIFocusedAnswerProvider({
+      apiKey: environment.apiKey,
+      timeoutMs: environment.reliabilityPolicy.timeoutsMs.focusedProvider,
+    }),
+  );
 }
 
 export async function POST(request: Request) {
@@ -250,9 +257,18 @@ export async function POST(request: Request) {
   const startedAt = Date.now();
   const stream = new ReadableStream({
     async start(controller) {
+      let clientConnected = true;
+      let quota: ReturnType<typeof createDurableAiQuotaReservation> | null =
+        null;
+      let providerResultStaged = false;
       const emit = (event: unknown) => {
+        if (!clientConnected) return;
         const safe = trailieStreamEventSchema.parse(event);
-        controller.enqueue(encoder.encode(`${JSON.stringify(safe)}\n`));
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(safe)}\n`));
+        } catch {
+          clientConnected = false;
+        }
       };
       emit({ type: "invocation_started", invocationId });
       try {
@@ -260,54 +276,55 @@ export async function POST(request: Request) {
         const attempts = createDurableProviderAttemptController<Envelope>(
           createProviderAttemptRepository<Envelope>(),
         );
-        const outcome = await attempts.run({
+        const durableQuota = createDurableAiQuotaReservation({
+          userId: authData.user.id,
+          roomId: parsed.data.roomId,
+          workflow: "focused_answer",
+          model: route.model,
+          estimatedTokens: 4_000,
+          reservationId: invocationId,
+        });
+        quota = durableQuota;
+        await durableQuota.reserve();
+        const routePolicy = {
+          ...environment.reliabilityPolicy,
+          maximumAttempts: Math.min(
+            environment.reliabilityPolicy.maximumAttempts,
+            2,
+          ),
+          totalWorkflowDeadlineMs: Math.min(
+            environment.reliabilityPolicy.totalWorkflowDeadlineMs,
+            55_000,
+          ),
+        };
+        const outcome = await runDurableProviderOperation({
+          controller: attempts,
           workflow: "focused_answer",
           operationKey: `focused:${invocationId}`,
-          attempt: Math.min(Number(invocation.retry_count ?? 0) + 1, 3),
           model: route.model,
-          leaseMs: environment.reliabilityPolicy.recoveryLeaseMs,
-          execute: async ({ attemptId }) => {
+          stage: "focusedProvider",
+          policy: routePolicy,
+          quotaReservationId: invocationId,
+          correlationId,
+          execute: async ({ signal, retryCount }) => {
+            if (retryCount > 0) emit({ type: "provider_retrying" });
             const providerStartedAt = Date.now();
-            const providerOperation = await runProviderOperation({
-              policy: environment.reliabilityPolicy,
-              stage: "focusedProvider",
-              signal: request.signal,
-              operation: async ({ signal }) => {
-                const bufferedDeltas: string[] = [];
-                const result = await runWithAiQuota(
-                  {
-                    userId: authData.user.id,
-                    roomId: parsed.data.roomId,
-                    workflow: "focused_answer",
-                    model: route.model,
-                    estimatedTokens: 4_000,
-                    reservationId: attemptId,
-                  },
-                  async () => {
-                    const providerStream = await providerFor(
-                      environment,
-                    ).stream({
-                      operationKey: invocationId,
-                      request: decision.normalizedRequest,
-                      context: context.text,
-                      model: route.model,
-                      safetyIdentifier: createSafetyIdentifier(
-                        authData.user.id,
-                        environment.safetyHmacSecret,
-                      ),
-                      signal,
-                    });
-                    for await (const delta of providerStream.textDeltas)
-                      bufferedDeltas.push(delta);
-                    return providerStream.completed;
-                  },
-                );
-                return { result, bufferedDeltas };
-              },
-            });
-            for (const delta of providerOperation.value.bufferedDeltas)
+            const consumed = await consumeFocusedStream(
+              await providerFor(environment).stream({
+                operationKey: invocationId,
+                request: decision.normalizedRequest,
+                context: context.text,
+                model: route.model,
+                safetyIdentifier: createSafetyIdentifier(
+                  authData.user.id,
+                  environment.safetyHmacSecret,
+                ),
+                signal,
+              }),
+            );
+            for (const delta of consumed.bufferedDeltas)
               emit({ type: "text_delta", delta });
-            const result = providerOperation.value.result;
+            const result = consumed.result;
             const envelope = trailieResponseEnvelopeSchema.parse({
               schemaVersion: "1",
               ...result.answer,
@@ -321,11 +338,15 @@ export async function POST(request: Request) {
               usage: result.usage,
               providerDurationMs: Date.now() - providerStartedAt,
               totalDurationMs: Date.now() - startedAt,
-              retryCount: providerOperation.retryCount,
+              retryCount,
               repairCount: 0,
             } satisfies ProviderAttemptExecutionResult<Envelope>;
           },
           parse: (value) => trailieResponseEnvelopeSchema.parse(value),
+          afterStage: async (result) => {
+            providerResultStaged = true;
+            await durableQuota.reconcile(result.usage.totalTokens ?? 4_000);
+          },
           apply: async (envelope, result) => {
             const { error: completeError } = await admin.rpc(
               "complete_ai_run",
@@ -356,16 +377,32 @@ export async function POST(request: Request) {
           model: route.model,
           promptVersion: environment.promptVersion,
           latencyMs: outcome.result.totalDurationMs,
+          providerLatencyMs: outcome.result.providerDurationMs,
+          totalWorkflowLatencyMs: outcome.result.totalDurationMs,
+          attemptCount: outcome.result.retryCount + 1,
+          retryCount: outcome.result.retryCount,
+          providerStatus: "completed",
+          recoveryCount: outcome.recovered ? 1 : 0,
+          quotaStatus: "reconciled",
         });
       } catch (error) {
-        const failure = request.signal.aborted
-          ? new TrailieProviderError("invocation_cancelled", false)
-          : error instanceof AiQuotaError
+        if (quota && !providerResultStaged)
+          await quota.release().catch(() => undefined);
+        const failure =
+          error instanceof AiQuotaError
             ? new TrailieProviderError(error.code as never, false)
             : error instanceof TrailieProviderError
               ? error
               : error instanceof ProviderFailure
-                ? new TrailieProviderError(error.code as never, error.retryable)
+                ? new TrailieProviderError(
+                    error.code as never,
+                    error.retryable,
+                    {
+                      statusCode: error.statusCode,
+                      requestId: error.requestId,
+                      retryAfterMs: error.retryAfterMs,
+                    },
+                  )
                 : new TrailieProviderError("openai_unavailable", true);
         await admin.rpc("fail_ai_run", {
           target_invocation_id: invocationId,
@@ -384,9 +421,11 @@ export async function POST(request: Request) {
           model: route.model,
           promptVersion: environment.promptVersion,
           errorCode: failure.code,
+          totalWorkflowLatencyMs: Date.now() - startedAt,
+          providerStatus: failure.statusCode,
         });
       } finally {
-        controller.close();
+        if (clientConnected) controller.close();
       }
     },
   });

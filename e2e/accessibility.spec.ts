@@ -46,6 +46,7 @@ test("landing, entry, and authenticated chat have no serious axe findings", asyn
   await page.getByLabel("Your display name").fill("Maya");
   await page.getByRole("button", { name: "Create Trip" }).click();
   await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveTitle("Trailie Crew");
   await expectNoSeriousAxeViolations(page, "authenticated chat");
 
   await page.setViewportSize({ width: 390, height: 844 });

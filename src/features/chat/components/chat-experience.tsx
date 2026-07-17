@@ -88,7 +88,7 @@ export function ChatExperience({
   const [trailieAnswer, setTrailieAnswer] = useState<{
     source: TrailieInvocationSource;
     body: string;
-    status: "answering" | "failed";
+    status: "answering" | "retrying" | "recovering" | "failed";
     errorCode: TrailieErrorCode | null;
     retryable: boolean;
   } | null>(null);
@@ -381,6 +381,14 @@ export function ChatExperience({
         if (event.type === "text_delta") {
           setTrailieAnswer((current) =>
             current ? { ...current, body: current.body + event.delta } : null,
+          );
+        } else if (event.type === "provider_retrying") {
+          setTrailieAnswer((current) =>
+            current ? { ...current, body: "", status: "retrying" } : null,
+          );
+        } else if (event.type === "response_recovering") {
+          setTrailieAnswer((current) =>
+            current ? { ...current, body: "", status: "recovering" } : null,
           );
         } else if (event.type === "response_completed") {
           setTrailieAnswer((current) =>

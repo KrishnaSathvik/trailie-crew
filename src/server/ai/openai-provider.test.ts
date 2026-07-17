@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import OpenAI from "openai";
 
 describe("focused-answer OpenAI boundary", () => {
   it("classifies a provider deadline as timeout instead of unavailable", async () => {
@@ -13,6 +14,28 @@ describe("focused-answer OpenAI boundary", () => {
     expect(
       mapError(new DOMException("The operation timed out", "TimeoutError")),
     ).toMatchObject({ code: "openai_timeout", retryable: true });
+  });
+
+  it("classifies HTTP 503 as model unavailable with safe metadata", async () => {
+    const { mapFocusedProviderError } = await import("./openai-provider");
+    const failure = mapFocusedProviderError(
+      new OpenAI.InternalServerError(
+        503,
+        { error: { message: "private provider body" } },
+        "unavailable",
+        new Headers({
+          "x-request-id": "req_focused_503",
+          "retry-after": "1",
+        }),
+      ),
+    );
+    expect(failure).toMatchObject({
+      code: "openai_unavailable",
+      retryable: true,
+      statusCode: 503,
+      requestId: "req_focused_503",
+      retryAfterMs: 1_000,
+    });
   });
 
   it("builds a strict model schema with nullable optional app fields", async () => {

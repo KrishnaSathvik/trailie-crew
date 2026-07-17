@@ -614,6 +614,18 @@ export type Database = {
         Args: { batch_size?: number };
         Returns: string[];
       };
+      list_recoverable_ai_invocations: {
+        Args: { batch_size?: number };
+        Returns: string[];
+      };
+      get_ai_invocation_context: {
+        Args: { target_invocation_id: string };
+        Returns: Json;
+      };
+      get_provider_resilience_report: {
+        Args: { target_room_id: string };
+        Returns: Json;
+      };
       create_itinerary_generation: {
         Args: {
           target_planning_request_id: string;

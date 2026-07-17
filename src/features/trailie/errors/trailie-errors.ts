@@ -34,8 +34,7 @@ export const trailieErrorMessages = {
     "Trailie did not produce a response that passed validation.",
   workflow_deadline_exceeded:
     "Trailie reached the workflow deadline without publishing partial work.",
-  retry_exhausted:
-    "Trailie reached the safe retry limit. Chat and existing plans remain available.",
+  retry_exhausted: "Trailie could not answer right now. Try again.",
   recovery_required:
     "Trailie saved this request for recovery. Chat remains available while recovery continues.",
   context_unavailable: "Trailie could not load the conversation context.",

@@ -168,6 +168,25 @@ test("Trailie stays silent, streams one focused answer, persists it, and handles
     0,
   );
 
+  await host
+    .getByLabel("Message your crew")
+    .fill("@Trailie simulate persistent provider failure");
+  await host.getByLabel("Message your crew").press("Enter");
+  await expect(
+    host.getByText("Trailie could not answer right now. Try again."),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    host.getByRole("article", { name: "Message from Trailie" }),
+  ).toHaveCount(4);
+  await expect(host.getByRole("button", { name: "Retry Trailie" })).toHaveCount(
+    0,
+  );
+  await member.getByLabel("Message your crew").fill("Human chat still works");
+  await member.getByLabel("Message your crew").press("Enter");
+  await expect(
+    host.getByText("Human chat still works", { exact: true }),
+  ).toBeVisible();
+
   await member.setViewportSize({ width: 390, height: 844 });
   expect(
     await member.evaluate(

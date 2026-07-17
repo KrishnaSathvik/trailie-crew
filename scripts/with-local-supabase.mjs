@@ -13,13 +13,6 @@ const status = spawnSync("pnpm", ["exec", "supabase", "status", "-o", "env"], {
   encoding: "utf8",
 });
 
-if (status.status !== 0) {
-  console.error(
-    "Local Supabase is unavailable. Run `pnpm exec supabase start` first.",
-  );
-  process.exit(status.status ?? 1);
-}
-
 const localEnvironment = Object.fromEntries(
   status.stdout
     .split("\n")
@@ -33,9 +26,9 @@ const localEnvironment = Object.fromEntries(
 
 if (!localEnvironment.API_URL || !localEnvironment.PUBLISHABLE_KEY) {
   console.error(
-    "Supabase status did not return the required public local values.",
+    "Local Supabase is unavailable or did not return the required public values. Run `pnpm exec supabase start` first.",
   );
-  process.exit(1);
+  process.exit(status.status ?? 1);
 }
 
 const child = spawnSync(command, args, {

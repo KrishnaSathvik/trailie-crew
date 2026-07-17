@@ -43,6 +43,7 @@ describe("provider attempt repository", () => {
         leaseOwner,
         leaseMs: 360_000,
         quotaReservationId: null,
+        correlationId: "corr_provider_1",
       }),
     ).resolves.toMatchObject({ attemptId, claimed: true });
     expect(rpc).toHaveBeenCalledWith("claim_ai_provider_attempt", {
@@ -53,6 +54,7 @@ describe("provider attempt repository", () => {
       target_lease_owner: leaseOwner,
       target_lease_ms: 360_000,
       target_quota_reservation_id: null,
+      target_correlation_id: "corr_provider_1",
     });
   });
 
@@ -120,7 +122,14 @@ describe("provider attempt repository", () => {
       },
     );
     await repository.markApplied(attemptId, leaseOwner);
-    await repository.fail(attemptId, leaseOwner, "model_unavailable", true);
+    await repository.fail(attemptId, leaseOwner, "model_unavailable", true, {
+      statusCode: 503,
+      retryAfterMs: 1_000,
+      requestId: "req_503",
+      nextRetryAt: "2026-07-17T15:00:01.000Z",
+      providerDurationMs: 275,
+      totalDurationMs: 400,
+    });
     expect(rpc).toHaveBeenNthCalledWith(2, "mark_ai_provider_attempt_applied", {
       target_attempt_id: attemptId,
       target_lease_owner: leaseOwner,
@@ -130,6 +139,12 @@ describe("provider attempt repository", () => {
       target_lease_owner: leaseOwner,
       target_error_code: "model_unavailable",
       target_retryable: true,
+      target_provider_status_code: 503,
+      target_retry_after_ms: 1_000,
+      target_provider_request_id: "req_503",
+      target_next_retry_at: "2026-07-17T15:00:01.000Z",
+      target_provider_duration_ms: 275,
+      target_total_duration_ms: 400,
     });
   });
 });

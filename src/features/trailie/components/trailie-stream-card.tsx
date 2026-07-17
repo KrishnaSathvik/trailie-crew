@@ -14,7 +14,7 @@ export function TrailieStreamCard({
   onRetry,
 }: {
   body: string;
-  status: "answering" | "failed";
+  status: "answering" | "retrying" | "recovering" | "failed";
   errorCode: TrailieErrorCode | null;
   retryable: boolean;
   onCancel: () => void;
@@ -45,6 +45,16 @@ export function TrailieStreamCard({
       {status === "answering" && !body ? (
         <p className="text-muted-foreground mt-2 text-sm">
           Trailie is answering…
+        </p>
+      ) : null}
+      {status === "retrying" ? (
+        <p className="text-muted-foreground mt-2 text-sm">
+          Trailie is retrying after a temporary issue.
+        </p>
+      ) : null}
+      {status === "recovering" ? (
+        <p className="text-muted-foreground mt-2 text-sm">
+          Trailie is recovering this response.
         </p>
       ) : null}
       {body ? (

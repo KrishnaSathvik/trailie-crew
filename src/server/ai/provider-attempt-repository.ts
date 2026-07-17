@@ -82,6 +82,7 @@ export function createProviderAttemptRepository<T>(
           target_lease_owner: input.leaseOwner,
           target_lease_ms: input.leaseMs,
           target_quota_reservation_id: input.quotaReservationId,
+          target_correlation_id: input.correlationId ?? input.leaseOwner,
         }),
       );
     },
@@ -138,12 +139,19 @@ export function createProviderAttemptRepository<T>(
       leaseOwner: string,
       code: string,
       retryable: boolean,
+      metadata = {},
     ) {
       await rpc("fail_ai_provider_attempt", {
         target_attempt_id: attemptId,
         target_lease_owner: leaseOwner,
         target_error_code: code,
         target_retryable: retryable,
+        target_provider_status_code: metadata.statusCode ?? null,
+        target_retry_after_ms: metadata.retryAfterMs ?? null,
+        target_provider_request_id: metadata.requestId ?? null,
+        target_next_retry_at: metadata.nextRetryAt ?? null,
+        target_provider_duration_ms: metadata.providerDurationMs ?? 0,
+        target_total_duration_ms: metadata.totalDurationMs ?? 0,
       });
     },
   };

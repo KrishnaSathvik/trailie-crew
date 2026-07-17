@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 import { spawnSync } from "node:child_process";
 
+const localBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) {
   const status = spawnSync(
     "pnpm",
@@ -28,7 +30,7 @@ export default defineConfig({
   reporter: "list",
   outputDir: "output/playwright/test-results",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: localBaseUrl,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -36,7 +38,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "pnpm dev:local",
-        url: "http://127.0.0.1:3000",
+        url: localBaseUrl,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },

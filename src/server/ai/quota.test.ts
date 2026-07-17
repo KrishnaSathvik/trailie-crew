@@ -16,6 +16,50 @@ function dependencies() {
 }
 
 describe("AI quota controller", () => {
+  it("supports one durable reservation reconciled after provider staging", async () => {
+    const reserve = vi.fn().mockResolvedValue(undefined);
+    const reconcile = vi.fn().mockResolvedValue(undefined);
+    const controller = createAiQuotaController({
+      reserve,
+      reconcile,
+      createId: () => "unused",
+    });
+    const reservation = controller.reservation({
+      userId: "user",
+      roomId: "room",
+      workflow: "focused_answer",
+      model: "terra",
+      estimatedTokens: 4_000,
+      reservationId: "invocation",
+    });
+    await reservation.reserve();
+    await reservation.reserve();
+    await reservation.reconcile(321);
+    await reservation.reconcile(321);
+    expect(reserve).toHaveBeenCalledTimes(2);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(reconcile).toHaveBeenCalledWith("invocation", 321, "used");
+  });
+
+  it("maps a durable reservation rejection before any provider work", async () => {
+    const controller = createAiQuotaController({
+      reserve: vi.fn().mockRejectedValue(new Error("ai_disabled")),
+      reconcile: vi.fn(),
+      createId: () => "unused",
+    });
+    await expect(
+      controller
+        .reservation({
+          userId: "user",
+          roomId: "room",
+          workflow: "focused_answer",
+          model: "terra",
+          estimatedTokens: 4_000,
+          reservationId: "invocation",
+        })
+        .reserve(),
+    ).rejects.toMatchObject({ code: "ai_disabled" });
+  });
   afterEach(() => vi.unstubAllEnvs());
 
   it("honors the server-only emergency environment switch before provider setup", () => {

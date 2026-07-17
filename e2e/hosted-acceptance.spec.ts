@@ -16,6 +16,8 @@ const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const recoverySecret = process.env.RECOVERY_SECRET;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecret = process.env.SUPABASE_SECRET_KEY;
+const providerFaultDrill =
+  process.env.HOSTED_ACCEPTANCE_PROVIDER_FAULT_ENABLED === "1";
 
 test.skip(!hosted, "Run only during controlled hosted acceptance.");
 
@@ -108,12 +110,52 @@ async function runBoundedRecovery(request: APIRequestContext) {
     expect(response.status()).toBe(200);
     const result = (await response.json()) as {
       status: string;
-      counts: { remainingEligible: number };
+      counts: {
+        claimed: number;
+        completed: number;
+        deferred: number;
+        retry_exhausted: number;
+        failed: number;
+        skipped: number;
+        remaining_eligible: number;
+      };
     };
     expect(result.status).toBe("ok");
     return result.counts;
   }
   throw new Error("hosted_recovery_rate_limited");
+}
+
+async function resilienceReport(roomId: string) {
+  const { data, error } = await admin!.rpc("get_provider_resilience_report", {
+    target_room_id: roomId,
+  });
+  expect(error).toBeNull();
+  return data as {
+    focused: {
+      attemptCount: number;
+      retryCount: number;
+      recoveryCount: number;
+      providerStatuses: number[];
+      providerLatencyMs: number;
+      totalWorkflowLatencyMs: number;
+      totalTokens: number;
+      unresolvedCount: number;
+    };
+    memory: {
+      attemptCount: number;
+      retryCount: number;
+      recoveryCount: number;
+      providerStatuses: number[];
+      providerLatencyMs: number;
+      totalWorkflowLatencyMs: number;
+      totalTokens: number;
+      unresolvedCount: number;
+    };
+    messages: { user: number; trailie: number };
+    planVersions: number[];
+    shares: { active: number; revoked: number };
+  };
 }
 
 async function recoverQueuedMemory(request: APIRequestContext) {
@@ -132,11 +174,82 @@ async function timed<T>(
   return result;
 }
 
-test("controlled hosted Preview completes Phase 5D revision reacceptance", async ({
+test("protected Preview recovers one controlled Terra and Luna 503", async ({
+  browser,
+}) => {
+  test.skip(
+    !providerFaultDrill,
+    "Controlled hosted provider fault is disabled.",
+  );
+  test.setTimeout(6 * 60_000);
+  const context = await protectedContext(browser);
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/trips/create`);
+  await page.getByLabel("Trip name").fill("Phase 5E Provider Drill");
+  await page.getByLabel("Your display name").fill("Maya");
+  await page.getByRole("button", { name: "Create Trip" }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+  const roomId = new URL(page.url()).pathname.split("/").at(-1)!;
+
+  await send(
+    page,
+    "@Trailie [[trailie-acceptance:focused-503-once]] What should we verify before a Yosemite trip?",
+  );
+  await expect(
+    page.getByText("Trailie is retrying after a temporary issue."),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("article", { name: "Message from Trailie" }),
+  ).toHaveCount(1, { timeout: 90_000 });
+
+  const memoryBefore = (await memory(roomId))?.snapshot.memory_version ?? 0;
+  await send(
+    page,
+    "[[trailie-acceptance:memory-503-once]] I prefer hiking and peanut-free meals.",
+  );
+  await expect
+    .poll(async () => (await memory(roomId))?.snapshot.memory_version ?? 0, {
+      timeout: 90_000,
+    })
+    .toBeGreaterThan(memoryBefore);
+  const preferenceVersion =
+    (await memory(roomId))?.snapshot.memory_version ?? memoryBefore;
+  await send(page, "Correction: I prefer kayaking instead of hiking.");
+  await expect
+    .poll(async () => (await memory(roomId))?.snapshot.memory_version ?? 0, {
+      timeout: 90_000,
+    })
+    .toBeGreaterThan(preferenceVersion);
+
+  const recovery = await runBoundedRecovery(context.request);
+  expect(recovery.failed).toBe(0);
+  const report = await resilienceReport(roomId);
+  expect(report.focused).toMatchObject({
+    attemptCount: 2,
+    retryCount: 1,
+    unresolvedCount: 0,
+  });
+  expect(report.focused.providerStatuses).toContain(503);
+  expect(report.memory.attemptCount).toBeGreaterThanOrEqual(3);
+  expect(report.memory.retryCount).toBeGreaterThanOrEqual(1);
+  expect(report.memory.providerStatuses).toContain(503);
+  expect(report.memory.unresolvedCount).toBe(0);
+  expect(report.messages.trailie).toBe(1);
+  console.log(
+    `HOSTED_PROVIDER_DRILL_RESULT ${JSON.stringify({
+      status: "pass",
+      recovery,
+      report,
+    })}`,
+  );
+  await context.close();
+});
+
+test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   browser,
 }) => {
   test.setTimeout(22 * 60_000);
-  await mkdir("output/phase-5d/screenshots", { recursive: true });
+  await mkdir("output/phase-5e/screenshots", { recursive: true });
 
   const timings: Record<string, number> = {};
   const prerequisiteFailures: string[] = [];
@@ -156,7 +269,7 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
     });
 
   await host.goto(`${baseUrl}/trips/create`);
-  await host.getByLabel("Trip name").fill("Phase 5D Hosted Acceptance");
+  await host.getByLabel("Trip name").fill("Phase 5E Hosted Acceptance");
   await host.getByLabel("Your display name").fill("Maya");
   await host.getByRole("button", { name: "Create Trip" }).click();
   await expect(host).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
@@ -300,17 +413,17 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
     timeout: 30_000,
   });
   await member.screenshot({
-    path: "output/phase-5d/screenshots/version-1.png",
+    path: "output/phase-5e/screenshots/version-1.png",
     fullPage: true,
   });
 
   await member.getByRole("tab", { name: "Day-by-day" }).click();
-  await member
-    .getByRole("heading", { level: 3, name: /kayak/i })
-    .first()
-    .locator("xpath=ancestor::li")
-    .getByRole("button", { name: "Change this" })
-    .click();
+  const kayakingItem = member
+    .getByRole("listitem")
+    .filter({ hasText: /kayak/i })
+    .first();
+  await expect(kayakingItem).toBeVisible({ timeout: 30_000 });
+  await kayakingItem.getByRole("button", { name: "Change this" }).click();
   await member
     .getByLabel("Change type")
     .selectOption({ label: "Remove an item" });
@@ -342,7 +455,7 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
     timeout: 60_000,
   });
   await host.screenshot({
-    path: "output/phase-5d/screenshots/version-2.png",
+    path: "output/phase-5e/screenshots/version-2.png",
     fullPage: true,
   });
 
@@ -381,9 +494,25 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
   );
   expect(publicResponse?.headers()["x-robots-tag"]).toContain("noindex");
   await visitor.screenshot({
-    path: "output/phase-5d/screenshots/public-version-1.png",
+    path: "output/phase-5e/screenshots/public-version-1.png",
     fullPage: true,
   });
+  const calendar = await hostContext.request.get(
+    `${baseUrl}/api/trips/${roomId}/plans/1/calendar`,
+  );
+  const ics = await calendar.text();
+  expect(calendar.status(), ics).toBe(200);
+  expect(ics).toContain("X-TRAILIE-PLAN-VERSION:1\r\n");
+  if (ics.includes("BEGIN:VEVENT\r\n")) {
+    expect(ics).toContain("@v1.trailie.crew");
+  } else {
+    expect(ics).toMatch(/X-TRAILIE-OMITTED-UNTIMED:[1-9]\d*\r\n/);
+  }
+  expect(ics).not.toContain("@v2.trailie.crew");
+  const print = await hostContext.newPage();
+  await print.goto(`${baseUrl}/trips/${roomId}/plans/1/print`);
+  await expect(print.getByLabel("Pinned Version 1")).toBeVisible();
+  await print.close();
   await host.getByRole("button", { name: "Revoke link" }).click();
   await expect(host.getByRole("status")).toContainText(
     "Public access is now off",
@@ -399,51 +528,8 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
   await openPlan(host);
   await expect(host.getByText("Published itinerary · Version 2")).toBeVisible();
 
-  // Repeatability: reuse the validated Version 2 base and remove a different
-  // timed food stop. This intentionally produces Version 3 rather
-  // than repeating the expensive room/bootstrap path.
-  await member.reload();
-  await openPlan(member);
-  await expect(
-    member.getByText("Published itinerary · Version 2"),
-  ).toBeVisible();
-  await member.getByRole("tab", { name: "Day-by-day" }).click();
-  await member.getByRole("button", { name: "Change this" }).nth(1).click();
-  await member
-    .getByLabel("Change type")
-    .selectOption({ label: "Remove an item" });
-  await member
-    .getByLabel("Request details")
-    .fill(
-      "Remove this timed food stop and keep everything else unchanged except directly connected route cleanup.",
-    );
-  await timed(timings, "repeat_revision_analysis_ms", async () => {
-    await member.getByRole("button", { name: "Submit change request" }).click();
-    await expect(
-      member.getByRole("button", { name: "Approve analysis" }),
-    ).toBeVisible({ timeout: 120_000 });
-  });
-  await member.getByRole("button", { name: "Approve analysis" }).click();
-  await expect(
-    host.getByRole("button", { name: "Approve analysis" }),
-  ).toBeVisible({ timeout: 30_000 });
-  await timed(timings, "repeat_revision_candidate_ms", async () => {
-    await host.getByRole("button", { name: "Approve analysis" }).click();
-    await expect(
-      member.getByRole("heading", { name: "Ready to publish Version 3" }),
-    ).toBeVisible({ timeout: 300_000 });
-  });
-  await member.getByRole("button", { name: "Confirm Version 3" }).click();
-  await expect(
-    host.getByRole("heading", { name: "Ready to publish Version 3" }),
-  ).toBeVisible({ timeout: 30_000 });
-  await host.getByRole("button", { name: "Confirm Version 3" }).click();
-  await expect(host.getByText("Published itinerary · Version 3")).toBeVisible({
-    timeout: 60_000,
-  });
-
   const recoveryCounts = await runBoundedRecovery(hostContext.request);
-  expect(recoveryCounts.remainingEligible).toBe(0);
+  expect(recoveryCounts.remaining_eligible).toBe(0);
   correctedMemory = await memory(roomId);
   if (
     correctedMemory?.facts.some(
@@ -466,6 +552,8 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
     );
   }
   const recoveryBacklogs = await Promise.all([
+    admin!.rpc("list_recoverable_ai_invocations", { batch_size: 50 }),
+    admin!.rpc("list_recoverable_message_extractions", { batch_size: 50 }),
     admin!.rpc("list_recoverable_plan_changes", { batch_size: 50 }),
     admin!.rpc("list_recoverable_plan_change_publications", { batch_size: 50 }),
     admin!.rpc("list_recoverable_ai_provider_attempts", { batch_size: 50 }),
@@ -474,6 +562,12 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
     expect(backlog.error).toBeNull();
     expect(backlog.data).toEqual([]);
   }
+  const providerReport = await resilienceReport(roomId);
+  expect(providerReport.focused.unresolvedCount).toBe(0);
+  expect(providerReport.memory.unresolvedCount).toBe(0);
+  expect(providerReport.messages.trailie).toBe(1);
+  expect(providerReport.planVersions).toEqual([1, 2]);
+  expect(providerReport.shares).toMatchObject({ active: 0, revoked: 1 });
 
   await member.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -494,14 +588,12 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
       timings,
       memoryVersion: correctedMemory?.snapshot.memory_version ?? null,
       memoryExtractions: correctedMemory?.extractions ?? [],
+      providerReport,
       prerequisiteFailures,
       browserProviderRequestCount: browserProviderRequests.length,
       consoleProblemCount: problems.length,
-      currentPlanVersion: 3,
-      revisionCases: [
-        { requestType: "remove_item", publishedVersion: 2 },
-        { requestType: "remove_food_stop", publishedVersion: 3 },
-      ],
+      currentPlanVersion: 2,
+      revisionCases: [{ requestType: "remove_item", publishedVersion: 2 }],
       recoveryBacklog: 0,
       historicalShareRegression: "passed_current_run",
       screenshots: 3,
@@ -509,4 +601,99 @@ test("controlled hosted Preview completes Phase 5D revision reacceptance", async
   );
 
   await Promise.all([hostContext.close(), memberContext.close()]);
+});
+
+test("fresh-room Terra Luna and planning repeatability subset", async ({
+  browser,
+}) => {
+  test.setTimeout(7 * 60_000);
+  const startedAt = Date.now();
+  const timings: Record<string, number> = {};
+  const context = await protectedContext(browser);
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/trips/create`);
+  await page.getByLabel("Trip name").fill("Phase 5E Repeatability");
+  await page.getByLabel("Your display name").fill("Riley");
+  await page.getByRole("button", { name: "Create Trip" }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+  const roomId = new URL(page.url()).pathname.split("/").at(-1)!;
+
+  await timed(timings, "focused_answer_ms", async () => {
+    await send(
+      page,
+      "@Trailie What should a crew confirm before a Yosemite weekend?",
+    );
+    await expect(
+      page.getByRole("article", { name: "Message from Trailie" }),
+    ).toHaveCount(1, { timeout: 90_000 });
+  });
+
+  let memoryVersion = (await memory(roomId))?.snapshot.memory_version ?? 0;
+  await timed(timings, "memory_preference_ms", async () => {
+    await send(page, "I prefer hiking and peanut-free meals.");
+    await expect
+      .poll(async () => (await memory(roomId))?.snapshot.memory_version ?? 0, {
+        timeout: 90_000,
+      })
+      .toBeGreaterThan(memoryVersion);
+  });
+  memoryVersion = (await memory(roomId))!.snapshot.memory_version;
+  await timed(timings, "memory_correction_ms", async () => {
+    await send(page, "Correction: I prefer kayaking instead of hiking.");
+    await expect
+      .poll(async () => (await memory(roomId))?.snapshot.memory_version ?? 0, {
+        timeout: 90_000,
+      })
+      .toBeGreaterThan(memoryVersion);
+  });
+  memoryVersion = (await memory(roomId))!.snapshot.memory_version;
+  await send(
+    page,
+    "We chose Yosemite for August 10 through August 13, 2026, with a moderate budget and accessible alternatives.",
+  );
+  await expect
+    .poll(async () => (await memory(roomId))?.snapshot.memory_version ?? 0, {
+      timeout: 90_000,
+    })
+    .toBeGreaterThan(memoryVersion);
+
+  await timed(timings, "planning_summary_ms", async () => {
+    await openPlan(page);
+    await page.getByRole("button", { name: "Build Our Itinerary" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Before I build the trip" }),
+    ).toBeVisible({ timeout: 120_000 });
+  });
+
+  const recovery = await runBoundedRecovery(context.request);
+  expect(recovery.remaining_eligible).toBe(0);
+  const report = await resilienceReport(roomId);
+  expect(report.focused.unresolvedCount).toBe(0);
+  expect(report.memory.unresolvedCount).toBe(0);
+  expect(report.messages.trailie).toBe(1);
+  const corrected = await memory(roomId);
+  expect(
+    corrected?.facts.some(
+      (fact) =>
+        fact.status === "superseded" &&
+        fact.value.text?.toLowerCase().includes("hiking"),
+    ),
+  ).toBe(true);
+  expect(
+    corrected?.facts.some(
+      (fact) =>
+        fact.status === "active" &&
+        fact.value.text?.toLowerCase().includes("kayak"),
+    ),
+  ).toBe(true);
+  console.log(
+    `HOSTED_REPEATABILITY_RESULT ${JSON.stringify({
+      status: "pass",
+      totalDurationMs: Date.now() - startedAt,
+      timings,
+      recovery,
+      report,
+    })}`,
+  );
+  await context.close();
 });

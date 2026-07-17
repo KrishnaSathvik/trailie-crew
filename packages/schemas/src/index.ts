@@ -260,6 +260,11 @@ export const trailieStreamEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      type: z.enum(["provider_retrying", "response_recovering"]),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal("text_delta"),
       delta: z.string().min(1).max(1000),
     })

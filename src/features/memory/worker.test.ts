@@ -108,7 +108,7 @@ describe("memory extraction worker", () => {
     expect(store.complete).not.toHaveBeenCalled();
   });
 
-  it("uses the central attempt cap and bounded backoff between durable claims", async () => {
+  it("caps memory at two attempts even when a shared policy allows three", async () => {
     const store = repository("I prefer hiking", [
       { status: "running", claimed: true, attemptCount: 1 },
       { status: "running", claimed: true, attemptCount: 2 },
@@ -132,10 +132,90 @@ describe("memory extraction worker", () => {
       }),
       retry: { sleep, random: () => 0.5 },
     });
-    expect(provider.extract).toHaveBeenCalledTimes(3);
-    expect(store.claim).toHaveBeenCalledTimes(3);
-    expect(sleep).toHaveBeenNthCalledWith(1, 500);
-    expect(sleep).toHaveBeenNthCalledWith(2, 1_000);
+    expect(provider.extract).toHaveBeenCalledTimes(2);
+    expect(store.claim).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledOnce();
+    expect(sleep).toHaveBeenCalledWith(500);
+  });
+
+  it("honors a bounded provider Retry-After before the second claim", async () => {
+    const store = repository("I prefer hiking", [
+      { status: "running", claimed: true, attemptCount: 1 },
+      { status: "running", claimed: true, attemptCount: 2 },
+    ]);
+    const provider = {
+      extract: vi
+        .fn()
+        .mockRejectedValueOnce(
+          Object.assign(new Error("temporarily unavailable"), {
+            code: "model_unavailable",
+            retryable: true,
+            retryAfterMs: 1_500,
+          }),
+        )
+        .mockResolvedValueOnce(
+          await createFakeMemoryExtractionProvider().extract({
+            operationKey: messageId,
+            model: "gpt-5.6-luna",
+            safetyIdentifier: "safe",
+            ...context("I prefer hiking"),
+            signal: new AbortController().signal,
+          }),
+        ),
+    };
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    await processMemoryExtraction(messageId, {
+      repository: store,
+      provider,
+      safetyIdentifier: "safe",
+      retry: { sleep, random: () => 0.5 },
+    });
+    expect(sleep).toHaveBeenCalledWith(1_500);
+    expect(store.complete).toHaveBeenCalledOnce();
+  });
+
+  it("uses one message-scoped quota reservation across a 503 retry", async () => {
+    const store = repository("I prefer hiking", [
+      { status: "running", claimed: true, attemptCount: 1 },
+      { status: "running", claimed: true, attemptCount: 2 },
+    ]);
+    const provider = {
+      extract: vi
+        .fn()
+        .mockRejectedValueOnce(
+          Object.assign(new Error("unavailable"), {
+            code: "model_unavailable",
+            retryable: true,
+          }),
+        )
+        .mockResolvedValueOnce(
+          await createFakeMemoryExtractionProvider().extract({
+            operationKey: messageId,
+            model: "gpt-5.6-luna",
+            safetyIdentifier: "safe",
+            ...context("I prefer hiking"),
+            signal: new AbortController().signal,
+          }),
+        ),
+    };
+    const reserve = vi.fn().mockResolvedValue(undefined);
+    const reconcile = vi.fn().mockResolvedValue(undefined);
+    const release = vi.fn().mockResolvedValue(undefined);
+    await processMemoryExtraction(messageId, {
+      repository: store,
+      provider,
+      safetyIdentifier: "safe",
+      retry: { sleep: vi.fn().mockResolvedValue(undefined) },
+      quotaReservation: {
+        id: messageId,
+        reserve,
+        reconcile,
+        release,
+      },
+    });
+    expect(reserve).toHaveBeenCalledTimes(2);
+    expect(reconcile).toHaveBeenCalledOnce();
+    expect(release).not.toHaveBeenCalled();
   });
 
   it("stages validated memory output through the durable attempt controller", async () => {

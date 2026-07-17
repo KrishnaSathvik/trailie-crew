@@ -39,6 +39,7 @@ describe("internal recovery route", () => {
   it("runs bounded recovery and returns only safe counts", async () => {
     vi.mocked(runDefaultRecovery).mockResolvedValue({
       selected: {
+        focused: 0,
         memory: 1,
         planning: 0,
         itinerary: 0,
@@ -46,6 +47,7 @@ describe("internal recovery route", () => {
         revisionPublication: 0,
       },
       completed: {
+        focused: 0,
         memory: 1,
         planning: 0,
         itinerary: 0,
@@ -53,12 +55,17 @@ describe("internal recovery route", () => {
         revisionPublication: 0,
       },
       failed: {
+        focused: 0,
         memory: 0,
         planning: 0,
         itinerary: 0,
         revision: 0,
         revisionPublication: 0,
       },
+      claimed: 1,
+      deferred: 0,
+      retryExhausted: 0,
+      skipped: 0,
       remainingEligible: 0,
     });
     const response = await POST(
@@ -69,7 +76,18 @@ describe("internal recovery route", () => {
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toMatchObject({ status: "ok" });
+    expect(await response.json()).toMatchObject({
+      status: "ok",
+      counts: {
+        claimed: 1,
+        completed: 1,
+        deferred: 0,
+        retry_exhausted: 0,
+        failed: 0,
+        skipped: 0,
+        remaining_eligible: 0,
+      },
+    });
   });
 
   it("accepts Vercel Cron GET authentication through CRON_SECRET", async () => {
@@ -77,6 +95,7 @@ describe("internal recovery route", () => {
     vi.stubEnv("CRON_SECRET", secret);
     vi.mocked(runDefaultRecovery).mockResolvedValue({
       selected: {
+        focused: 0,
         memory: 0,
         planning: 0,
         itinerary: 0,
@@ -84,6 +103,7 @@ describe("internal recovery route", () => {
         revisionPublication: 0,
       },
       completed: {
+        focused: 0,
         memory: 0,
         planning: 0,
         itinerary: 0,
@@ -91,12 +111,17 @@ describe("internal recovery route", () => {
         revisionPublication: 0,
       },
       failed: {
+        focused: 0,
         memory: 0,
         planning: 0,
         itinerary: 0,
         revision: 0,
         revisionPublication: 0,
       },
+      claimed: 0,
+      deferred: 0,
+      retryExhausted: 0,
+      skipped: 0,
       remainingEligible: 0,
     });
     const response = await GET(
@@ -117,7 +142,7 @@ describe("internal recovery route", () => {
         headers: { authorization: `Bearer ${secret}` },
       }),
     );
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       status: "error",
       code: "recovery_unavailable",

@@ -14,12 +14,24 @@ export type SafeAiErrorCode =
   | "invocation_cancelled";
 
 export class TrailieProviderError extends Error {
+  readonly statusCode: number | null;
+  readonly requestId: string | null;
+  readonly retryAfterMs: number | null;
+
   constructor(
     readonly code: SafeAiErrorCode,
     readonly retryable: boolean,
+    metadata: {
+      statusCode?: number | null;
+      requestId?: string | null;
+      retryAfterMs?: number | null;
+    } = {},
   ) {
     super(code);
     this.name = "TrailieProviderError";
+    this.statusCode = metadata.statusCode ?? null;
+    this.requestId = metadata.requestId ?? null;
+    this.retryAfterMs = metadata.retryAfterMs ?? null;
   }
 }
 
@@ -71,9 +83,14 @@ export function createFakeFocusedAnswerProvider(
 ): FocusedAnswerProvider {
   return {
     async stream(input) {
-      if (/simulate provider failure/i.test(input.request)) {
+      if (/simulate (?:persistent )?provider failure/i.test(input.request)) {
+        const persistent = /simulate persistent provider failure/i.test(
+          input.request,
+        );
         const shouldFail =
-          !options.failOnce || !failedFakeOperations.has(input.operationKey);
+          persistent ||
+          !options.failOnce ||
+          !failedFakeOperations.has(input.operationKey);
         failedFakeOperations.add(input.operationKey);
         if (!shouldFail) {
           // Continue into the normal deterministic response on a deliberate retry.

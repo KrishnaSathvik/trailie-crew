@@ -7,9 +7,11 @@ import {
   drainPlanChange,
   publishPlanChange,
 } from "@/features/revisions/scheduler";
+import { drainFocusedAnswer } from "@/server/ai/focused-worker";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 
 export const recoveryCategories = [
+  "focused",
   "memory",
   "planning",
   "itinerary",
@@ -23,7 +25,10 @@ type RecoveryCounts = Record<RecoveryCategory, number>;
 export type RecoveryDependencies = {
   prepare(): Promise<void>;
   list(category: RecoveryCategory, batchSize: number): Promise<string[]>;
-  drain(category: RecoveryCategory, id: string): Promise<void>;
+  drain(
+    category: RecoveryCategory,
+    id: string,
+  ): Promise<void | { status: "completed" | "deferred" | "skipped" }>;
 };
 
 export class RecoveryRateLimitedError extends Error {
@@ -34,6 +39,7 @@ export class RecoveryRateLimitedError extends Error {
 }
 
 const emptyCounts = (): RecoveryCounts => ({
+  focused: 0,
   memory: 0,
   planning: 0,
   itinerary: 0,
@@ -64,27 +70,57 @@ export async function runRecovery(
   const outcomes = await Promise.all(
     selectedJobs.map(async (job) => {
       try {
-        await dependencies.drain(job.category, job.id);
-        return { category: job.category, completed: true } as const;
-      } catch {
-        return { category: job.category, completed: false } as const;
+        const result = await dependencies.drain(job.category, job.id);
+        return {
+          category: job.category,
+          status: result?.status ?? "completed",
+        } as const;
+      } catch (error) {
+        const retryExhausted =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "retry_exhausted";
+        return {
+          category: job.category,
+          status: retryExhausted ? "retry_exhausted" : "failed",
+        } as const;
       }
     }),
   );
   const completed = emptyCounts();
   const failed = emptyCounts();
   for (const outcome of outcomes)
-    (outcome.completed ? completed : failed)[outcome.category] += 1;
+    if (outcome.status === "completed") completed[outcome.category] += 1;
+    else if (outcome.status === "failed") failed[outcome.category] += 1;
+
+  const deferredJobs = outcomes.filter(
+    (outcome) => outcome.status === "deferred",
+  ).length;
+  const retryExhausted = outcomes.filter(
+    (outcome) => outcome.status === "retry_exhausted",
+  ).length;
+  const skipped = outcomes.filter(
+    (outcome) => outcome.status === "skipped",
+  ).length;
+  const unselected = Math.max(eligible.length - selectedJobs.length, 0);
 
   return {
     selected,
     completed,
     failed,
-    remainingEligible: Math.max(eligible.length - selectedJobs.length, 0),
+    claimed: selectedJobs.length,
+    deferred: unselected + deferredJobs,
+    retryExhausted,
+    skipped,
+    remainingEligible: unselected + deferredJobs,
   };
 }
 
 const rpcByCategory = {
+  focused: {
+    name: "list_recoverable_ai_invocations",
+  },
   memory: {
     name: "list_recoverable_message_extractions",
   },
@@ -113,13 +149,17 @@ export function createDefaultRecoveryDependencies(): RecoveryDependencies {
     },
     async list(category, batchSize) {
       const rpc = rpcByCategory[category];
-      const { data, error } = await admin.rpc(rpc.name, {
-        batch_size: batchSize,
-      });
+      const { data, error } = await admin.rpc(
+        rpc.name as never,
+        {
+          batch_size: batchSize,
+        } as never,
+      );
       if (error) throw new Error("recovery_listing_failed");
       return (data ?? []) as string[];
     },
     async drain(category, id) {
+      if (category === "focused") return drainFocusedAnswer(id);
       if (category === "memory") return drainMemoryExtraction(id);
       if (category === "planning") return drainPlanningSummary(id);
       if (category === "itinerary") return drainItineraryGeneration(id);
