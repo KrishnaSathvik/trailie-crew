@@ -1,5 +1,9 @@
 # Phase 4C Production Readiness Audit
 
+## Phase 5D addendum — July 16–17, 2026
+
+Revision generation now uses an application-owned manifest, protected hashes, patch-first deterministic routing, and one scope-only repair. Local quality/security gates pass; prior protected evidence published the exact removal as Version 2 and an independent removal as Version 3. This does not change the production verdict: `not_ready`. The complete protected regression remains incomplete, and existing real Turnstile, WAF/budget, cron/external-alert, restore/RPO/RTO, and manual-accessibility blockers remain.
+
 Audit date: 2026-07-14
 
 Base commit: `8bafcdd` on `main`
@@ -214,3 +218,9 @@ The Phase 5C exact local gate passes: formatting, lint, typecheck, production bu
 The protected hosted regression did not pass. Real providers reached validated Version 1 and an approved revision candidate attempt, but deterministic scope validation rejected that candidate with `change_scope_exceeded`. No Version 2 was published. Real Turnstile, WAF/bot controls, external alert receipt, provider monetary budget evidence, isolated restore/RPO/RTO, and the manual accessibility matrix remain blocked.
 
 Updated independent verdicts: feature completeness `complete_for_phase_5c_implementation`; local product quality `pass`; protected Preview `not_accepted_for_release`; Production `not_ready`. See the [complete 23-gate Phase 5C report](./phase-5c-provider-infrastructure.md).
+
+## Phase 5D audit addendum — July 17, 2026
+
+Revision scope reliability is `conditional_pass`: application-owned manifests, protected snapshots, validated patches, deterministic narrow routing, preservation hashes, top-level classification, canonical diffs, and one scope-only repair now prevent the full-plan drift observed in Phase 5C without weakening `change_scope_exceeded`. Prior protected runs published exact removal Version 2 and independent removal Version 3 while preserving Version 1.
+
+The latest complete regression worktree deployed Ready as `dpl_52TpJwK7aReq9CzZJgPJHkwC8pMP` only to the Vercel-Authentication-protected `hosted-acceptance` target, then stopped at a focused-answer prerequisite when bounded recovery returned HTTP 503. A prior independent credentialed harness returned HTTP 429 for all 15 operations. This is not accepted as a successful full rerun. The failed disposable room and temporary environment file were deleted, bypass count is zero, linked migrations match local, and revision/publication/provider recovery backlogs are zero. Protected Preview remains `not_accepted_for_release`; Production remains `not_ready` and was not deployed.

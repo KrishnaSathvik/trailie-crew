@@ -1,5 +1,19 @@
 # Submission Checklist
 
+## Phase 5D release gate
+
+- [x] Exact allowed-change manifest and immutable base/hash binding
+- [x] Patch-first narrow revisions and deterministic removal
+- [x] Protected semantic hashes and unchanged boundary severity
+- [x] One dedicated scope repair; second violation blocks
+- [x] Local unit/SQL/E2E/interruption/quota/security gates
+- [x] Protected real-provider kayaking removal published Version 2
+- [x] Second independent hosted revision publication
+- [ ] Hosted Luna preference/correction reaccepted
+- [ ] Full protected Preview regression passes end to end
+- [ ] Protected Preview accepted for release
+- [ ] Production ready
+
 - [x] Phase 4B SQL, unit, integration, and deterministic two-user/public-browser E2E gates pass locally.
 - [x] Version 1 remains readable, shareable, and exportable unchanged after Version 2.
 - [x] Stale request, outsider, spoofing, duplicate publication, private leakage, and production fake controls are verified locally.
@@ -96,7 +110,7 @@
 - [x] Provider, interruption, quota, bounded-load, and protected-infrastructure harnesses
 - [x] Full local static, unit, database, browser, security, dependency, and bounded-load gates
 - [x] One-run hosted automation bypass isolation and verified revocation
-- [ ] Passing full protected real-provider regression (`change_scope_exceeded` blocked Version 2)
+- [ ] Passing full protected real-provider regression (Phase 5D removed the scope defect; final rerun stopped at provider-rate-limited focused answer)
 - [ ] Real Turnstile, WAF/bot/rate-limit, external alert, and provider-budget acceptance
 - [ ] Isolated hosted restore with measured RPO/RTO and complete manual accessibility acceptance
 - [ ] Production deployment (not authorized; remains undeployed)

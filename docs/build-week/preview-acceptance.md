@@ -1,5 +1,7 @@
 # Phase 5A Preview Acceptance
 
+> Phase 5D reacceptance update (July 16–17, 2026): the Phase 5C revision-scope defect is conditionally fixed without validator weakening. Prior protected runs published the exact kayaking removal as immutable Version 2 and an independent food-stop removal as Version 3. The latest complete rerun stopped earlier when focused-answer recovery returned HTTP 503, so protected Preview remains `not_accepted_for_release`. Production remains undeployed.
+
 Status: **Preview ready with controlled conditions. Production was not deployed.**
 
 ## Baseline and hosted configuration
@@ -101,3 +103,9 @@ The longer legacy live-provider scenario passed create/join, Realtime, focused A
 The Phase 5C deployment remained inside the same protected custom environment. One-run automation bypasses were revoked after every attempt and the final bypass count is zero. Real-provider create/join, Realtime/presence, chat, focused answer, memory correction, planning/approvals, and validated Version 1 publication succeeded. The final precise removal revision was feasible and approved by both participants, but its generated candidate exceeded the approved scope. The database blocked it with `change_scope_exceeded`; no Version 2 published.
 
 This demonstrates correct fail-closed validation but is a **failed full hosted regression**. The Phase 5A historical acceptance remains evidence for its exact deployment only; Phase 5C protected Preview is `not_accepted_for_release` pending a clean full rerun after the model-output/scope issue is resolved. Production remains undeployed.
+
+## Phase 5D protected-Preview result
+
+Phase 5D replaced full-plan freedom for narrow revisions with an application-owned allowed-change manifest, protected snapshot, validated patch, deterministic narrow application, semantic preservation hashes, and one scope-only repair. No validator severity was reduced. Prior protected evidence published exact kayaking removal Version 2 and independent food-stop removal Version 3; Version 1 remained immutable and historical sharing stayed pinned.
+
+The latest worktree deployed Ready as `dpl_52TpJwK7aReq9CzZJgPJHkwC8pMP` only to `hosted-acceptance`. Its complete rerun stopped before planning when focused Terra recovery returned HTTP 503. A prior credentialed 15-operation provider harness returned HTTP 429 for every operation, but the latest 503 is not overclassified as the same exact response. The failed disposable room and temporary environment file were removed, temporary bypass count was verified as zero, and count-only database verification reported zero revision, publication, and provider recovery backlog after the provider-backlog semantics migration. Preview remains `not_accepted_for_release`; Production remains undeployed.

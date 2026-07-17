@@ -1,5 +1,7 @@
 # Phase 5C — Provider reliability and infrastructure
 
+> Phase 5D follow-up: the original kayaking removal publishes protected Version 2 through a manifest/patch-first deterministic path without validator weakening, and an independent food-stop removal published Version 3. Preview remains unaccepted because the complete final rerun stopped at a rate-limited focused-answer prerequisite. See [Phase 5D](./phase-5d-revision-scope-reliability.md).
+
 Date: July 15–16, 2026. Branch: `main`. Unrestricted Production was not deployed.
 
 ## Outcome
