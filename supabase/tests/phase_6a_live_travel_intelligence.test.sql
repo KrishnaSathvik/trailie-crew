@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(34);
+select plan(36);
 
 select has_table('private','travel_evidence','normalized travel evidence is private');
 select has_table('private','travel_evidence_bindings','evidence bindings are private');
@@ -16,6 +16,8 @@ select has_function('public','bind_plan_evidence_snapshot',array['uuid','uuid','
 select has_function('public','claim_travel_refresh_job',array['uuid','integer'],'durable refresh claim exists');
 select has_function('public','cleanup_travel_provider_data',array['integer','integer'],'bounded travel cleanup exists');
 select function_privs_are('public','cleanup_travel_provider_data',array['integer','integer'],'service_role',array['EXECUTE'],'only service role can clean travel data');
+select has_function('public','get_travel_provider_acceptance_report',array['uuid'],'safe hosted acceptance report exists');
+select function_privs_are('public','get_travel_provider_acceptance_report',array['uuid'],'authenticated',array[]::text[],'browser cannot read provider acceptance operations');
 select ok((select relforcerowsecurity from pg_class where oid='private.travel_evidence'::regclass),'evidence RLS is forced');
 select ok((select relforcerowsecurity from pg_class where oid='private.plan_evidence_snapshots'::regclass),'snapshot RLS is forced');
 select table_privs_are('private','travel_evidence','authenticated',array[]::text[],'browser cannot read evidence');

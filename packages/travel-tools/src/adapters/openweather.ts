@@ -180,7 +180,6 @@ export function createOpenWeatherAdapter(
     if (cached && cached.expiresAt > Date.now()) return cached.payload;
     const payload = loadOneCall(configuration, input, signal);
     payloadCache.set(key, { expiresAt: Date.now() + 300_000, payload });
-    payload.catch(() => payloadCache.delete(key));
     return payload;
   };
   const unsupported = (

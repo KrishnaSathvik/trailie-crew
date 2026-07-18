@@ -158,6 +158,37 @@ async function resilienceReport(roomId: string) {
   };
 }
 
+async function travelProviderReport(roomId: string) {
+  const { data, error } = await admin!.rpc(
+    "get_travel_provider_acceptance_report",
+    { target_room_id: roomId },
+  );
+  expect(error).toBeNull();
+  return data as {
+    operations: Array<{
+      provider: string;
+      capability: string;
+      status: string;
+      cacheStatus: string;
+      durationMs: number | null;
+      errorClass: string | null;
+    }>;
+    versions: Array<{
+      version: number;
+      snapshotCount: number;
+      verifiedCount: number;
+      unavailableCount: number;
+      evidenceKeys: Array<{
+        evidenceId: string;
+        evidenceType: string;
+        targetItemId: string | null;
+        semanticHash: string;
+      }>;
+    }>;
+    backlog: { refreshJobs: number; providerRetries: number };
+  };
+}
+
 async function recoverQueuedMemory(request: APIRequestContext) {
   await new Promise((resolve) => setTimeout(resolve, 65_000));
   return runBoundedRecovery(request);
@@ -412,6 +443,21 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   await expect(host.getByText("Published itinerary · Version 1")).toBeVisible({
     timeout: 30_000,
   });
+  await member.getByRole("tab", { name: "Evidence" }).click();
+  await expect(
+    member.getByRole("heading", { name: "Travel evidence" }),
+  ).toBeVisible();
+  await expect(member.getByText("National Park Service").first()).toBeVisible();
+  const versionOneTravelReport = await travelProviderReport(roomId);
+  const versionOneEvidence =
+    versionOneTravelReport.versions.find((version) => version.version === 1)
+      ?.evidenceKeys ?? [];
+  expect(versionOneEvidence.length).toBeGreaterThan(0);
+  expect(
+    new Set(
+      versionOneTravelReport.operations.map((operation) => operation.provider),
+    ),
+  ).toEqual(new Set(["mapbox", "openweather", "nps", "ridb"]));
   await member.screenshot({
     path: "output/phase-5e/screenshots/version-1.png",
     fullPage: true,
@@ -489,6 +535,14 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   await expect(visitor.getByText("Version 2", { exact: true })).toHaveCount(0);
   await expect(visitor.getByText("Maya", { exact: true })).toHaveCount(0);
   await expect(visitor.getByText("Alex", { exact: true })).toHaveCount(0);
+  await expect(
+    visitor.getByRole("heading", { name: "Sources and freshness" }),
+  ).toBeVisible();
+  await expect(
+    visitor.getByText(
+      "Conditions may have changed since this version was published.",
+    ),
+  ).toBeVisible();
   expect(publicResponse?.headers()["cache-control"]).toMatch(
     /no-store|no-cache.*must-revalidate/,
   );
@@ -563,11 +617,24 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
     expect(backlog.data).toEqual([]);
   }
   const providerReport = await resilienceReport(roomId);
+  const travelReport = await travelProviderReport(roomId);
   expect(providerReport.focused.unresolvedCount).toBe(0);
   expect(providerReport.memory.unresolvedCount).toBe(0);
   expect(providerReport.messages.trailie).toBe(1);
   expect(providerReport.planVersions).toEqual([1, 2]);
   expect(providerReport.shares).toMatchObject({ active: 0, revoked: 1 });
+  expect(travelReport.backlog).toEqual({
+    refreshJobs: 0,
+    providerRetries: 0,
+  });
+  expect(
+    travelReport.versions.find((version) => version.version === 1)
+      ?.evidenceKeys,
+  ).toEqual(versionOneEvidence);
+  expect(
+    travelReport.versions.find((version) => version.version === 2)
+      ?.snapshotCount,
+  ).toBeGreaterThan(0);
 
   await member.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -589,6 +656,7 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
       memoryVersion: correctedMemory?.snapshot.memory_version ?? null,
       memoryExtractions: correctedMemory?.extractions ?? [],
       providerReport,
+      travelReport,
       prerequisiteFailures,
       browserProviderRequestCount: browserProviderRequests.length,
       consoleProblemCount: problems.length,
