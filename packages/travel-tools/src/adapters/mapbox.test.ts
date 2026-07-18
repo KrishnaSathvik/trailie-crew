@@ -94,7 +94,8 @@ describe("Mapbox TravelProviderAdapter", () => {
         ),
       ),
     }).geocode({
-      query: "Yosemite National Park, California",
+      query:
+        "Yosemite National Park, California (July 22 through July 25, 2026)",
       locale: "en-US",
     });
 

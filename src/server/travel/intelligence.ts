@@ -117,11 +117,17 @@ function corroborateOfficialDestination(
   };
 }
 
+function providerPlaceQuery(destination: string) {
+  const parkName = destination.match(/^(.+?)\s+national\s+parks?\b/iu)?.[1];
+  return parkName?.trim() || destination;
+}
+
 export async function collectDestinationTravelEvidence(input: Input) {
   const evidence: TravelEvidenceV1[] = [];
   const callsByProvider: Record<string, number> = {};
   const callsByCapability: Record<string, number> = {};
   const requestCache = new Map<string, Promise<TravelProviderResponse>>();
+  const destinationQuery = providerPlaceQuery(input.destination);
 
   function call(
     provider: TravelProviderAdapter,
@@ -149,30 +155,30 @@ export async function collectDestinationTravelEvidence(input: Input) {
   const geocodePromise = call(
     input.providers.geocoding,
     "geocode",
-    `${input.locale}:${input.destination}`,
+    `${input.locale}:${destinationQuery}`,
     () =>
       input.providers.geocoding.geocode(
-        { query: input.destination, locale: input.locale },
+        { query: destinationQuery, locale: input.locale },
         input.signal,
       ),
   );
   const parkPromise = call(
     input.providers.parks,
     "park",
-    `${input.locale}:${input.destination}`,
+    `${input.locale}:${destinationQuery}`,
     () =>
       input.providers.parks.getPark(
-        { query: input.destination, locale: input.locale },
+        { query: destinationQuery, locale: input.locale },
         input.signal,
       ),
   );
   const recreationPromise = call(
     input.providers.recreation,
     "recreation",
-    `${input.locale}:${input.destination}`,
+    `${input.locale}:${destinationQuery}`,
     () =>
       input.providers.recreation.getPark(
-        { query: input.destination, locale: input.locale },
+        { query: destinationQuery, locale: input.locale },
         input.signal,
       ),
   );

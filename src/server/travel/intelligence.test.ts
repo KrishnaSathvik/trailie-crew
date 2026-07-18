@@ -93,7 +93,8 @@ describe("collectDestinationTravelEvidence", () => {
     const geocoding = {
       ...baseline,
       providerId: "mapbox",
-      async geocode() {
+      async geocode(input: { query: string }) {
+        expect(input.query).toBe("Yosemite");
         return {
           state: "ambiguous" as const,
           warnings: [],
@@ -132,7 +133,8 @@ describe("collectDestinationTravelEvidence", () => {
     const parks = {
       ...baseline,
       providerId: "nps",
-      async getPark() {
+      async getPark(input: { query?: string }) {
+        expect(input.query).toBe("Yosemite");
         return {
           state: "ambiguous" as const,
           warnings: [],
@@ -164,7 +166,8 @@ describe("collectDestinationTravelEvidence", () => {
     };
 
     const result = await collectDestinationTravelEvidence({
-      destination: "Yosemite",
+      destination:
+        "Yosemite National Park, California (July 22 through July 25, 2026)",
       dates: ["2026-07-18"],
       locale: "en-US",
       providers: {

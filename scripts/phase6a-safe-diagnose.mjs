@@ -13,6 +13,71 @@ const admin = createClient(
   process.env.SUPABASE_SECRET_KEY,
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
+
+function normalizeEntityName(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+async function safeProviderMatchProfile(destination) {
+  if (!process.env.MAPBOX_ACCESS_TOKEN || !process.env.NPS_API_KEY) return null;
+  try {
+    const mapboxUrl = new URL(
+      "https://api.mapbox.com/search/geocode/v6/forward",
+    );
+    mapboxUrl.searchParams.set("q", destination);
+    mapboxUrl.searchParams.set("limit", "10");
+    mapboxUrl.searchParams.set("permanent", "true");
+    mapboxUrl.searchParams.set("access_token", process.env.MAPBOX_ACCESS_TOKEN);
+    const npsUrl = new URL("https://developer.nps.gov/api/v1/parks");
+    npsUrl.searchParams.set("q", destination);
+    npsUrl.searchParams.set("limit", "50");
+    npsUrl.searchParams.set("api_key", process.env.NPS_API_KEY);
+    const [mapboxResponse, npsResponse] = await Promise.all([
+      fetch(mapboxUrl, { signal: AbortSignal.timeout(10_000) }),
+      fetch(npsUrl, { signal: AbortSignal.timeout(10_000) }),
+    ]);
+    if (!mapboxResponse.ok || !npsResponse.ok)
+      return {
+        status: "unavailable",
+        mapboxStatus: mapboxResponse.status,
+        npsStatus: npsResponse.status,
+      };
+    const [mapboxPayload, npsPayload] = await Promise.all([
+      mapboxResponse.json(),
+      npsResponse.json(),
+    ]);
+    const expected = normalizeEntityName(destination);
+    const mapboxNames = (mapboxPayload.features ?? [])
+      .map((feature) =>
+        normalizeEntityName(
+          feature.properties?.name_preferred ?? feature.properties?.name,
+        ),
+      )
+      .filter(Boolean);
+    const npsNames = (npsPayload.data ?? [])
+      .map((park) => normalizeEntityName(park.fullName))
+      .filter(Boolean);
+    const embedded = (name) =>
+      name.split(/\s+/u).length >= 2 && ` ${expected} `.includes(` ${name} `);
+    return {
+      status: "available",
+      mapboxCandidateCount: mapboxNames.length,
+      npsCandidateCount: npsNames.length,
+      mapboxEmbeddedOfficialNameCount: mapboxNames.filter(embedded).length,
+      npsEmbeddedOfficialNameCount: npsNames.filter(embedded).length,
+      uniqueSharedOfficialNameCount: new Set(
+        mapboxNames.filter((name) => npsNames.includes(name)),
+      ).size,
+    };
+  } catch {
+    return { status: "unavailable", errorClass: "safe_smoke_failed" };
+  }
+}
+
 const roomResult = await admin
   .from("rooms")
   .select("id,current_plan_version")
@@ -21,7 +86,9 @@ const roomResult = await admin
 if (roomResult.error) throw new Error("diagnostic_room_unavailable");
 const plansResult = await admin
   .from("trip_plans")
-  .select("id,version,status,validation_status,error_code,validation_summary")
+  .select(
+    "id,planning_summary_id,version,status,validation_status,error_code,validation_summary",
+  )
   .eq("room_id", roomResult.data.id)
   .order("version");
 if (plansResult.error) throw new Error("diagnostic_plans_unavailable");
@@ -31,6 +98,16 @@ for (const plan of plansResult.data) {
   const context = await admin.rpc("get_itinerary_generation_context", {
     target_trip_plan_id: plan.id,
   });
+  const planningSummary = await admin
+    .from("planning_summaries")
+    .select("summary_json")
+    .eq("id", plan.planning_summary_id)
+    .single();
+  const destinations =
+    planningSummary.data?.summary_json?.tripSnapshot?.destinations ?? [];
+  const providerProfiles = await Promise.all(
+    destinations.map((destination) => safeProviderMatchProfile(destination)),
+  );
   plans.push({
     version: plan.version,
     status: plan.status,
@@ -43,6 +120,13 @@ for (const plan of plansResult.data) {
     latestWarningCodes:
       context.data?.latestValidation?.warnings?.map((issue) => issue.code) ??
       [],
+    destinationProfiles: destinations.map((destination) => ({
+      characterCount: destination.length,
+      wordCount: destination.trim().split(/\s+/u).filter(Boolean).length,
+      containsNationalPark: /\bnational\s+park\b/iu.test(destination),
+      containsStateQualifier: /,\s*(?:california|ca)\b/iu.test(destination),
+    })),
+    providerProfiles,
   });
 }
 const travel = await admin.rpc("get_travel_provider_acceptance_report", {

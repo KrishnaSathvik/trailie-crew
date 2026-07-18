@@ -186,7 +186,16 @@ function selectExactGeocodeMatch(
       name && region ? `${name}, ${region}` : "",
     ].some((candidate) => normalizePlaceLabel(candidate) === expected);
   });
-  return exact.length === 1 ? exact : features;
+  if (exact.length === 1) return exact;
+  const embeddedOfficialName = features.filter((feature) => {
+    const name = normalizePlaceLabel(
+      feature.properties.name_preferred ?? feature.properties.name ?? "",
+    );
+    return (
+      name.split(/\s+/u).length >= 2 && ` ${expected} `.includes(` ${name} `)
+    );
+  });
+  return embeddedOfficialName.length === 1 ? embeddedOfficialName : features;
 }
 
 async function performGeocode(

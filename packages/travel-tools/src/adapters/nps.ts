@@ -143,7 +143,16 @@ function selectExactParkMatch(
   const exact = parks.filter(
     (park) => normalizeParkName(park.fullName) === officialName,
   );
-  return exact.length === 1 ? exact : parks;
+  if (exact.length === 1) return exact;
+  const normalizedQuery = normalizeParkName(query);
+  const embeddedOfficialName = parks.filter((park) => {
+    const name = normalizeParkName(park.fullName);
+    return (
+      name.split(/\s+/u).length >= 2 &&
+      ` ${normalizedQuery} `.includes(` ${name} `)
+    );
+  });
+  return embeddedOfficialName.length === 1 ? embeddedOfficialName : parks;
 }
 
 function parkEvidence(
