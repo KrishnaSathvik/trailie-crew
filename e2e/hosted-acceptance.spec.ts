@@ -398,7 +398,7 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
 
   await send(
     host,
-    "We all decided on Yosemite from August 10 through August 13, 2026. We arrive by 10 AM on August 10, depart after 4 PM on August 13, want a moderate budget, and must see Glacier Point sunset.",
+    "We all decided on Yosemite National Park, California from July 22 through July 25, 2026. We arrive by 10 AM on July 22, depart after 4 PM on July 25, want a moderate budget, and must see Glacier Point sunset.",
   );
   await send(
     member,

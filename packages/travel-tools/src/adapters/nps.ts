@@ -126,6 +126,26 @@ function locationForPark(park: z.infer<typeof parkSchema>) {
     : null;
 }
 
+function normalizeParkName(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function selectExactParkMatch(
+  parks: Array<z.infer<typeof parkSchema>>,
+  query?: string,
+) {
+  if (!query) return parks;
+  const officialName = normalizeParkName(query.split(",")[0]);
+  const exact = parks.filter(
+    (park) => normalizeParkName(park.fullName) === officialName,
+  );
+  return exact.length === 1 ? exact : parks;
+}
+
 function parkEvidence(
   park: z.infer<typeof parkSchema>,
   configuration: Configuration,
@@ -234,7 +254,7 @@ export function createNpsAdapter(
       ),
     );
     if (!payload.data.length) throw new TravelProviderHttpError(404);
-    return payload.data;
+    return selectExactParkMatch(payload.data, input.query);
   }
   return {
     providerId: provider,

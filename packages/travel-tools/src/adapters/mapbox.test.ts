@@ -65,6 +65,51 @@ describe("Mapbox TravelProviderAdapter", () => {
     expect(JSON.stringify(result)).not.toContain("test-token");
   });
 
+  it("resolves one exact canonical match while preserving unrelated alternatives", async () => {
+    const result = await createMapboxAdapter({
+      accessToken: "test-token",
+      fetcher: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            features: [
+              {
+                id: "place.one",
+                geometry: { coordinates: [-119.5383, 37.8651] },
+                properties: {
+                  mapbox_id: "mapbox.one",
+                  name: "Yosemite National Park",
+                  full_address: "Yosemite National Park, California",
+                  feature_type: "place",
+                  context: { region: { name: "California" } },
+                },
+              },
+              {
+                id: "place.two",
+                geometry: { coordinates: [-88.1, 41.8] },
+                properties: { name: "Yosemite", feature_type: "place" },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    }).geocode({
+      query: "Yosemite National Park, California",
+      locale: "en-US",
+    });
+
+    expect(result).toMatchObject({
+      state: "available",
+      evidence: [
+        {
+          sourceEntityId: "mapbox.one",
+          availabilityState: "available",
+          verificationState: "verified",
+        },
+      ],
+    });
+  });
+
   it("normalizes traffic-aware routing and an official no-route response", async () => {
     const successFetcher = vi.fn().mockResolvedValue(
       new Response(

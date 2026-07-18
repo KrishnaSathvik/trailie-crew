@@ -69,6 +69,40 @@ describe("NPS TravelProviderAdapter", () => {
     });
   });
 
+  it("resolves one exact official park name from broader search results", async () => {
+    const result = await createNpsAdapter({
+      apiKey: "test-key",
+      fetcher: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "nps-yose",
+                parkCode: "yose",
+                fullName: "Yosemite National Park",
+                url: "https://www.nps.gov/yose/index.htm",
+              },
+              {
+                id: "nps-other",
+                parkCode: "other",
+                fullName: "Another Yosemite Historic Site",
+                url: "https://www.nps.gov/other/index.htm",
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    }).getPark({
+      query: "Yosemite National Park, California",
+      locale: "en-US",
+    });
+
+    expect(result.state).toBe("available");
+    expect(result.evidence).toHaveLength(1);
+    expect(result.evidence[0].sourceEntityId).toBe("yose");
+  });
+
   it("normalizes closure severity and active status from the current official alert feed", async () => {
     const result = await createNpsAdapter({
       apiKey: "test-key",

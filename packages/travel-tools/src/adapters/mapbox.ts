@@ -164,6 +164,31 @@ function geocodeEvidence(
   });
 }
 
+function normalizePlaceLabel(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function selectExactGeocodeMatch(
+  features: z.infer<typeof geocodingPayloadSchema>["features"],
+  query: string,
+) {
+  const expected = normalizePlaceLabel(query);
+  const exact = features.filter((feature) => {
+    const name =
+      feature.properties.name_preferred ?? feature.properties.name ?? "";
+    const region = feature.properties.context?.region?.name ?? "";
+    return [
+      feature.properties.full_address ?? "",
+      name && region ? `${name}, ${region}` : "",
+    ].some((candidate) => normalizePlaceLabel(candidate) === expected);
+  });
+  return exact.length === 1 ? exact : features;
+}
+
 async function performGeocode(
   configuration: Configuration,
   input: GeocodeInput | ReverseGeocodeInput,
@@ -201,13 +226,14 @@ async function performGeocode(
     }),
   );
   if (payload.features.length === 0) throw new TravelProviderHttpError(404);
-  const ambiguous = !reverse && payload.features.length > 1;
+  const features = reverse
+    ? payload.features
+    : selectExactGeocodeMatch(payload.features, (input as GeocodeInput).query);
+  const ambiguous = !reverse && features.length > 1;
   const retrievedAt = now(configuration);
   return makeTravelResponse(
     ambiguous ? "ambiguous" : "available",
-    payload.features.map((feature) =>
-      geocodeEvidence(feature, ambiguous, retrievedAt),
-    ),
+    features.map((feature) => geocodeEvidence(feature, ambiguous, retrievedAt)),
   );
 }
 
