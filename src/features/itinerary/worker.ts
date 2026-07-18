@@ -5,7 +5,11 @@ import {
   type TravelProvider,
   type TravelToolResult,
 } from "@trailie/travel-tools";
-import { itinerarySchema, type Itinerary } from "@trailie/schemas";
+import {
+  itinerarySchema,
+  type Itinerary,
+  type TravelEvidenceV1,
+} from "@trailie/schemas";
 import { buildItineraryContext, buildItineraryRepairContext } from "./context";
 import {
   ItineraryProviderError,
@@ -35,6 +39,11 @@ import {
   type DurableProviderAttemptController,
   type ProviderAttemptExecutionResult,
 } from "@/server/ai/provider-attempts";
+import {
+  collectDestinationTravelEvidence,
+  type TravelProviderRegistry,
+} from "@/server/travel/intelligence";
+import type { TravelEvidenceRepository } from "@/server/travel/repository";
 
 export type TravelEvidenceDependencies = {
   repository: Pick<ItineraryRepository, "recordEvidence">;
@@ -50,7 +59,66 @@ type Dependencies = TravelEvidenceDependencies & {
   quotaSubject?: AiQuotaSubject;
   reliabilityPolicy?: WorkflowReliabilityPolicy;
   providerAttempts?: DurableProviderAttemptController<Itinerary>;
+  travelIntelligence?: {
+    providers: TravelProviderRegistry;
+    evidenceRepository: TravelEvidenceRepository;
+    maximumCallsPerProvider: number;
+  };
 };
+
+function itineraryDates(dateWindows: readonly string[]) {
+  const dates: string[] = [];
+  for (const window of dateWindows) {
+    const found = window.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
+    if (!found.length) continue;
+    const start = new Date(`${found[0]}T00:00:00Z`);
+    const end = new Date(`${found.at(-1)!}T00:00:00Z`);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()))
+      continue;
+    for (
+      let current = start;
+      current <= end && dates.length < 8;
+      current = new Date(current.getTime() + 86_400_000)
+    )
+      dates.push(current.toISOString().slice(0, 10));
+    if (dates.length >= 8) break;
+  }
+  return [...new Set(dates)];
+}
+
+async function prepareLiveTravelEvidence(
+  context: ItineraryGenerationContext,
+  dependencies: Dependencies,
+) {
+  if (!dependencies.travelIntelligence)
+    return {
+      evidence: [] as TravelEvidenceV1[],
+      stored: [] as Array<{ evidence: TravelEvidenceV1; id: string }>,
+    };
+  const destination = context.approvedSummary.tripSnapshot.destinations[0];
+  if (!destination)
+    return {
+      evidence: [] as TravelEvidenceV1[],
+      stored: [] as Array<{ evidence: TravelEvidenceV1; id: string }>,
+    };
+  const collected = await collectDestinationTravelEvidence({
+    destination,
+    dates: itineraryDates(context.approvedSummary.tripSnapshot.dateWindows),
+    locale: "en-US",
+    providers: dependencies.travelIntelligence.providers,
+    maximumCallsPerProvider:
+      dependencies.travelIntelligence.maximumCallsPerProvider,
+  });
+  const stored = await Promise.all(
+    collected.evidence.map(async (evidence) => ({
+      evidence,
+      id: await dependencies.travelIntelligence!.evidenceRepository.store(
+        evidence,
+      ),
+    })),
+  );
+  return { evidence: collected.evidence, stored };
+}
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
   dependencies: Dependencies,
@@ -244,6 +312,7 @@ async function validateAndRecord(
   context: ItineraryGenerationContext,
   draft: Itinerary,
   evidence: NormalizedToolEvidence[],
+  liveEvidence: TravelEvidenceV1[],
   dependencies: Dependencies,
 ) {
   await dependencies.repository.recordProgress(id, "route_validation_started");
@@ -253,20 +322,100 @@ async function validateAndRecord(
     evidence,
     dependencies,
   );
+  const normalizedRoutes: Array<{
+    evidence: TravelEvidenceV1;
+    id: string;
+    targetItemId: string;
+  }> = [];
+  if (dependencies.travelIntelligence) {
+    for (const day of enriched.itinerary.days) {
+      for (const segment of day.travelSegments) {
+        if (
+          segment.origin.latitude === null ||
+          segment.origin.longitude === null ||
+          segment.destination.latitude === null ||
+          segment.destination.longitude === null
+        )
+          continue;
+        const response =
+          await dependencies.travelIntelligence.providers.geocoding.getRoute({
+            origin: {
+              latitude: segment.origin.latitude,
+              longitude: segment.origin.longitude,
+            },
+            destination: {
+              latitude: segment.destination.latitude,
+              longitude: segment.destination.longitude,
+            },
+            mode:
+              segment.mode === "drive" ||
+              segment.mode === "walk" ||
+              segment.mode === "bike" ||
+              segment.mode === "transit" ||
+              segment.mode === "shuttle"
+                ? segment.mode
+                : "unknown",
+            locale: "en-US",
+          });
+        for (const evidence of response.evidence) {
+          const storedId =
+            await dependencies.travelIntelligence.evidenceRepository.store(
+              evidence,
+            );
+          normalizedRoutes.push({
+            evidence,
+            id: storedId,
+            targetItemId: segment.id,
+          });
+          if (
+            evidence.evidenceType === "route" &&
+            evidence.verificationState === "verified"
+          ) {
+            const duration = Number(
+              evidence.normalizedValue.data.durationMinutes,
+            );
+            const distance = Number(
+              evidence.normalizedValue.data.distanceMeters,
+            );
+            if (Number.isFinite(duration) && Number.isFinite(distance)) {
+              segment.durationMinutes = duration;
+              segment.distanceMeters = distance;
+              segment.verificationStatus = "verified";
+            }
+          }
+          segment.evidenceRefs = [
+            ...new Set([...segment.evidenceRefs, evidence.evidenceId]),
+          ];
+        }
+      }
+    }
+  }
+  const normalizedItinerary = itinerarySchema.parse(enriched.itinerary);
+  const combinedLiveEvidence = [
+    ...liveEvidence,
+    ...normalizedRoutes.map((entry) => entry.evidence),
+  ];
   await dependencies.repository.recordProgress(
     id,
     "constraint_validation_started",
   );
   const report = validateItinerary({
-    itinerary: enriched.itinerary,
+    itinerary: normalizedItinerary,
     approvedSummary: context.approvedSummary,
     evidence: enriched.evidence,
+    liveEvidence: combinedLiveEvidence,
     now: dependencies.now ?? new Date().toISOString(),
     minimumTravelBufferMinutes: 15,
     maximumDailyDriveMinutes: 360,
   });
   await dependencies.repository.recordValidation(id, report, context.version);
-  return { ...enriched, report };
+  return {
+    ...enriched,
+    itinerary: normalizedItinerary,
+    report,
+    normalizedRoutes,
+    liveEvidence: combinedLiveEvidence,
+  };
 }
 
 export async function processItineraryGeneration(
@@ -355,6 +504,7 @@ export async function processItineraryGeneration(
     const firstClaim = await dependencies.repository.claim(id);
     if (!firstClaim.claimed || !firstClaim.stage) return;
     let context = await dependencies.repository.loadContext(id);
+    const live = await prepareLiveTravelEvidence(context, dependencies);
     let output;
     if (firstClaim.stage === "repair") {
       if (!context.draft || !context.latestValidation) return;
@@ -375,6 +525,7 @@ export async function processItineraryGeneration(
               draft: repairDraft,
               validation: repairValidation,
               evidence: context.evidence,
+              liveEvidence: live.evidence,
             }),
             signal,
           }),
@@ -394,7 +545,10 @@ export async function processItineraryGeneration(
             operationKey: `${id}:generate`,
             model: dependencies.model ?? "gpt-5.6-sol",
             safetyIdentifier: dependencies.safetyIdentifier,
-            context: buildItineraryContext(context),
+            context: buildItineraryContext({
+              ...context,
+              liveEvidence: live.evidence,
+            }),
             signal,
           }),
       });
@@ -412,9 +566,22 @@ export async function processItineraryGeneration(
       context,
       draft,
       context.evidence,
+      live.evidence,
       dependencies,
     );
     if (result.report.status === "pass") {
+      if (dependencies.travelIntelligence)
+        for (const stored of [
+          ...live.stored.map((entry) => ({ ...entry, targetItemId: null })),
+          ...result.normalizedRoutes,
+        ])
+          await dependencies.travelIntelligence.evidenceRepository.bindSnapshot(
+            {
+              tripPlanId: id,
+              storedEvidenceId: stored.id,
+              targetItemId: stored.targetItemId,
+            },
+          );
       await dependencies.repository.publish(id, result.itinerary);
       return;
     }
@@ -443,6 +610,7 @@ export async function processItineraryGeneration(
             draft: result.itinerary,
             validation: result.report,
             evidence: result.evidence,
+            liveEvidence: live.evidence,
           }),
           signal,
         }),
@@ -455,10 +623,24 @@ export async function processItineraryGeneration(
       context,
       draft,
       result.evidence,
+      live.evidence,
       dependencies,
     );
-    if (result.report.status === "pass")
+    if (result.report.status === "pass") {
+      if (dependencies.travelIntelligence)
+        for (const stored of [
+          ...live.stored.map((entry) => ({ ...entry, targetItemId: null })),
+          ...result.normalizedRoutes,
+        ])
+          await dependencies.travelIntelligence.evidenceRepository.bindSnapshot(
+            {
+              tripPlanId: id,
+              storedEvidenceId: stored.id,
+              targetItemId: stored.targetItemId,
+            },
+          );
       await dependencies.repository.publish(id, result.itinerary);
+    }
   } catch (error) {
     const failure =
       error instanceof AiQuotaError

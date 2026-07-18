@@ -2,6 +2,7 @@ import {
   itinerarySchema,
   type Itinerary,
   type PlanningSummary,
+  type TravelEvidenceV1,
   type ValidationIssue,
   type ValidationReport,
 } from "@trailie/schemas";
@@ -25,6 +26,7 @@ type Input = {
   itinerary: unknown;
   approvedSummary: PlanningSummary;
   evidence: NormalizedToolEvidence[];
+  liveEvidence?: TravelEvidenceV1[];
   now: string;
   minimumTravelBufferMinutes: number;
   maximumDailyDriveMinutes: number;
@@ -45,6 +47,42 @@ function normalized(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function significantTokens(value: string) {
+  return new Set(
+    normalized(value)
+      .split(" ")
+      .filter((token) => token.length >= 4),
+  );
+}
+
+function materiallyMatches(left: string, right: string) {
+  const leftTokens = significantTokens(left);
+  const rightTokens = significantTokens(right);
+  let overlap = 0;
+  for (const token of leftTokens) if (rightTokens.has(token)) overlap += 1;
+  return overlap >= 2;
+}
+
+function localMinutesFromInstant(value: unknown, timezone: unknown) {
+  if (typeof value !== "string") return null;
+  const direct = value.match(/T(\d{2}):(\d{2})/);
+  if (direct && !value.endsWith("Z"))
+    return Number(direct[1]) * 60 + Number(direct[2]);
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime()) || typeof timezone !== "string")
+    return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+  return Number(values.hour) * 60 + Number(values.minute);
 }
 
 function numericBudget(summary: PlanningSummary) {
@@ -95,6 +133,10 @@ export function validateItinerary(input: Input): ValidationReport {
   const warnings: ValidationIssue[] = [];
   const evidenceById = new Map(
     input.evidence.map((entry) => [entry.id, entry]),
+  );
+  const liveEvidence = input.liveEvidence ?? [];
+  const liveEvidenceById = new Map(
+    liveEvidence.map((entry) => [entry.evidenceId, entry]),
   );
   const allItems = plan.days.flatMap((day) => day.items);
   const itemById = new Map(allItems.map((item) => [item.id, item]));
@@ -211,10 +253,17 @@ export function validateItinerary(input: Input): ValidationReport {
       const routeEvidence = segment.evidenceRefs
         .map((id) => evidenceById.get(id))
         .find((entry) => entry?.toolName === "route");
+      const normalizedRouteEvidence = segment.evidenceRefs
+        .map((id) => liveEvidenceById.get(id))
+        .find((entry) => entry?.evidenceType === "route");
+      const normalizedRouteVerified =
+        normalizedRouteEvidence?.verificationState === "verified" &&
+        normalizedRouteEvidence.availabilityState === "available";
       if (
-        !routeEvidence ||
-        routeEvidence.status === "unavailable" ||
-        routeEvidence.status === "failed"
+        !normalizedRouteVerified &&
+        (!routeEvidence ||
+          routeEvidence.status === "unavailable" ||
+          routeEvidence.status === "failed")
       ) {
         warnings.push(
           issue(
@@ -229,9 +278,12 @@ export function validateItinerary(input: Input): ValidationReport {
         continue;
       }
       if (
-        routeEvidence.status === "stale" ||
-        (routeEvidence.expiresAt !== null &&
-          routeEvidence.expiresAt <= input.now)
+        normalizedRouteEvidence?.freshnessState === "stale" ||
+        normalizedRouteEvidence?.freshnessState === "expired" ||
+        (routeEvidence &&
+          (routeEvidence.status === "stale" ||
+            (routeEvidence.expiresAt !== null &&
+              routeEvidence.expiresAt <= input.now)))
       ) {
         issues.push(
           issue(
@@ -240,12 +292,18 @@ export function validateItinerary(input: Input): ValidationReport {
             "Route evidence is stale and must be checked again.",
             [segment.id],
             false,
-            [routeEvidence.id],
+            [
+              normalizedRouteEvidence?.evidenceId ??
+                routeEvidence?.id ??
+                segment.id,
+            ],
           ),
         );
       }
       const verifiedDuration = Number(
-        routeEvidence.normalizedResult.durationMinutes,
+        normalizedRouteVerified
+          ? normalizedRouteEvidence.normalizedValue.data.durationMinutes
+          : routeEvidence?.normalizedResult.durationMinutes,
       );
       const duration = Number.isFinite(verifiedDuration)
         ? verifiedDuration
@@ -275,7 +333,11 @@ export function validateItinerary(input: Input): ValidationReport {
               "Verified travel time does not fit between two scheduled stops.",
               [from!.id, to!.id, segment.id],
               true,
-              [routeEvidence.id],
+              [
+                normalizedRouteEvidence?.evidenceId ??
+                  routeEvidence?.id ??
+                  segment.id,
+              ],
             ),
           );
         }
@@ -290,7 +352,11 @@ export function validateItinerary(input: Input): ValidationReport {
               "The schedule needs a larger travel buffer.",
               [from!.id, to!.id, segment.id],
               true,
-              [routeEvidence.id],
+              [
+                normalizedRouteEvidence?.evidenceId ??
+                  routeEvidence?.id ??
+                  segment.id,
+              ],
             ),
           );
         }
@@ -372,6 +438,192 @@ export function validateItinerary(input: Input): ValidationReport {
       }
     }
   }
+
+  const unresolvedDestination = liveEvidence.find(
+    (entry) =>
+      entry.evidenceType === "geocode" &&
+      (entry.availabilityState === "ambiguous" ||
+        entry.availabilityState === "not_found"),
+  );
+  if (unresolvedDestination) {
+    issues.push(
+      issue(
+        unresolvedDestination.availabilityState === "ambiguous"
+          ? "destination_ambiguous"
+          : "destination_unresolved",
+        "critical",
+        unresolvedDestination.availabilityState === "ambiguous"
+          ? "More than one materially different destination matched the request."
+          : "The destination identity could not be resolved.",
+        [],
+        false,
+        [unresolvedDestination.evidenceId],
+      ),
+    );
+  }
+
+  for (const closure of liveEvidence.filter(
+    (entry) =>
+      entry.evidenceType === "park_closure" &&
+      entry.verificationState === "verified" &&
+      entry.availabilityState === "available",
+  )) {
+    const value = closure.normalizedValue.data;
+    const active =
+      value.active === true ||
+      value.activeStatus === "active" ||
+      value.status === "active";
+    if (!active) continue;
+    const closureText = [value.affectedArea, value.title, value.description]
+      .filter((entry): entry is string => typeof entry === "string")
+      .join(" ");
+    if (!closureText) continue;
+    const affected = allItems.filter((item) =>
+      materiallyMatches(
+        closureText,
+        [item.title, item.description, item.location?.name ?? ""].join(" "),
+      ),
+    );
+    if (affected.length)
+      issues.push(
+        issue(
+          "official_closure_conflict",
+          "critical",
+          "An active official closure conflicts with a planned activity.",
+          affected.map((item) => item.id),
+          true,
+          [closure.evidenceId],
+        ),
+      );
+  }
+
+  const unavailableWeather = liveEvidence.find(
+    (entry) =>
+      entry.evidenceType === "weather_forecast" &&
+      (entry.availabilityState === "unavailable" ||
+        entry.availabilityState === "unsupported" ||
+        entry.verificationState === "failed"),
+  );
+  if (unavailableWeather)
+    warnings.push(
+      issue(
+        unavailableWeather.errorState?.code === "forecast_horizon_unsupported"
+          ? "forecast_horizon_unsupported"
+          : "weather_forecast_unavailable",
+        "medium",
+        unavailableWeather.errorState?.code === "forecast_horizon_unsupported"
+          ? "This date is outside the available forecast window."
+          : "Live weather information is unavailable for this plan.",
+        [],
+        false,
+        [unavailableWeather.evidenceId],
+      ),
+    );
+
+  for (const weatherAlert of liveEvidence.filter(
+    (entry) =>
+      entry.evidenceType === "severe_weather" &&
+      entry.verificationState === "verified" &&
+      entry.availabilityState === "available",
+  ))
+    warnings.push(
+      issue(
+        "severe_weather_caution",
+        "medium",
+        "An official weather alert may affect outdoor activities; it is not a guarantee of safety.",
+        [],
+        false,
+        [weatherAlert.evidenceId],
+      ),
+    );
+
+  for (const day of plan.days) {
+    const daylight = liveEvidence.filter(
+      (entry) =>
+        (entry.evidenceType === "sunrise" || entry.evidenceType === "sunset") &&
+        entry.normalizedValue.data.date === day.date &&
+        entry.verificationState === "verified",
+    );
+    const sunsetEvidence =
+      daylight.find((entry) => entry.evidenceType === "sunset") ??
+      daylight.find(
+        (entry) => typeof entry.normalizedValue.data.sunset === "string",
+      );
+    if (!sunsetEvidence) continue;
+    const sunsetMinutes = localMinutesFromInstant(
+      sunsetEvidence.normalizedValue.data.instant ??
+        sunsetEvidence.normalizedValue.data.sunset,
+      sunsetEvidence.normalizedValue.data.timezone ??
+        sunsetEvidence.locationBinding?.timezone,
+    );
+    if (sunsetMinutes === null) continue;
+    const affected = day.items.filter(
+      (item) =>
+        item.type === "activity" &&
+        minutes(item.endTime) !== null &&
+        minutes(item.endTime)! > sunsetMinutes,
+    );
+    if (affected.length)
+      issues.push(
+        issue(
+          "daylight_conflict",
+          "high",
+          "An outdoor activity is scheduled to end after sunset.",
+          affected.map((item) => item.id),
+          true,
+          [sunsetEvidence.evidenceId],
+        ),
+      );
+  }
+
+  for (const reservationEvidence of liveEvidence.filter(
+    (entry) => entry.evidenceType === "reservation",
+  )) {
+    const value = reservationEvidence.normalizedValue.data;
+    if (value.requirement !== "required") continue;
+    const entityName = reservationEvidence.entityBinding?.name ?? "";
+    const affected = allItems.filter((item) =>
+      materiallyMatches(
+        entityName,
+        `${item.title} ${item.location?.name ?? ""}`,
+      ),
+    );
+    for (const item of affected)
+      if (item.reservation.status !== "required")
+        issues.push(
+          issue(
+            "reservation_required",
+            "high",
+            `${item.title} requires a visible reservation requirement.`,
+            [item.id],
+            true,
+            [reservationEvidence.evidenceId],
+          ),
+        );
+  }
+
+  for (const critical of liveEvidence.filter(
+    (entry) =>
+      (entry.evidenceType === "park_closure" ||
+        entry.evidenceType === "severe_weather") &&
+      (entry.freshnessState === "stale" ||
+        entry.freshnessState === "expired" ||
+        entry.freshnessState === "conflicting"),
+  ))
+    issues.push(
+      issue(
+        critical.freshnessState === "conflicting"
+          ? "official_evidence_conflicting"
+          : "critical_evidence_stale",
+        "high",
+        critical.freshnessState === "conflicting"
+          ? "Current official sources conflict and require review."
+          : "Critical live evidence is stale and must be refreshed.",
+        [],
+        false,
+        [critical.evidenceId],
+      ),
+    );
 
   const timedItems = plan.days.flatMap((day) =>
     day.items
@@ -538,6 +790,10 @@ export function validateItinerary(input: Input): ValidationReport {
     "budget_ceiling",
     "duplicates",
     "public_safe_rendering",
+    "official_closures",
+    "weather",
+    "daylight",
+    "destination_resolution",
   ];
   const checkFailures: Record<string, string[]> = {
     itinerary_schema: ["day_empty", "day_without_planned_activity"],
@@ -558,6 +814,18 @@ export function validateItinerary(input: Input): ValidationReport {
     budget_ceiling: ["budget_ceiling_exceeded"],
     duplicates: ["duplicate_item"],
     public_safe_rendering: ["unsafe_render_content"],
+    official_closures: [
+      "official_closure_conflict",
+      "official_evidence_conflicting",
+      "critical_evidence_stale",
+    ],
+    weather: [
+      "weather_forecast_unavailable",
+      "forecast_horizon_unsupported",
+      "severe_weather_caution",
+    ],
+    daylight: ["daylight_conflict"],
+    destination_resolution: ["destination_ambiguous", "destination_unresolved"],
   };
   return {
     validatorVersion: ITINERARY_VALIDATOR_VERSION,

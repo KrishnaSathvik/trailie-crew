@@ -13,13 +13,20 @@ const progressCopy = {
   failed: "Itinerary generation stopped",
 } as const;
 type View =
-  "Overview" | "Day-by-day" | "Travel" | "Stay" | "Food" | "Validation";
+  | "Overview"
+  | "Day-by-day"
+  | "Travel"
+  | "Stay"
+  | "Food"
+  | "Evidence"
+  | "Validation";
 const views: View[] = [
   "Overview",
   "Day-by-day",
   "Travel",
   "Stay",
   "Food",
+  "Evidence",
   "Validation",
 ];
 const quotaCopy: Record<string, string> = {
@@ -346,6 +353,119 @@ function Validation({ plan }: { plan: TripPlanView }) {
   );
 }
 
+function evidenceStatus(
+  evidence: NonNullable<TripPlanView["travelEvidence"]>[number],
+) {
+  if (
+    evidence.verificationState === "verified" &&
+    (evidence.freshnessState === "fresh" ||
+      evidence.freshnessState === "cached_fresh")
+  )
+    return "Verified";
+  if (evidence.verificationState === "partially_verified")
+    return "Partially verified";
+  if (
+    evidence.freshnessState === "stale" ||
+    evidence.freshnessState === "expired"
+  )
+    return "Stale";
+  return "Not verified";
+}
+
+function evidenceFallback(
+  evidence: NonNullable<TripPlanView["travelEvidence"]>[number],
+) {
+  if (
+    evidence.evidenceType === "weather_forecast" &&
+    evidence.availabilityState !== "available"
+  )
+    return "Weather information is unavailable for this published version.";
+  if (
+    evidence.evidenceType === "route" &&
+    evidence.availabilityState !== "available"
+  )
+    return "Live route information is unavailable, so Trailie has not verified this travel time.";
+  if (
+    evidence.evidenceType === "reservation" &&
+    evidence.verificationState !== "verified"
+  )
+    return "This reservation requirement has not been verified.";
+  if (
+    evidence.evidenceType === "park_alert" &&
+    evidence.availabilityState !== "available"
+  )
+    return "Official park alerts could not be checked.";
+  return null;
+}
+
+function Evidence({ plan }: { plan: TripPlanView }) {
+  const evidence = plan.travelEvidence ?? [];
+  return (
+    <div>
+      <h2 className="text-xl font-semibold">Travel evidence</h2>
+      <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
+        Sources are pinned to Version {plan.version}. Conditions may have
+        changed since this version was published.
+      </p>
+      {evidence.length ? (
+        <ul className="border-border mt-6 divide-y border-y">
+          {evidence.map((entry) => {
+            const fallback = evidenceFallback(entry);
+            return (
+              <li
+                key={entry.evidenceId}
+                className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto]"
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="border-border rounded-full border px-2 py-1 text-[0.6875rem] font-semibold">
+                      {evidenceStatus(entry)}
+                    </span>
+                    {entry.evidenceType === "park_closure" ? (
+                      <span className="border-foreground rounded-full border px-2 py-1 text-[0.6875rem] font-semibold">
+                        Official closure
+                      </span>
+                    ) : null}
+                    <span className="text-muted-foreground font-mono text-[0.625rem] capitalize">
+                      {entry.evidenceType.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <p className="mt-3 font-semibold">
+                    {entry.headline ?? fallback ?? entry.sourceName}
+                  </p>
+                  {fallback && entry.headline ? (
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      {fallback}
+                    </p>
+                  ) : null}
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    {entry.sourceName} · Last checked{" "}
+                    {new Date(entry.retrievedAt).toLocaleString()}
+                  </p>
+                </div>
+                {entry.sourceUrl ? (
+                  <a
+                    href={entry.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="h-fit text-sm font-semibold underline underline-offset-4"
+                  >
+                    Open official source
+                  </a>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground mt-6">
+          Live travel evidence is unavailable for this published version.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ItineraryExperience({
   plan,
   onRequestChange,
@@ -472,6 +592,7 @@ export function ItineraryExperience({
         {view === "Travel" ? <Travel plan={plan} /> : null}
         {view === "Stay" ? <Stay plan={plan} /> : null}
         {view === "Food" ? <Food plan={plan} /> : null}
+        {view === "Evidence" ? <Evidence plan={plan} /> : null}
         {view === "Validation" ? <Validation plan={plan} /> : null}
       </div>
     </div>

@@ -311,6 +311,65 @@ export function PublicItinerary({
         </section>
 
         <section
+          aria-labelledby="sources-heading"
+          className="public-section border-border mt-16 border-t pt-8"
+        >
+          <h2
+            id="sources-heading"
+            className="text-2xl font-semibold tracking-[-0.035em]"
+          >
+            Sources and freshness
+          </h2>
+          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6">
+            {itinerary.conditionsDisclaimer ??
+              "Conditions may have changed since this version was published."}
+          </p>
+          {itinerary.travelEvidence?.length ? (
+            <ul className="border-border mt-6 divide-y border-y">
+              {itinerary.travelEvidence.map((evidence) => (
+                <li
+                  key={`${evidence.provider}:${evidence.evidenceType}:${evidence.retrievedAt}`}
+                  className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto]"
+                >
+                  <div>
+                    <p className="font-semibold">
+                      {evidence.headline ?? evidence.sourceName}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {evidence.sourceName} ·{" "}
+                      {evidence.verificationState === "verified" &&
+                      (evidence.freshnessState === "fresh" ||
+                        evidence.freshnessState === "cached_fresh")
+                        ? "Verified"
+                        : evidence.freshnessState === "stale" ||
+                            evidence.freshnessState === "expired"
+                          ? "Stale"
+                          : "Not verified"}{" "}
+                      · Last checked{" "}
+                      {new Date(evidence.retrievedAt).toLocaleString()}
+                    </p>
+                  </div>
+                  {evidence.sourceUrl ? (
+                    <a
+                      href={evidence.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="h-fit text-sm font-semibold underline underline-offset-4"
+                    >
+                      {evidence.headline ?? "Open official source"}
+                    </a>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground mt-5 text-sm">
+              No live source snapshot was available for this version.
+            </p>
+          )}
+        </section>
+
+        <section
           aria-labelledby="validation-heading"
           className="public-section border-border mt-16 border-t pt-8"
         >

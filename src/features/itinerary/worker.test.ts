@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createFakeTravelProviderAdapter,
   createFakeTravelProvider,
   createUnavailableTravelProvider,
 } from "@trailie/travel-tools";
@@ -250,6 +251,56 @@ describe("itinerary worker", () => {
         workflow: "itinerary_repair",
         operationKey: "plan-durable:repair",
       }),
+    );
+    expect(calls.published).toBe(1);
+  });
+
+  it("supplies normalized live evidence and snapshots it before publication", async () => {
+    const { repo, calls } = repository();
+    const itineraryProvider = createFakeItineraryProvider();
+    const generate = vi.spyOn(itineraryProvider, "generate");
+    const fixture = createFakeTravelProviderAdapter({
+      scenario: "baseline",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    const store = vi.fn(async () => crypto.randomUUID());
+    const bindSnapshot = vi.fn(async () => crypto.randomUUID());
+
+    await processItineraryGeneration("plan-live-evidence", {
+      repository: repo,
+      provider: itineraryProvider,
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      travelIntelligence: {
+        providers: {
+          geocoding: fixture,
+          weather: fixture,
+          parks: fixture,
+          recreation: fixture,
+        },
+        evidenceRepository: {
+          store,
+          bindSnapshot,
+          copySnapshots: vi.fn(async () => 0),
+        },
+        maximumCallsPerProvider: 8,
+      },
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+
+    expect(generate.mock.calls[0][0].context).toContain(
+      "<LIVE_TRAVEL_EVIDENCE>",
+    );
+    expect(generate.mock.calls[0][0].context).toContain(
+      '"evidenceType":"weather_forecast"',
+    );
+    expect(store).toHaveBeenCalled();
+    expect(bindSnapshot).toHaveBeenCalled();
+    expect(bindSnapshot.mock.calls.length).toBeLessThanOrEqual(
+      store.mock.calls.length,
+    );
+    expect(bindSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ tripPlanId: "plan-live-evidence" }),
     );
     expect(calls.published).toBe(1);
   });

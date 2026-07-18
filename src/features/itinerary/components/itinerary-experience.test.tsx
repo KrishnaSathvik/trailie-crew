@@ -80,6 +80,38 @@ describe("ItineraryExperience", () => {
       updatedAt: "2026-07-13T18:01:00.000Z",
       publishedAt: "2026-07-13T18:01:00.000Z",
       errorCode: null,
+      travelEvidence: [
+        {
+          evidenceId: "evidence:nps:park_closure:official-1",
+          evidenceType: "park_closure",
+          provider: "nps",
+          sourceName: "National Park Service",
+          sourceUrl: "https://www.nps.gov/yose/planyourvisit/conditions.htm",
+          retrievedAt: "2026-07-13T18:00:00.000Z",
+          validUntil: "2026-07-13T18:10:00.000Z",
+          freshnessState: "fresh",
+          verificationState: "verified",
+          availabilityState: "available",
+          confidence: "high",
+          targetItemId: "item:sunset",
+          headline: "Glacier Point Road closure",
+        },
+        {
+          evidenceId: "evidence:openweather:weather_forecast:unavailable-1",
+          evidenceType: "weather_forecast",
+          provider: "openweather",
+          sourceName: "OpenWeather One Call 3.0",
+          sourceUrl: "https://openweathermap.org/api/one-call-3",
+          retrievedAt: "2026-07-13T18:00:00.000Z",
+          validUntil: null,
+          freshnessState: "unavailable",
+          verificationState: "failed",
+          availabilityState: "unavailable",
+          confidence: "low",
+          targetItemId: null,
+          headline: null,
+        },
+      ],
     };
     render(<ItineraryExperience plan={plan} />);
     expect(
@@ -104,6 +136,17 @@ describe("ItineraryExperience", () => {
     ).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "Validation" }));
     expect(screen.getByText("2 checks passed")).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: "Evidence" }));
+    expect(screen.getByText("Glacier Point Road closure")).toBeVisible();
+    expect(screen.getByText("Verified")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Weather information is unavailable for this published version.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getAllByRole("link", { name: "Open official source" })[0],
+    ).toHaveAttribute("rel", "noreferrer noopener");
   });
 
   it("renders safe blocked and failed terminal states", () => {

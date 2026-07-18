@@ -64,6 +64,45 @@ describe("public shared itinerary", () => {
     );
   });
 
+  it("shows privacy-safe exact-version source labels and freshness disclosure", () => {
+    const itinerary = {
+      ...shared(),
+      conditionsDisclaimer:
+        "Conditions may have changed since this version was published." as const,
+      travelEvidence: [
+        {
+          evidenceId: "evidence:nps:park_alert:official-1",
+          evidenceType: "park_alert" as const,
+          provider: "nps",
+          sourceName: "National Park Service",
+          sourceUrl: "https://www.nps.gov/yose/planyourvisit/conditions.htm",
+          retrievedAt: "2026-07-14T00:00:00.000Z",
+          validUntil: "2026-07-14T00:10:00.000Z",
+          freshnessState: "fresh" as const,
+          verificationState: "verified" as const,
+          availabilityState: "available" as const,
+          confidence: "high" as const,
+          targetItemId: null,
+          headline: "Official park conditions",
+        },
+      ],
+    };
+    render(<PublicItinerary itinerary={itinerary} />);
+
+    expect(
+      screen.getByText(
+        "Conditions may have changed since this version was published.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/National Park Service · Verified/)).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Official park conditions" }),
+    ).toHaveAttribute("rel", "noreferrer noopener");
+    expect(document.body.textContent).not.toContain(
+      "evidence:nps:park_alert:official-1",
+    );
+  });
+
   it("uses one generic unavailable state for every token failure", () => {
     render(<ShareUnavailable />);
     expect(

@@ -8,6 +8,7 @@ import type {
   PlanningSummary,
   RevisionAllowedChangeManifestV1,
   RevisionPatchV1,
+  TravelEvidenceV1,
   ValidationReport,
 } from "@trailie/schemas";
 import {
@@ -60,6 +61,9 @@ import {
   type DurableProviderAttemptController,
   type ProviderAttemptExecutionResult,
 } from "@/server/ai/provider-attempts";
+import type { TravelProviderRegistry } from "@/server/travel/intelligence";
+import type { TravelEvidenceRepository } from "@/server/travel/repository";
+import { refreshRevisionTravelEvidence } from "@/server/travel/revision-refresh";
 
 export type RevisionContext = {
   request: {
@@ -165,6 +169,11 @@ type Dependencies = {
   analysisAttempts?: DurableProviderAttemptController<PlanChangeAnalysis>;
   candidateAttempts?: DurableProviderAttemptController<Itinerary>;
   patchAttempts?: DurableProviderAttemptController<RevisionPatchV1>;
+  travelIntelligence?: {
+    providers: TravelProviderRegistry;
+    evidenceRepository: TravelEvidenceRepository;
+    maximumCallsPerProvider: number;
+  };
 };
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
@@ -233,6 +242,7 @@ async function validateCandidate(
   dependencies: Dependencies,
   existingEvidence: NormalizedToolEvidence[],
   manifest: RevisionAllowedChangeManifestV1,
+  liveEvidence: TravelEvidenceV1[],
 ) {
   const enriched = { itinerary: source, evidence: existingEvidence };
   await dependencies.repository.updateCandidate(candidateId, source);
@@ -240,6 +250,7 @@ async function validateCandidate(
     itinerary: enriched.itinerary,
     approvedSummary: context.approvedSummary,
     evidence: enriched.evidence,
+    liveEvidence,
     now: dependencies.now ?? new Date().toISOString(),
     minimumTravelBufferMinutes: 15,
     maximumDailyDriveMinutes: 360,
@@ -681,6 +692,20 @@ export async function processPlanChange(
         "candidate_generation",
         generatedMeta,
       );
+    const refreshed = dependencies.travelIntelligence
+      ? await refreshRevisionTravelEvidence({
+          requestType: manifest.requestType,
+          evidenceRefreshTargets: manifest.evidenceRefreshTargets,
+          baseTripPlanId: context.request.baseTripPlanId,
+          candidateTripPlanId: candidate.id,
+          candidate: generatedItinerary,
+          providers: dependencies.travelIntelligence.providers,
+          repository: dependencies.travelIntelligence.evidenceRepository,
+          locale: "en-US",
+          maximumCallsPerProvider:
+            dependencies.travelIntelligence.maximumCallsPerProvider,
+        })
+      : { evidence: [] as TravelEvidenceV1[] };
     let result = await validateCandidate(
       id,
       candidate.id,
@@ -690,6 +715,7 @@ export async function processPlanChange(
       dependencies,
       context.evidence,
       manifest,
+      refreshed.evidence,
     );
 
     if (result.boundary.status === "blocked") {
@@ -800,6 +826,7 @@ export async function processPlanChange(
         dependencies,
         result.evidence,
         manifest,
+        refreshed.evidence,
       );
       if (result.boundary.status === "blocked") {
         await dependencies.repository.block(id, "change_scope_exceeded");
@@ -920,6 +947,7 @@ export async function processPlanChange(
       dependencies,
       result.evidence,
       manifest,
+      refreshed.evidence,
     );
     if (
       result.validation.status === "pass" &&

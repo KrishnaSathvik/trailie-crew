@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Itinerary, PlanningSummary } from "@trailie/schemas";
+import {
+  createFakeTravelProviderAdapter,
+  createUnavailableTravelProviderAdapter,
+} from "@trailie/travel-tools";
 import { validateItinerary } from "./validate-itinerary";
 
 const evidenceId = "evidence:route-1";
@@ -374,6 +378,42 @@ describe("deterministic itinerary validation", () => {
     expect(report.passedChecks).not.toContain("route_duration");
   });
 
+  it("uses normalized live route evidence for deterministic timing checks", async () => {
+    const route = await createFakeTravelProviderAdapter({
+      scenario: "baseline",
+      now: "2026-07-13T19:00:00.000Z",
+    }).getRoute({
+      origin: { latitude: 37.7459, longitude: -119.5936 },
+      destination: { latitude: 37.728, longitude: -119.573 },
+      mode: "drive",
+      locale: "en-US",
+    });
+    const plan = itinerary();
+    plan.days[0].items[1].startTime = "16:00";
+    plan.days[0].travelSegments[0].evidenceRefs = [
+      route.evidence[0].evidenceId,
+    ];
+    const report = validateItinerary({
+      itinerary: plan,
+      approvedSummary: approvedSummary(),
+      evidence: evidence({ status: "unavailable" }),
+      liveEvidence: route.evidence,
+      now: "2026-07-13T19:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+
+    expect(report.issues.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining([
+        "route_timing_impossible",
+        "travel_buffer_insufficient",
+      ]),
+    );
+    expect(report.warnings.map((entry) => entry.code)).not.toContain(
+      "route_unavailable",
+    );
+  });
+
   it("surfaces closure and reservation evidence", () => {
     const plan = itinerary();
     plan.days[0].items[0].evidenceRefs = ["evidence:place-1"];
@@ -399,6 +439,81 @@ describe("deterministic itinerary validation", () => {
     });
     expect(report.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining(["location_closed", "reservation_required"]),
+    );
+  });
+
+  it("blocks a matching active official park closure", async () => {
+    const liveEvidence = (
+      await createFakeTravelProviderAdapter({
+        scenario: "active_closure",
+        now: "2026-09-12T12:00:00.000Z",
+      }).getParkAlerts({ parkCode: "yose", locale: "en-US" })
+    ).evidence;
+    const report = validateItinerary({
+      itinerary: itinerary(),
+      approvedSummary: approvedSummary(),
+      evidence: evidence(),
+      liveEvidence,
+      now: "2026-09-12T12:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "official_closure_conflict",
+        severity: "critical",
+        affectedItemIds: ["item:sunset"],
+      }),
+    );
+    expect(report.status).not.toBe("pass");
+  });
+
+  it("warns for unavailable forecasts and detects after-dark activity", async () => {
+    const plan = itinerary();
+    plan.days[0].items[1].endTime = "21:00";
+    const fixture = createFakeTravelProviderAdapter({
+      scenario: "baseline",
+      now: "2026-09-12T12:00:00.000Z",
+    });
+    const daylight = await fixture.getDaylight({
+      latitude: 37.8651,
+      longitude: -119.5383,
+      date: "2026-09-12",
+      locale: "en-US",
+    });
+    const unavailableWeather = await createUnavailableTravelProviderAdapter({
+      providerId: "openweather-disabled",
+      reason: "provider_disabled",
+      now: "2026-09-12T12:00:00.000Z",
+    }).getWeather({
+      latitude: 37.8651,
+      longitude: -119.5383,
+      startDate: "2026-09-12",
+      endDate: "2026-09-13",
+      locale: "en-US",
+    });
+    const report = validateItinerary({
+      itinerary: plan,
+      approvedSummary: approvedSummary(),
+      evidence: evidence(),
+      liveEvidence: [...daylight.evidence, ...unavailableWeather.evidence],
+      now: "2026-09-12T12:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "daylight_conflict",
+        affectedItemIds: ["item:sunset"],
+      }),
+    );
+    expect(report.warnings).toContainEqual(
+      expect.objectContaining({
+        code: "weather_forecast_unavailable",
+        severity: "medium",
+      }),
     );
   });
 
