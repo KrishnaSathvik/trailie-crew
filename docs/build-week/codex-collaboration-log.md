@@ -91,3 +91,11 @@ Started from clean `main` commit `c658653`. Human direction locked approved-summ
 ## 2026-07-17 — Phase 6A
 
 Started from clean `main` commit `8c1e9c7`. Human direction selected Mapbox, OpenWeather One Call 3.0, NPS, and RIDB; required evidence-backed planning, exact-version snapshots, official-source precedence, protected hosted acceptance, and no Production/Phase 6B/6C/7 work. Codex verified official provider documentation and credential usability without exposing values, then implemented the strict normalized evidence model, provider adapters, cache/budget boundary, private database contract, itinerary/revision validation, source UI, and deterministic tests. Live Mapbox, NPS, and RIDB smokes succeeded; OpenWeather returned HTTP 401 and remains explicitly unavailable pending entitlement.
+
+Local release gates passed, including 589 unit/component and 577 pgTAP
+assertions. Hosted diagnosis found and fixed exact official-name handling,
+provider-query normalization, and Mapbox candidate depth without weakening
+generic ambiguity. The final protected fresh-provider run still failed closed
+with `destination_ambiguous`, so Version 1/2 snapshot and share/export acceptance
+did not complete. Vercel Authentication remained enabled, bypass and recovery
+backlogs returned to zero, and Production was not deployed.

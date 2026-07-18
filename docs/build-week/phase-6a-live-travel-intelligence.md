@@ -19,9 +19,25 @@ Phase 6A adds a strict evidence layer between external travel providers and itin
 
 ## Acceptance state
 
-Local focused tests and the Phase 6A database contract are green during implementation. Live credential presence and minimal capability smokes were checked without printing, hashing, exporting, or logging any credential value. Mapbox geocoding/routing, NPS park/alerts, and RIDB recreation-area smokes returned HTTP 200. OpenWeather One Call 3.0 returned HTTP 401, so weather/daylight are not accepted as usable live capabilities and remain explicit unavailable evidence.
+Local gates pass: formatting, lint, type checking, 589 unit/component
+assertions, the local production build, 60 travel-provider assertions, 577
+pgTAP assertions, local Playwright, database lint, dependency audit, diff/secret
+checks, and the focused provider/snapshot/revision/recovery/quota suites. Live
+credential presence and capability smokes were checked without printing,
+hashing, exporting, or logging credential values. Mapbox geocoding/routing, NPS
+park/alerts, and RIDB recreation-area smokes returned HTTP 200. OpenWeather One
+Call 3.0 returned HTTP 401, so weather/daylight remain explicit unavailable
+evidence.
 
-Final full local gates and protected hosted acceptance are recorded only after they run. Existing protected Preview remains the release baseline until then. Production remains undeployed.
+Protected hosted acceptance is **not accepted for release**. The final
+acceptance-only deployment `dpl_GHch4Kd2VvBg3ercSBrQSotyyTag` remained behind
+Vercel Authentication, used `TRAVEL_CACHE_BYPASS=true`, and left zero temporary
+bypasses and zero provider/recovery backlog. Fresh provider diagnostics found
+one unique Mapbox/NPS official-name match, but the assembled itinerary still
+failed closed with `destination_ambiguous`; repairable duplicate-item findings
+could not run while that critical identity blocker remained. Version 1 did not
+publish, so immutable Version 1/2 hosted evidence, sharing, print, and ICS were
+not accepted. Production remains undeployed.
 
 ## Deferred or unsupported
 

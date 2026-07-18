@@ -118,7 +118,7 @@
 - [x] Privacy-safe itinerary/public source presentation
 - [x] Live Mapbox, NPS, and RIDB minimal credential smokes
 - [ ] OpenWeather One Call 3.0 usable credential (current live smoke: HTTP 401)
-- [ ] Complete protected hosted-acceptance Phase 6A flow
+- [ ] Complete protected hosted-acceptance Phase 6A flow (latest fresh-provider run blocked by `destination_ambiguous` before Version 1)
 - [ ] Live reservation inventory (not claimed; official link only unless proved)
 - [ ] Phase 6B interactive map (explicitly deferred)
 - [ ] Unrestricted Production deployment (not authorized)

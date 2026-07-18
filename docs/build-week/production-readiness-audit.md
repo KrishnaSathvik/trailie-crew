@@ -236,3 +236,12 @@ The latest complete regression worktree deployed Ready as `dpl_52TpJwK7aReq9CzZJ
 ## Phase 6A audit addendum — July 17, 2026
 
 The implementation adds strict normalized travel evidence, selected official-provider adapters, provider-aware caching and budgets, forced-RLS evidence/operation/snapshot storage, exact-version source projections, and deterministic live-evidence validation without weakening Phase 5 controls. OpenWeather One Call 3.0 entitlement is a current external blocker, and RIDB live inventory/availability plus a stable TrailVerse service are intentionally not claimed. Production readiness cannot advance until all local gates and a protected hosted-acceptance flow pass with those limitations represented honestly.
+
+Local Phase 6A gates pass, but the final protected fresh-provider flow did not
+publish Version 1. Mapbox/NPS diagnostics produced one unique official-name
+match, while deterministic validation still received
+`destination_ambiguous`; repairable duplicate-item findings therefore remained
+behind the critical blocker. Deployment `dpl_GHch4Kd2VvBg3ercSBrQSotyyTag`
+stayed protected, temporary bypass and recovery backlog counts returned to
+zero, and Production was not deployed. Phase 6A Production readiness is
+`not_ready`.

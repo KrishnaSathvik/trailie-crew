@@ -92,6 +92,14 @@ const roomResult = await admin
   .eq("room_code", roomCode)
   .single();
 if (roomResult.error) throw new Error("diagnostic_room_unavailable");
+const planningResult = await admin
+  .from("planning_requests")
+  .select(
+    "status,current_summary_version,generation_attempt_count,generation_error_code,updated_at",
+  )
+  .eq("room_id", roomResult.data.id)
+  .order("created_at");
+if (planningResult.error) throw new Error("diagnostic_planning_unavailable");
 const plansResult = await admin
   .from("trip_plans")
   .select(
@@ -152,6 +160,13 @@ process.stdout.write(
   `${JSON.stringify({
     roomCode,
     currentPlanVersion: roomResult.data.current_plan_version,
+    planning: planningResult.data.map((request) => ({
+      status: request.status,
+      summaryVersion: request.current_summary_version,
+      attemptCount: request.generation_attempt_count,
+      errorCode: request.generation_error_code,
+      updatedAt: request.updated_at,
+    })),
     plans,
     travel: travel.data,
     validation: validation.data,

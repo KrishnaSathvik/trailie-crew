@@ -125,3 +125,14 @@ Final clean deployment `dpl_81bc4Db2Hp4UejzooFe2Ac9arxdT` is Ready only on `host
 Phase 6A changes do not inherit the Phase 5E hosted verdict automatically. The accepted protected deployment above must remain intact until a new hosted-acceptance-only deployment passes provider smokes and the complete live-data room flow. Credential presence and live minimal smokes were checked without exposing values: Mapbox geocoding/routing, NPS park/alerts, and RIDB recreation-area requests succeeded; OpenWeather One Call 3.0 returned HTTP 401 and is therefore an explicit degraded capability, not verified weather.
 
 No unrestricted Production deployment is authorized. The Phase 6A protected Preview verdict remains pending until the final hosted run is recorded, Vercel Authentication is rechecked, temporary bypass count is zero, and provider/recovery backlogs are zero.
+
+Final Phase 6A result: `not_accepted_for_release`. Deployment
+`dpl_GHch4Kd2VvBg3ercSBrQSotyyTag` was Ready only on
+`hosted-acceptance`, Vercel Authentication remained enabled, the
+acceptance-only cache bypass forced fresh calls, and temporary bypass/provider
+recovery counts returned to zero. Mapbox/NPS live diagnostics found one unique
+official-name match, but itinerary validation still reported
+`destination_ambiguous`; Version 1 therefore did not publish and the Version 2,
+historical-share, ICS, and print tail could not run. OpenWeather One Call 3.0
+also remains unusable with the supplied credential (HTTP 401). Production was
+not deployed.
