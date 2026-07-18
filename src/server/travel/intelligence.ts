@@ -38,6 +38,85 @@ function uniqueEvidence(evidence: TravelEvidenceV1[]) {
   ];
 }
 
+function normalizedEntityName(value: unknown) {
+  return typeof value === "string"
+    ? value
+        .normalize("NFKC")
+        .toLocaleLowerCase("en-US")
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim()
+    : "";
+}
+
+function resolvedByOfficialName(
+  entry: TravelEvidenceV1,
+  corroboratingProvider: string,
+): TravelEvidenceV1 {
+  return {
+    ...entry,
+    freshnessState: "fresh",
+    verificationState: "verified",
+    confidence: "high",
+    availabilityState: "available",
+    providerMetadata: {
+      ...entry.providerMetadata,
+      applicationResolution: "official_name_corroboration",
+      corroboratingProvider,
+    },
+    errorState: null,
+  };
+}
+
+function corroborateOfficialDestination(
+  geocode: TravelProviderResponse,
+  park: TravelProviderResponse,
+) {
+  if (geocode.state !== "ambiguous" && park.state !== "ambiguous")
+    return { geocode, park };
+  const geocodes = geocode.evidence.filter(
+    (entry) => entry.evidenceType === "geocode",
+  );
+  const parks = park.evidence.filter((entry) => entry.evidenceType === "park");
+  const matches = geocodes.flatMap((geocodeEntry) => {
+    const geocodeName = normalizedEntityName(
+      geocodeEntry.normalizedValue.data.name,
+    );
+    if (!geocodeName) return [];
+    return parks
+      .filter(
+        (parkEntry) =>
+          normalizedEntityName(parkEntry.normalizedValue.data.officialName) ===
+          geocodeName,
+      )
+      .map((parkEntry) => ({ geocodeEntry, parkEntry, geocodeName }));
+  });
+  const names = new Set(matches.map((match) => match.geocodeName));
+  if (matches.length !== 1 || names.size !== 1) return { geocode, park };
+  const [{ geocodeEntry, parkEntry }] = matches;
+  const parkEvidence = park.evidence.filter(
+    (entry) => entry.sourceEntityId === parkEntry.sourceEntityId,
+  );
+  return {
+    geocode: {
+      ...geocode,
+      state: "available" as const,
+      evidence: [resolvedByOfficialName(geocodeEntry, parkEntry.provider)],
+      warnings: [
+        ...geocode.warnings,
+        "resolved_by_official_name_corroboration",
+      ],
+    },
+    park: {
+      ...park,
+      state: "available" as const,
+      evidence: parkEvidence.map((entry) =>
+        resolvedByOfficialName(entry, geocodeEntry.provider),
+      ),
+      warnings: [...park.warnings, "resolved_by_official_name_corroboration"],
+    },
+  };
+}
+
 export async function collectDestinationTravelEvidence(input: Input) {
   const evidence: TravelEvidenceV1[] = [];
   const callsByProvider: Record<string, number> = {};
@@ -98,11 +177,15 @@ export async function collectDestinationTravelEvidence(input: Input) {
       ),
   );
 
-  const [geocode, park, recreation] = await Promise.all([
+  const [geocodeResult, parkResult, recreation] = await Promise.all([
     geocodePromise,
     parkPromise,
     recreationPromise,
   ]);
+  const { geocode, park } = corroborateOfficialDestination(
+    geocodeResult,
+    parkResult,
+  );
   evidence.push(...geocode.evidence, ...park.evidence, ...recreation.evidence);
 
   const parkRecord =
