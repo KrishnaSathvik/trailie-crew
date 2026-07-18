@@ -119,3 +119,9 @@ The protected controlled drill then passed first-call 503 recovery for both work
 One complete protected room passed create/join, Realtime behavior, focused Terra, Luna correction, planning and approvals, validated Version 1, narrow manifest revision, immutable Version 2, pinned Version 1 share/ICS/print, revocation, and refresh. A stale attempt from an older terminal repair was finalized by the service-only recovery migration without replay; the global content-free backlog audit was then zero. A fresh-room focused/Luna/planning repeatability subset also passed with no duplicate output or unresolved work.
 
 Final clean deployment `dpl_81bc4Db2Hp4UejzooFe2Ac9arxdT` is Ready only on `hosted-acceptance`. The fault variable is absent, Vercel Authentication remains enabled, and zero bypasses remain. Protected Preview is `accepted`; Production remains undeployed and `not_ready`.
+
+## Phase 6A acceptance addendum — July 17, 2026
+
+Phase 6A changes do not inherit the Phase 5E hosted verdict automatically. The accepted protected deployment above must remain intact until a new hosted-acceptance-only deployment passes provider smokes and the complete live-data room flow. Credential presence and live minimal smokes were checked without exposing values: Mapbox geocoding/routing, NPS park/alerts, and RIDB recreation-area requests succeeded; OpenWeather One Call 3.0 returned HTTP 401 and is therefore an explicit degraded capability, not verified weather.
+
+No unrestricted Production deployment is authorized. The Phase 6A protected Preview verdict remains pending until the final hosted run is recorded, Vercel Authentication is rechecked, temporary bypass count is zero, and provider/recovery backlogs are zero.

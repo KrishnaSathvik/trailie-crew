@@ -14,7 +14,15 @@ No values belong in this document or browser logs.
 | `CAPTCHA_TEST_MODE`                                             | server-only             | controlled acceptance only                  | forbidden                       | deterministic adapter                  |
 | `NEXT_PUBLIC_CAPTCHA_TEST_MODE`                                 | browser-visible         | controlled acceptance only                  | forbidden                       | deterministic widget adapter           |
 | `AI_GENERATION_ENABLED`                                         | server-only             | `true`/drill `false`                        | default `false` for rollout     | emergency AI switch                    |
-| `TRAVEL_PROVIDERS_ENABLED`                                      | server-only             | `false`                                     | `false` until Phase 6A          | travel-provider circuit breaker        |
+| `TRAVEL_PROVIDERS_ENABLED`                                      | server-only             | `true` only in protected acceptance         | `false` until release approval  | global travel-provider circuit breaker |
+| `MAPBOX_ACCESS_TOKEN`                                           | server-only             | Preview-scoped                              | Production-scoped               | geocoding and routing                  |
+| `NPS_API_KEY`                                                   | server-only             | Preview-scoped                              | Production-scoped               | official park records and alerts       |
+| `OPENWEATHER_API_KEY`                                           | server-only             | One Call 3.0-entitled                       | One Call 3.0-entitled           | forecast, alerts, timezone, daylight   |
+| `RIDB_API_KEY`                                                  | server-only             | Preview-scoped                              | Production-scoped               | recreation entities and official links |
+| `TRAVEL_DISABLED_PROVIDERS`                                     | server-only             | reviewed comma-separated subset             | reviewed comma-separated subset | individual provider emergency disable  |
+| `TRAVEL_PROVIDER_ROOM_DAILY_LIMIT`                              | server-only             | bounded integer                             | policy-approved integer         | per-room/provider live-call ceiling    |
+| `TRAVEL_PROVIDER_GLOBAL_DAILY_LIMIT`                            | server-only             | bounded integer                             | policy-approved integer         | global/provider live-call ceiling      |
+| `TRAVEL_CACHE_BYPASS`                                           | server-only             | acceptance only                             | forbidden                       | deterministic provider-cache bypass    |
 | `OPENAI_API_KEY`                                                | server-only             | Preview provider key                        | Production provider key         | provider authentication                |
 | `OPENAI_SAFETY_HMAC_SECRET`                                     | server-only             | unique Preview value                        | unique Production value         | pseudonymous safety identifier         |
 | `OPENAI_MODEL_*`, `OPENAI_*_TIMEOUT_MS`, prompt/schema versions | server-only             | pinned                                      | pinned                          | workflow routing and runtime bounds    |
@@ -26,3 +34,5 @@ No values belong in this document or browser logs.
 | `ANONYMOUS_CLEANUP_BATCH_SIZE`                                  | server-only             | small batch                                 | bounded reviewed batch          | cleanup runtime bound                  |
 
 Rotate immediately after suspected exposure and at ownership changes. Rotate service/OpenAI/Cron/Turnstile secrets independently, redeploy, verify the old credential fails, and record only the rotation timestamp and owner. A client-bundle scan must allow only `NEXT_PUBLIC_*` keys.
+
+Travel credentials must be verified only for presence and a minimal capability result. Never print, hash, export, or place values in logs/evidence. Browser code may not read any travel credential.

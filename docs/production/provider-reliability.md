@@ -34,3 +34,9 @@ Never manually edit an attempt into `applied`, reuse a provider response for a d
 - Prior protected Phase 5D runs published exact removal Version 2 and independent removal Version 3. Phase 5E controlled first-attempt 503s recovered on the bounded second attempts for focused and Luna. A complete protected flow published immutable Version 2 and passed pinned sharing/exports; a fresh-room repeatability subset passed. Final clean recovery and all workflow backlogs are zero.
 
 See [Timeout and retry policy](./timeout-retry-policy.md), [Monitoring and operational alerts](./monitoring-alerts.md), and [Provider cost controls](./cost-controls.md).
+
+## Phase 6A travel providers
+
+Travel provider calls use the same stable parent itinerary/revision recovery identity plus a capability-specific hashed cache/request key. Cache misses require a service-only durable budget claim; cache hits do not consume live-call limits. Timeout, rate limit, and unavailable failures are retryable within the existing bounded workflow. Invalid input, invalid credential/entitlement, unsupported capability, malformed response, and not found are not blindly retried. One provider failure becomes unavailable evidence and does not block unrelated evidence unless deterministic policy marks the missing fact critical.
+
+See [travel provider operations](./travel-provider-operations.md) and [travel cache policy](./travel-cache-policy.md).

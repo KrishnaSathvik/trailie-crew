@@ -107,6 +107,22 @@
 - [x] Bounded recovery drain for abandoned extraction rows
 - [ ] Durable production queue/cron scheduling for recovery
 
+## Phase 6A live travel intelligence
+
+- [x] Strict `TravelEvidenceV1` freshness/verification/confidence/availability contract
+- [x] Server-only Mapbox, OpenWeather One Call 3.0, NPS, and RIDB adapters
+- [x] Explicit ambiguous, stale, unsupported, unavailable, and conflicting states
+- [x] Provider-aware cache, deduplication, budgets, and global/individual disables
+- [x] Forced-RLS normalized evidence and immutable published-version snapshots
+- [x] Official closure, normalized route, weather, daylight, reservation, and location validation
+- [x] Privacy-safe itinerary/public source presentation
+- [x] Live Mapbox, NPS, and RIDB minimal credential smokes
+- [ ] OpenWeather One Call 3.0 usable credential (current live smoke: HTTP 401)
+- [ ] Complete protected hosted-acceptance Phase 6A flow
+- [ ] Live reservation inventory (not claimed; official link only unless proved)
+- [ ] Phase 6B interactive map (explicitly deferred)
+- [ ] Unrestricted Production deployment (not authorized)
+
 ## Phase 5B Production-hardening checklist
 
 - [x] CAPTCHA-protected anonymous sign-in/create/join application boundary with deterministic local adapter

@@ -25,3 +25,7 @@ A first boundary failure is persisted safely and may start one `candidate_scope_
 ## Operator rule
 
 Never suppress `change_scope_exceeded`, lower unrelated-drift severity, edit a manifest after approval, use general repair to expand scope, or publish a candidate whose preservation/boundary/full validation did not pass.
+
+## Phase 6A evidence refresh
+
+Evidence refresh targets remain subordinate to the approved change manifest. Route/timing changes refresh only affected segment evidence; broader destination/item changes may refresh destination, official park, alert, weather, daylight, reservation, and operating-hours evidence. Unaffected snapshots are copied explicitly to the candidate version. Metadata-only refresh does not expand itinerary scope or require a new plan version; a new closure proposes a normal revision and never silently rewrites the published plan.
