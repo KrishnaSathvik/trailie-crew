@@ -22,19 +22,25 @@ function normalizeEntityName(value) {
     .trim();
 }
 
+function providerPlaceQuery(destination) {
+  const parkName = destination.match(/^(.+?)\s+national\s+parks?\b/iu)?.[1];
+  return parkName?.trim() || destination;
+}
+
 async function safeProviderMatchProfile(destination) {
   if (!process.env.MAPBOX_ACCESS_TOKEN || !process.env.NPS_API_KEY) return null;
   try {
+    const providerQuery = providerPlaceQuery(destination);
     const mapboxUrl = new URL(
       "https://api.mapbox.com/search/geocode/v6/forward",
     );
-    mapboxUrl.searchParams.set("q", destination);
+    mapboxUrl.searchParams.set("q", providerQuery);
     mapboxUrl.searchParams.set("limit", "10");
     mapboxUrl.searchParams.set("permanent", "true");
     mapboxUrl.searchParams.set("access_token", process.env.MAPBOX_ACCESS_TOKEN);
     const npsUrl = new URL("https://developer.nps.gov/api/v1/parks");
-    npsUrl.searchParams.set("q", destination);
-    npsUrl.searchParams.set("limit", "50");
+    npsUrl.searchParams.set("q", providerQuery);
+    npsUrl.searchParams.set("limit", "10");
     npsUrl.searchParams.set("api_key", process.env.NPS_API_KEY);
     const [mapboxResponse, npsResponse] = await Promise.all([
       fetch(mapboxUrl, { signal: AbortSignal.timeout(10_000) }),
@@ -50,7 +56,7 @@ async function safeProviderMatchProfile(destination) {
       mapboxResponse.json(),
       npsResponse.json(),
     ]);
-    const expected = normalizeEntityName(destination);
+    const expected = normalizeEntityName(providerQuery);
     const mapboxNames = (mapboxPayload.features ?? [])
       .map((feature) =>
         normalizeEntityName(
@@ -65,6 +71,8 @@ async function safeProviderMatchProfile(destination) {
       name.split(/\s+/u).length >= 2 && ` ${expected} `.includes(` ${name} `);
     return {
       status: "available",
+      queryCharacterCount: providerQuery.length,
+      queryWordCount: providerQuery.split(/\s+/u).filter(Boolean).length,
       mapboxCandidateCount: mapboxNames.length,
       npsCandidateCount: npsNames.length,
       mapboxEmbeddedOfficialNameCount: mapboxNames.filter(embedded).length,

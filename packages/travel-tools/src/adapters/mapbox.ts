@@ -222,7 +222,7 @@ async function performGeocode(
       url.searchParams.set("country", query.countryCodes.join(","));
     url.searchParams.set("autocomplete", "false");
   }
-  url.searchParams.set("limit", reverse ? "1" : "5");
+  url.searchParams.set("limit", reverse ? "1" : "10");
   url.searchParams.set("permanent", "true");
   url.searchParams.set("language", input.locale.split("-")[0]);
   url.searchParams.set("access_token", configuration.accessToken);

@@ -46,6 +46,7 @@ describe("Mapbox TravelProviderAdapter", () => {
 
     const requested = new URL(String(fetcher.mock.calls[0][0]));
     expect(requested.searchParams.get("permanent")).toBe("true");
+    expect(requested.searchParams.get("limit")).toBe("10");
     expect(result.state).toBe("ambiguous");
     expect(result.evidence).toHaveLength(2);
     expect(result.evidence[0]).toMatchObject({
