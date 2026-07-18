@@ -45,6 +45,7 @@ import {
   publicSharedItinerarySchema,
   revisionAllowedChangeManifestV1Schema,
   revisionPatchV1Schema,
+  travelEvidenceSummarySchema,
 } from "./index";
 
 const uuid = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
@@ -227,6 +228,40 @@ describe("Phase 4A itinerary revision schemas", () => {
       planVersionDiffSchema.safeParse({
         ...diff,
         items: [{ ...diff.items[0], operation: "patched" }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("Phase 6A evidence presentation schemas", () => {
+  it("accepts privacy-safe source summaries and rejects provider internals", () => {
+    const summary = {
+      evidenceId: "evidence:nps:park_closure:official-1",
+      evidenceType: "park_closure",
+      provider: "nps",
+      sourceName: "National Park Service",
+      sourceUrl: "https://www.nps.gov/yose/planyourvisit/conditions.htm",
+      retrievedAt: "2026-07-17T20:00:00.000Z",
+      validUntil: "2026-07-17T20:10:00.000Z",
+      freshnessState: "fresh",
+      verificationState: "verified",
+      availabilityState: "available",
+      confidence: "high",
+      targetItemId: "item:sunset",
+      headline: "Glacier Point Road closure",
+    } as const;
+
+    expect(travelEvidenceSummarySchema.parse(summary)).toEqual(summary);
+    expect(
+      travelEvidenceSummarySchema.safeParse({
+        ...summary,
+        coordinates: { latitude: 1, longitude: 2 },
+      }).success,
+    ).toBe(false);
+    expect(
+      travelEvidenceSummarySchema.safeParse({
+        ...summary,
+        sourceUrl: "https://private.example/evidence",
       }).success,
     ).toBe(false);
   });

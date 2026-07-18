@@ -38,6 +38,9 @@
     "test:pdf:smoke": "vitest run src/features/sharing/components/public-itinerary.test.tsx src/app/trips/[roomId]/plans/[version]/print/page.test.tsx",
     "test:calendar:smoke": "vitest run src/features/exports/ics.test.ts src/app/api/trips/[roomId]/plans/[version]/calendar/route.test.ts",
     "test:travel-tools:smoke": "node scripts/travel-tools-smoke.mjs",
+    "test:travel-provider:acceptance": "vitest run packages/travel-tools/src packages/trailverse-adapter/src src/server/travel",
+    "test:evidence-snapshot:acceptance": "vitest run packages/schemas/src/travel-evidence.test.ts src/server/travel/repository.test.ts src/features/itinerary/worker.test.ts src/features/sharing/components/public-itinerary.test.tsx",
+    "test:revision-evidence:acceptance": "vitest run src/server/travel/revision-refresh.test.ts src/features/revisions/worker.test.ts",
     "test:watch": "vitest",
     "supabase": "supabase"
   },

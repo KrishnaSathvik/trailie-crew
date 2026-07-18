@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  travelAvailabilityStateSchema,
+  travelConfidenceSchema,
+  travelEvidenceTypeSchema,
+  travelFreshnessStateSchema,
+  travelVerificationStateSchema,
+} from "./travel-evidence";
+
+export * from "./travel-evidence";
 
 export const tripIdSchema = z.string().trim().min(1).brand("TripId");
 
@@ -822,6 +831,44 @@ const publicFoodSummarySchema = z
     reservationStatus: publicReservationStatusSchema,
   })
   .strict();
+
+const trustedTravelSourceUrlSchema = z.url().refine((value) => {
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return [
+      "nps.gov",
+      "recreation.gov",
+      "mapbox.com",
+      "openweathermap.org",
+    ].some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  } catch {
+    return false;
+  }
+}, "Travel evidence source must be an allowlisted official provider.");
+
+export const travelEvidenceSummarySchema = z
+  .object({
+    evidenceId: z
+      .string()
+      .trim()
+      .min(16)
+      .max(240)
+      .regex(/^evidence:[a-zA-Z0-9._:-]+$/),
+    evidenceType: travelEvidenceTypeSchema,
+    provider: z.string().trim().min(1).max(80),
+    sourceName: publicItineraryTextSchema(200),
+    sourceUrl: trustedTravelSourceUrlSchema.nullable(),
+    retrievedAt: timestampSchema,
+    validUntil: timestampSchema.nullable(),
+    freshnessState: travelFreshnessStateSchema,
+    verificationState: travelVerificationStateSchema,
+    availabilityState: travelAvailabilityStateSchema,
+    confidence: travelConfidenceSchema,
+    targetItemId: itineraryIdSchema.nullable(),
+    headline: publicItineraryTextSchema(300).nullable(),
+  })
+  .strict();
+
 export const publicSharedItinerarySchema = z
   .object({
     schemaVersion: z.literal("1"),
@@ -839,6 +886,10 @@ export const publicSharedItinerarySchema = z
     lodging: z.array(publicStaySummarySchema).max(30),
     food: z.array(publicFoodSummarySchema).max(100),
     disclaimer: z.literal("No bookings were made by Trailie"),
+    conditionsDisclaimer: z
+      .literal("Conditions may have changed since this version was published.")
+      .optional(),
+    travelEvidence: z.array(travelEvidenceSummarySchema).max(200).optional(),
   })
   .strict();
 export const publicShareMetadataSchema = z
@@ -898,6 +949,7 @@ export const tripPlanViewSchema = z
     updatedAt: timestampSchema,
     publishedAt: timestampSchema.nullable(),
     errorCode: z.string().trim().min(1).max(80).nullable(),
+    travelEvidence: z.array(travelEvidenceSummarySchema).max(200).optional(),
   })
   .strict();
 

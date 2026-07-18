@@ -6,6 +6,7 @@ import {
   parseOpenAIEnv,
   parseRecoveryEnv,
   parseServerSupabaseEnv,
+  parseTravelProviderEnv,
   requireAiGeneration,
 } from "./env";
 
@@ -143,5 +144,73 @@ describe("server environment validation", () => {
         ANONYMOUS_CLEANUP_BATCH_SIZE: "1000",
       }),
     ).toThrow();
+  });
+
+  it("requires every selected travel credential when live providers are enabled", () => {
+    expect(
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        MAPBOX_ACCESS_TOKEN: "mapbox-test",
+        NPS_API_KEY: "nps-test",
+        OPENWEATHER_API_KEY: "openweather-test",
+        RIDB_API_KEY: "ridb-test",
+      }),
+    ).toMatchObject({
+      enabled: true,
+      mapboxAccessToken: "mapbox-test",
+      npsApiKey: "nps-test",
+      openWeatherApiKey: "openweather-test",
+      ridbApiKey: "ridb-test",
+      disabledProviders: [],
+      roomDailyLimit: 200,
+      globalDailyLimit: 5000,
+    });
+    expect(() =>
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        MAPBOX_ACCESS_TOKEN: "mapbox-test",
+        NPS_API_KEY: "nps-test",
+        OPENWEATHER_API_KEY: "openweather-test",
+      }),
+    ).toThrow("Travel provider server configuration is incomplete.");
+  });
+
+  it("keeps planning available with null travel credentials when providers are disabled", () => {
+    expect(
+      parseTravelProviderEnv({ TRAVEL_PROVIDERS_ENABLED: "false" }),
+    ).toEqual({
+      enabled: false,
+      mapboxAccessToken: null,
+      npsApiKey: null,
+      openWeatherApiKey: null,
+      ridbApiKey: null,
+      disabledProviders: [],
+      roomDailyLimit: 200,
+      globalDailyLimit: 5000,
+    });
+  });
+
+  it("supports bounded limits and individual provider emergency disables", () => {
+    expect(
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        MAPBOX_ACCESS_TOKEN: "mapbox-test",
+        NPS_API_KEY: "nps-test",
+        OPENWEATHER_API_KEY: "openweather-test",
+        RIDB_API_KEY: "ridb-test",
+        TRAVEL_DISABLED_PROVIDERS: "openweather,nps",
+        TRAVEL_PROVIDER_ROOM_DAILY_LIMIT: "50",
+        TRAVEL_PROVIDER_GLOBAL_DAILY_LIMIT: "100",
+      }),
+    ).toMatchObject({
+      disabledProviders: ["openweather", "nps"],
+      roomDailyLimit: 50,
+      globalDailyLimit: 100,
+    });
+    expect(() =>
+      parseTravelProviderEnv({
+        TRAVEL_DISABLED_PROVIDERS: "unknown",
+      }),
+    ).toThrow("Unknown disabled travel provider.");
   });
 });

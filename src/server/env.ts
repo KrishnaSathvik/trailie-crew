@@ -122,6 +122,30 @@ const captchaEnvSchema = z.object({
   VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
 });
 
+const travelProviderEnvSchema = z.object({
+  TRAVEL_PROVIDERS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  MAPBOX_ACCESS_TOKEN: z.string().trim().min(1).optional(),
+  NPS_API_KEY: z.string().trim().min(1).optional(),
+  OPENWEATHER_API_KEY: z.string().trim().min(1).optional(),
+  RIDB_API_KEY: z.string().trim().min(1).optional(),
+  TRAVEL_DISABLED_PROVIDERS: z.string().trim().default(""),
+  TRAVEL_PROVIDER_ROOM_DAILY_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(10_000)
+    .default(200),
+  TRAVEL_PROVIDER_GLOBAL_DAILY_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1_000_000)
+    .default(5_000),
+});
+
 export function parseServerSupabaseEnv(source: EnvironmentSource) {
   const publicValues = parsePublicSupabaseEnv(source);
   const values = serverSupabaseEnvSchema.parse(source);
@@ -215,4 +239,47 @@ export function parseCaptchaEnv(source: EnvironmentSource) {
     authCaptchaEnabled: values.SUPABASE_AUTH_CAPTCHA_ENABLED,
     testMode: values.CAPTCHA_TEST_MODE,
   };
+}
+
+export function parseTravelProviderEnv(source: EnvironmentSource) {
+  const values = travelProviderEnvSchema.parse(source);
+  const disabledProviders = [
+    ...new Set(
+      values.TRAVEL_DISABLED_PROVIDERS.split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (
+    disabledProviders.some(
+      (provider) =>
+        !["mapbox", "openweather", "nps", "ridb"].includes(provider),
+    )
+  )
+    throw new Error("Unknown disabled travel provider.");
+  if (
+    values.TRAVEL_PROVIDER_ROOM_DAILY_LIMIT >
+    values.TRAVEL_PROVIDER_GLOBAL_DAILY_LIMIT
+  )
+    throw new Error("Travel provider limits are invalid.");
+  if (
+    values.TRAVEL_PROVIDERS_ENABLED &&
+    (!values.MAPBOX_ACCESS_TOKEN ||
+      !values.NPS_API_KEY ||
+      !values.OPENWEATHER_API_KEY ||
+      !values.RIDB_API_KEY)
+  )
+    throw new Error("Travel provider server configuration is incomplete.");
+  return {
+    enabled: values.TRAVEL_PROVIDERS_ENABLED,
+    mapboxAccessToken: values.MAPBOX_ACCESS_TOKEN ?? null,
+    npsApiKey: values.NPS_API_KEY ?? null,
+    openWeatherApiKey: values.OPENWEATHER_API_KEY ?? null,
+    ridbApiKey: values.RIDB_API_KEY ?? null,
+    disabledProviders: disabledProviders as ReadonlyArray<
+      "mapbox" | "openweather" | "nps" | "ridb"
+    >,
+    roomDailyLimit: values.TRAVEL_PROVIDER_ROOM_DAILY_LIMIT,
+    globalDailyLimit: values.TRAVEL_PROVIDER_GLOBAL_DAILY_LIMIT,
+  } as const;
 }
