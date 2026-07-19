@@ -209,6 +209,71 @@ export const travelEvidenceV1Schema = z
       });
   });
 
+export const travelEvidenceSnapshotV1Schema = z
+  .object({
+    schemaVersion: z.literal("1"),
+    evidenceId: safeIdentifierSchema,
+    evidenceType: travelEvidenceTypeSchema,
+    provider: safeIdentifierSchema,
+    sourceName: z.string().trim().min(1).max(200),
+    sourceUrl: z.url().nullable(),
+    sourceEntityId: safeIdentifierSchema.nullable(),
+    retrievedAt: timestampSchema,
+    observedAt: timestampSchema.nullable(),
+    validFrom: timestampSchema.nullable(),
+    validUntil: timestampSchema.nullable(),
+    freshnessState: travelFreshnessStateSchema,
+    verificationState: travelVerificationStateSchema,
+    confidence: travelConfidenceSchema,
+    availabilityState: travelAvailabilityStateSchema,
+    normalizedValue: z
+      .object({
+        kind: travelEvidenceTypeSchema,
+        data: boundedRecordSchema,
+      })
+      .strict(),
+    attribution: z
+      .object({
+        label: z.string().trim().min(1).max(300),
+        url: z.url().nullable(),
+        required: z.boolean(),
+      })
+      .strict(),
+    restrictions: z
+      .object({
+        storage: z.enum(["permanent", "bounded", "prohibited", "unknown"]),
+        display: z.string().trim().min(1).max(300),
+      })
+      .strict(),
+    errorState: z
+      .object({
+        code: safeIdentifierSchema,
+        retryable: z.boolean(),
+        httpStatus: z.number().int().min(100).max(599).nullable(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.normalizedValue.kind !== value.evidenceType)
+      context.addIssue({
+        code: "custom",
+        path: ["normalizedValue", "kind"],
+        message: "Normalized snapshot kind must match its evidence type.",
+      });
+    if (
+      value.validFrom !== null &&
+      value.validUntil !== null &&
+      value.validFrom > value.validUntil
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["validUntil"],
+        message: "Travel evidence snapshot validity window is reversed.",
+      });
+  });
+
 export const canonicalDestinationResolutionV1Schema = z
   .object({
     schemaVersion: z.literal("1"),
@@ -312,6 +377,9 @@ export function semanticTravelEvidenceHashInput(
 
 export type TravelEvidenceType = z.infer<typeof travelEvidenceTypeSchema>;
 export type TravelEvidenceV1 = z.infer<typeof travelEvidenceV1Schema>;
+export type TravelEvidenceSnapshotV1 = z.infer<
+  typeof travelEvidenceSnapshotV1Schema
+>;
 export type CanonicalDestinationResolutionV1 = z.infer<
   typeof canonicalDestinationResolutionV1Schema
 >;

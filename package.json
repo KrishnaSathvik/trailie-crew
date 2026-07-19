@@ -52,6 +52,7 @@
     "@trailie/travel-tools": "workspace:*",
     "@trailie/validation": "workspace:*",
     "lucide-react": "^1.24.0",
+    "mapbox-gl": "3.26.0",
     "next": "^16.2.10",
     "openai": "6.46.0",
     "react": "^19.2.7",

@@ -8,6 +8,7 @@ import {
 } from "./travel-evidence";
 
 export * from "./travel-evidence";
+export * from "./map-projection";
 
 export const tripIdSchema = z.string().trim().min(1).brand("TripId");
 

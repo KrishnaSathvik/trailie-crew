@@ -77,6 +77,17 @@ const directionsPayloadSchema = z.object({
       z.object({
         distance: z.number().nonnegative(),
         duration: z.number().nonnegative(),
+        geometry: z
+          .object({
+            type: z.literal("LineString"),
+            coordinates: z.array(
+              z.tuple([
+                z.number().finite().min(-180).max(180),
+                z.number().finite().min(-90).max(90),
+              ]),
+            ),
+          })
+          .optional(),
         warnings: z.array(z.string()).optional(),
       }),
     )
@@ -355,7 +366,8 @@ export function createMapboxAdapter(
       const url = new URL(
         `https://api.mapbox.com/directions/v5/${profile}/${input.origin.longitude},${input.origin.latitude};${input.destination.longitude},${input.destination.latitude}`,
       );
-      url.searchParams.set("overview", "false");
+      url.searchParams.set("overview", "simplified");
+      url.searchParams.set("geometries", "geojson");
       url.searchParams.set("notifications", "all");
       if (input.departAt) url.searchParams.set("depart_at", input.departAt);
       url.searchParams.set("access_token", configuration.accessToken);
@@ -371,6 +383,13 @@ export function createMapboxAdapter(
         const route = payload.routes?.[0];
         if (payload.code !== "Ok" || !route)
           throw new TravelProviderHttpError(404);
+        const geometry =
+          route.geometry &&
+          route.geometry.coordinates.length >= 2 &&
+          route.geometry.coordinates.length <= 1_000 &&
+          JSON.stringify(route.geometry).length <= 24_000
+            ? route.geometry
+            : null;
         return makeTravelResponse("available", [
           makeTravelEvidence({
             provider,
@@ -401,8 +420,14 @@ export function createMapboxAdapter(
                 ? "live_and_historical"
                 : "not_requested",
               departureTime: input.departAt ?? null,
-              geometryReference: null,
-              warnings: route.warnings ?? [],
+              geometry,
+              warnings:
+                route.geometry && geometry === null
+                  ? [
+                      ...(route.warnings ?? []),
+                      "Route geometry omitted because it exceeded the map projection budget.",
+                    ]
+                  : (route.warnings ?? []),
             },
             providerMetadata: {},
             attribution,
