@@ -128,6 +128,9 @@ const travelProviderEnvSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   MAPBOX_ACCESS_TOKEN: z.string().trim().min(1).optional(),
+  MAPBOX_GEOCODING_STORAGE_MODE: z
+    .enum(["disabled", "temporary", "permanent"])
+    .default("disabled"),
   NPS_API_KEY: z.string().trim().min(1).optional(),
   OPENWEATHER_API_KEY: z.string().trim().min(1).optional(),
   RIDB_API_KEY: z.string().trim().min(1).optional(),
@@ -273,6 +276,7 @@ export function parseTravelProviderEnv(source: EnvironmentSource) {
   return {
     enabled: values.TRAVEL_PROVIDERS_ENABLED,
     mapboxAccessToken: values.MAPBOX_ACCESS_TOKEN ?? null,
+    mapboxGeocodingStorageMode: values.MAPBOX_GEOCODING_STORAGE_MODE,
     npsApiKey: values.NPS_API_KEY ?? null,
     openWeatherApiKey: values.OPENWEATHER_API_KEY ?? null,
     ridbApiKey: values.RIDB_API_KEY ?? null,

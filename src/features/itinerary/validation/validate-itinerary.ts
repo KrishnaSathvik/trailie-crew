@@ -1,5 +1,6 @@
 import {
   itinerarySchema,
+  type CanonicalDestinationResolutionV1,
   type Itinerary,
   type PlanningSummary,
   type TravelEvidenceV1,
@@ -27,6 +28,11 @@ type Input = {
   approvedSummary: PlanningSummary;
   evidence: NormalizedToolEvidence[];
   liveEvidence?: TravelEvidenceV1[];
+  destinationResolution?: {
+    resolutionId: string;
+    semanticHash: string;
+    resolution: CanonicalDestinationResolutionV1;
+  };
   now: string;
   minimumTravelBufferMinutes: number;
   maximumDailyDriveMinutes: number;
@@ -63,6 +69,27 @@ function materiallyMatches(left: string, right: string) {
   let overlap = 0;
   for (const token of leftTokens) if (rightTokens.has(token)) overlap += 1;
   return overlap >= 2;
+}
+
+const genericDestinationTokens = new Set([
+  "national",
+  "park",
+  "parks",
+  "state",
+  "city",
+  "county",
+  "region",
+  "valley",
+]);
+
+function destinationMateriallyMatches(left: string, right: string) {
+  if (normalized(left) === normalized(right)) return true;
+  const leftTokens = significantTokens(left);
+  const rightTokens = significantTokens(right);
+  for (const token of leftTokens)
+    if (rightTokens.has(token) && !genericDestinationTokens.has(token))
+      return true;
+  return false;
 }
 
 function localMinutesFromInstant(value: unknown, timezone: unknown) {
@@ -445,7 +472,57 @@ export function validateItinerary(input: Input): ValidationReport {
       (entry.availabilityState === "ambiguous" ||
         entry.availabilityState === "not_found"),
   );
-  if (unresolvedDestination) {
+  const canonicalResolution = input.destinationResolution;
+  const staleCanonicalResolution =
+    canonicalResolution !== undefined &&
+    canonicalResolution.semanticHash !==
+      canonicalResolution.resolution.semanticHash;
+  if (staleCanonicalResolution) {
+    issues.push(
+      issue(
+        "destination_resolution_stale",
+        "critical",
+        "The canonical destination binding is stale or mismatched.",
+        [],
+        false,
+      ),
+    );
+  } else if (
+    canonicalResolution?.resolution.status === "resolved" &&
+    canonicalResolution.resolution.canonicalName !== null &&
+    !destinationMateriallyMatches(
+      plan.destinationSummary,
+      canonicalResolution.resolution.canonicalName,
+    )
+  ) {
+    issues.push(
+      issue(
+        "destination_drift",
+        "critical",
+        "The generated itinerary changed the canonical destination identity.",
+        [],
+        true,
+        canonicalResolution.resolution.evidenceIds,
+      ),
+    );
+  } else if (
+    canonicalResolution &&
+    canonicalResolution.resolution.status !== "resolved"
+  ) {
+    const ambiguous = canonicalResolution.resolution.status === "ambiguous";
+    issues.push(
+      issue(
+        ambiguous ? "destination_ambiguous" : "destination_unresolved",
+        "critical",
+        ambiguous
+          ? "More than one materially different destination matched the request."
+          : "The destination identity could not be resolved.",
+        [],
+        false,
+        canonicalResolution.resolution.evidenceIds,
+      ),
+    );
+  } else if (!canonicalResolution && unresolvedDestination) {
     issues.push(
       issue(
         unresolvedDestination.availabilityState === "ambiguous"

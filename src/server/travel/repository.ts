@@ -1,6 +1,10 @@
 import "server-only";
 
-import type { TravelEvidenceV1 } from "@trailie/schemas";
+import {
+  canonicalDestinationResolutionV1Schema,
+  type CanonicalDestinationResolutionV1,
+  type TravelEvidenceV1,
+} from "@trailie/schemas";
 
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import type { Json } from "@/types/database";
@@ -28,6 +32,18 @@ export interface TravelEvidenceRepository {
     excludedTargetItemIds: string[];
     excludedEvidenceTypes: string[];
   }): Promise<number>;
+  storeDestinationResolution(input: {
+    tripPlanId: string;
+    resolution: CanonicalDestinationResolutionV1;
+  }): Promise<string>;
+  loadDestinationResolution(input: {
+    resolutionId: string;
+    semanticHash: string;
+  }): Promise<CanonicalDestinationResolutionV1>;
+  bindDestinationResolutionEvidence(input: {
+    resolutionId: string;
+    storedEvidenceId: string;
+  }): Promise<string>;
 }
 
 function valueOrThrow(
@@ -43,6 +59,8 @@ export function createTravelEvidenceRepository(
 ): TravelEvidenceRepository {
   return {
     async store(evidence, providerRequestId = null) {
+      if (evidence.restrictions.storage === "prohibited")
+        throw new Error("travel_evidence_storage_prohibited");
       const result = await client.rpc("store_travel_evidence", {
         target_evidence: evidence as unknown as Json,
         target_provider_request_id: providerRequestId,
@@ -67,6 +85,31 @@ export function createTravelEvidenceRepository(
       if (result.error || typeof result.data !== "number")
         throw new Error("travel_evidence_snapshot_copy_failed");
       return result.data;
+    },
+    async storeDestinationResolution(input) {
+      const result = await client.rpc(
+        "store_canonical_destination_resolution",
+        {
+          target_trip_plan_id: input.tripPlanId,
+          target_resolution: input.resolution as unknown as Json,
+        },
+      );
+      return valueOrThrow(result, "destination_resolution_store_failed");
+    },
+    async loadDestinationResolution(input) {
+      const result = await client.rpc("get_canonical_destination_resolution", {
+        target_resolution_id: input.resolutionId,
+        target_semantic_hash: input.semanticHash,
+      });
+      if (result.error) throw new Error("destination_resolution_load_failed");
+      return canonicalDestinationResolutionV1Schema.parse(result.data);
+    },
+    async bindDestinationResolutionEvidence(input) {
+      const result = await client.rpc("bind_destination_resolution_evidence", {
+        target_resolution_id: input.resolutionId,
+        target_evidence_id: input.storedEvidenceId,
+      });
+      return valueOrThrow(result, "destination_resolution_evidence_failed");
     },
   };
 }

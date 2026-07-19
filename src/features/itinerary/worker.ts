@@ -7,6 +7,7 @@ import {
 } from "@trailie/travel-tools";
 import {
   itinerarySchema,
+  type CanonicalDestinationResolutionV1,
   type Itinerary,
   type TravelEvidenceV1,
 } from "@trailie/schemas";
@@ -41,6 +42,7 @@ import {
 } from "@/server/ai/provider-attempts";
 import {
   collectDestinationTravelEvidence,
+  traceDestinationResolution,
   type TravelProviderRegistry,
 } from "@/server/travel/intelligence";
 import type { TravelEvidenceRepository } from "@/server/travel/repository";
@@ -66,13 +68,63 @@ type Dependencies = TravelEvidenceDependencies & {
   };
 };
 
-function itineraryDates(dateWindows: readonly string[]) {
+const monthNumber = new Map(
+  [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+  ].map((month, index) => [month, index + 1]),
+);
+const monthPattern =
+  "January|February|March|April|May|June|July|August|September|October|November|December";
+
+function naturalDateRange(value: string) {
+  const match = value.match(
+    new RegExp(
+      `\\b(${monthPattern})\\s+(\\d{1,2})(?:,\\s*(\\d{4}))?\\s*(?:through|to|[-–—])\\s*(?:(${monthPattern})\\s+)?(\\d{1,2})(?:,\\s*(\\d{4}))?\\b`,
+      "iu",
+    ),
+  );
+  if (!match) return null;
+  const startMonth = monthNumber.get(match[1].toLocaleLowerCase("en-US"));
+  const endMonth = match[4]
+    ? monthNumber.get(match[4].toLocaleLowerCase("en-US"))
+    : startMonth;
+  const startYear = Number(match[3] ?? match[6]);
+  const endYear = Number(match[6] ?? match[3]);
+  const startDay = Number(match[2]);
+  const endDay = Number(match[5]);
+  if (!startMonth || !endMonth || !startYear || !endYear) return null;
+  const build = (year: number, month: number, day: number) => {
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+      ? parsed
+      : null;
+  };
+  const start = build(startYear, startMonth, startDay);
+  const end = build(endYear, endMonth, endDay);
+  return start && end ? ([start, end] as const) : null;
+}
+
+export function parseItineraryDates(dateWindows: readonly string[]) {
   const dates: string[] = [];
   for (const window of dateWindows) {
     const found = window.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
-    if (!found.length) continue;
-    const start = new Date(`${found[0]}T00:00:00Z`);
-    const end = new Date(`${found.at(-1)!}T00:00:00Z`);
+    const natural = found.length ? null : naturalDateRange(window);
+    if (!found.length && !natural) continue;
+    const start = natural?.[0] ?? new Date(`${found[0]}T00:00:00Z`);
+    const end = natural?.[1] ?? new Date(`${found.at(-1)!}T00:00:00Z`);
     if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()))
       continue;
     for (
@@ -86,6 +138,51 @@ function itineraryDates(dateWindows: readonly string[]) {
   return [...new Set(dates)];
 }
 
+const genericDestinationWords = new Set([
+  "national",
+  "park",
+  "parks",
+  "state",
+  "city",
+  "county",
+  "region",
+  "valley",
+]);
+
+function normalizeDestinationDisplay(
+  itinerary: Itinerary,
+  destinationResolution: {
+    resolution: CanonicalDestinationResolutionV1;
+  } | null,
+) {
+  const canonicalName = destinationResolution?.resolution.canonicalName;
+  if (
+    destinationResolution?.resolution.status !== "resolved" ||
+    canonicalName === null ||
+    canonicalName === undefined
+  )
+    return itinerary;
+  const tokens = (value: string) =>
+    new Set(
+      value
+        .normalize("NFKC")
+        .toLocaleLowerCase("en-US")
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim()
+        .split(" ")
+        .filter(
+          (token) => token.length >= 4 && !genericDestinationWords.has(token),
+        ),
+    );
+  const generated = tokens(itinerary.destinationSummary);
+  const canonical = tokens(canonicalName);
+  if (![...generated].some((token) => canonical.has(token))) return itinerary;
+  return itinerarySchema.parse({
+    ...itinerary,
+    destinationSummary: canonicalName,
+  });
+}
+
 async function prepareLiveTravelEvidence(
   context: ItineraryGenerationContext,
   dependencies: Dependencies,
@@ -94,30 +191,78 @@ async function prepareLiveTravelEvidence(
     return {
       evidence: [] as TravelEvidenceV1[],
       stored: [] as Array<{ evidence: TravelEvidenceV1; id: string }>,
+      destinationResolution: null,
     };
   const destination = context.approvedSummary.tripSnapshot.destinations[0];
   if (!destination)
     return {
       evidence: [] as TravelEvidenceV1[],
       stored: [] as Array<{ evidence: TravelEvidenceV1; id: string }>,
+      destinationResolution: null,
     };
   const collected = await collectDestinationTravelEvidence({
     destination,
-    dates: itineraryDates(context.approvedSummary.tripSnapshot.dateWindows),
+    dates: parseItineraryDates(
+      context.approvedSummary.tripSnapshot.dateWindows,
+    ),
     locale: "en-US",
     providers: dependencies.travelIntelligence.providers,
     maximumCallsPerProvider:
       dependencies.travelIntelligence.maximumCallsPerProvider,
   });
+  const resolutionId =
+    await dependencies.travelIntelligence.evidenceRepository.storeDestinationResolution(
+      {
+        tripPlanId: context.tripPlanId,
+        resolution: collected.destinationResolution,
+      },
+    );
+  const authoritativeResolution =
+    await dependencies.travelIntelligence.evidenceRepository.loadDestinationResolution(
+      {
+        resolutionId,
+        semanticHash: collected.destinationResolution.semanticHash,
+      },
+    );
+  traceDestinationResolution({
+    stage: "provider_resolution",
+    resolutionId,
+    resolution: authoritativeResolution,
+  });
+  traceDestinationResolution({
+    stage: "planning_input",
+    resolutionId,
+    resolution: authoritativeResolution,
+  });
   const stored = await Promise.all(
-    collected.evidence.map(async (evidence) => ({
-      evidence,
-      id: await dependencies.travelIntelligence!.evidenceRepository.store(
+    collected.evidence
+      .filter((evidence) => evidence.restrictions.storage !== "prohibited")
+      .map(async (evidence) => ({
         evidence,
-      ),
-    })),
+        id: await dependencies.travelIntelligence!.evidenceRepository.store(
+          evidence,
+        ),
+      })),
   );
-  return { evidence: collected.evidence, stored };
+  await Promise.all(
+    stored.map((entry) =>
+      dependencies.travelIntelligence!.evidenceRepository.bindDestinationResolutionEvidence(
+        {
+          resolutionId,
+          storedEvidenceId: entry.id,
+        },
+      ),
+    ),
+  );
+  return {
+    evidence: collected.evidence,
+    stored,
+    destinationResolution: {
+      resolutionId,
+      semanticHash: authoritativeResolution.semanticHash,
+      resolution: authoritativeResolution,
+    },
+  };
 }
 
 function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
@@ -313,12 +458,27 @@ async function validateAndRecord(
   draft: Itinerary,
   evidence: NormalizedToolEvidence[],
   liveEvidence: TravelEvidenceV1[],
+  destinationResolution: {
+    resolutionId: string;
+    semanticHash: string;
+    resolution: CanonicalDestinationResolutionV1;
+  } | null,
   dependencies: Dependencies,
 ) {
+  if (destinationResolution)
+    traceDestinationResolution({
+      stage: "generated_plan_normalization",
+      resolutionId: destinationResolution.resolutionId,
+      resolution: destinationResolution.resolution,
+    });
   await dependencies.repository.recordProgress(id, "route_validation_started");
+  const normalizedDraft = normalizeDestinationDisplay(
+    draft,
+    destinationResolution,
+  );
   const enriched = await enrichWithTravelEvidence(
     id,
-    draft,
+    normalizedDraft,
     evidence,
     dependencies,
   );
@@ -404,10 +564,18 @@ async function validateAndRecord(
     approvedSummary: context.approvedSummary,
     evidence: enriched.evidence,
     liveEvidence: combinedLiveEvidence,
+    ...(destinationResolution ? { destinationResolution } : {}),
     now: dependencies.now ?? new Date().toISOString(),
     minimumTravelBufferMinutes: 15,
     maximumDailyDriveMinutes: 360,
   });
+  if (destinationResolution)
+    traceDestinationResolution({
+      stage: "final_validation",
+      resolutionId: destinationResolution.resolutionId,
+      resolution: destinationResolution.resolution,
+      validationResult: report.status,
+    });
   await dependencies.repository.recordValidation(id, report, context.version);
   return {
     ...enriched,
@@ -510,6 +678,12 @@ export async function processItineraryGeneration(
       if (!context.draft || !context.latestValidation) return;
       const repairDraft = context.draft;
       const repairValidation = context.latestValidation;
+      if (live.destinationResolution)
+        traceDestinationResolution({
+          stage: "repair_input",
+          resolutionId: live.destinationResolution.resolutionId,
+          resolution: live.destinationResolution.resolution,
+        });
       const execution = await executeProvider({
         workflow: "itinerary_repair",
         operationKey: `${id}:repair`,
@@ -526,6 +700,9 @@ export async function processItineraryGeneration(
               validation: repairValidation,
               evidence: context.evidence,
               liveEvidence: live.evidence,
+              ...(live.destinationResolution
+                ? { destinationResolution: live.destinationResolution }
+                : {}),
             }),
             signal,
           }),
@@ -535,6 +712,12 @@ export async function processItineraryGeneration(
     } else if (firstClaim.stage === "validate" && context.draft) {
       output = null;
     } else {
+      if (live.destinationResolution)
+        traceDestinationResolution({
+          stage: "generation_input",
+          resolutionId: live.destinationResolution.resolutionId,
+          resolution: live.destinationResolution.resolution,
+        });
       const execution = await executeProvider({
         workflow: "itinerary_generation",
         operationKey: `${id}:generate`,
@@ -548,6 +731,9 @@ export async function processItineraryGeneration(
             context: buildItineraryContext({
               ...context,
               liveEvidence: live.evidence,
+              ...(live.destinationResolution
+                ? { destinationResolution: live.destinationResolution }
+                : {}),
             }),
             signal,
           }),
@@ -567,10 +753,18 @@ export async function processItineraryGeneration(
       draft,
       context.evidence,
       live.evidence,
+      live.destinationResolution,
       dependencies,
     );
     if (result.report.status === "pass") {
-      if (dependencies.travelIntelligence)
+      if (dependencies.travelIntelligence) {
+        if (live.destinationResolution)
+          traceDestinationResolution({
+            stage: "snapshot_publication",
+            resolutionId: live.destinationResolution.resolutionId,
+            resolution: live.destinationResolution.resolution,
+            validationResult: "pass",
+          });
         for (const stored of [
           ...live.stored.map((entry) => ({ ...entry, targetItemId: null })),
           ...result.normalizedRoutes,
@@ -582,6 +776,7 @@ export async function processItineraryGeneration(
               targetItemId: stored.targetItemId,
             },
           );
+      }
       await dependencies.repository.publish(id, result.itinerary);
       return;
     }
@@ -595,6 +790,12 @@ export async function processItineraryGeneration(
     const repairClaim = await dependencies.repository.claim(id);
     if (!repairClaim.claimed) return;
     context = await dependencies.repository.loadContext(id);
+    if (live.destinationResolution)
+      traceDestinationResolution({
+        stage: "repair_input",
+        resolutionId: live.destinationResolution.resolutionId,
+        resolution: live.destinationResolution.resolution,
+      });
     const repairExecution = await executeProvider({
       workflow: "itinerary_repair",
       operationKey: `${id}:repair`,
@@ -611,6 +812,9 @@ export async function processItineraryGeneration(
             validation: result.report,
             evidence: result.evidence,
             liveEvidence: live.evidence,
+            ...(live.destinationResolution
+              ? { destinationResolution: live.destinationResolution }
+              : {}),
           }),
           signal,
         }),
@@ -624,10 +828,18 @@ export async function processItineraryGeneration(
       draft,
       result.evidence,
       live.evidence,
+      live.destinationResolution,
       dependencies,
     );
     if (result.report.status === "pass") {
-      if (dependencies.travelIntelligence)
+      if (dependencies.travelIntelligence) {
+        if (live.destinationResolution)
+          traceDestinationResolution({
+            stage: "snapshot_publication",
+            resolutionId: live.destinationResolution.resolutionId,
+            resolution: live.destinationResolution.resolution,
+            validationResult: "pass",
+          });
         for (const stored of [
           ...live.stored.map((entry) => ({ ...entry, targetItemId: null })),
           ...result.normalizedRoutes,
@@ -639,9 +851,18 @@ export async function processItineraryGeneration(
               targetItemId: stored.targetItemId,
             },
           );
+      }
       await dependencies.repository.publish(id, result.itinerary);
     }
   } catch (error) {
+    const safeErrorClass =
+      error instanceof Error && /^[a-z][a-z0-9_]{2,80}$/.test(error.message)
+        ? error.message
+        : "unclassified_itinerary_failure";
+    console.error("itinerary_generation_failure", {
+      tripPlanId: id,
+      errorClass: safeErrorClass,
+    });
     const failure =
       error instanceof AiQuotaError
         ? new ItineraryProviderError(error.code as never, false)

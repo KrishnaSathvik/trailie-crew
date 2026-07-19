@@ -1,5 +1,6 @@
 import type {
   Itinerary,
+  CanonicalDestinationResolutionV1,
   PlanningSummary,
   TravelEvidenceV1,
   ValidationReport,
@@ -20,12 +21,18 @@ export function buildItineraryContext(input: {
   }>;
   evidence: NormalizedToolEvidence[];
   liveEvidence?: TravelEvidenceV1[];
+  destinationResolution?: {
+    resolutionId: string;
+    resolution: CanonicalDestinationResolutionV1;
+  };
 }) {
   return [
     `<APPROVED_SUMMARY>${bounded(input.approvedSummary, 12_000)}</APPROVED_SUMMARY>`,
     `<ACTIVE_TRAVELERS>${bounded(input.travelers.slice(0, 50), 4_000)}</ACTIVE_TRAVELERS>`,
     `<VERIFIED_EVIDENCE>${bounded(input.evidence.slice(0, 100), 10_000)}</VERIFIED_EVIDENCE>`,
     `<LIVE_TRAVEL_EVIDENCE>${bounded((input.liveEvidence ?? []).slice(0, 200), 20_000)}</LIVE_TRAVEL_EVIDENCE>`,
+    `<CANONICAL_DESTINATION>${bounded(input.destinationResolution ?? null, 4_000)}</CANONICAL_DESTINATION>`,
+    "<DESTINATION_IDENTITY_POLICY>The application-owned canonical destination is authoritative. Preserve its resolution ID, canonical identity, NPS park code, and semantic hash. A display label may vary only if it still identifies the same entity.</DESTINATION_IDENTITY_POLICY>",
     "<LIVE_EVIDENCE_POLICY>Distinguish verified, stale, missing, unavailable, inferred, and conflicting evidence. Official closures take precedence. Never claim live availability or booking completion without verified official evidence. Surface conflicts and required user confirmation.</LIVE_EVIDENCE_POLICY>",
   ]
     .join("\n")
@@ -38,6 +45,10 @@ export function buildItineraryRepairContext(input: {
   validation: ValidationReport;
   evidence: NormalizedToolEvidence[];
   liveEvidence?: TravelEvidenceV1[];
+  destinationResolution?: {
+    resolutionId: string;
+    resolution: CanonicalDestinationResolutionV1;
+  };
 }) {
   return [
     `<APPROVED_SUMMARY>${bounded(input.approvedSummary, 12_000)}</APPROVED_SUMMARY>`,
@@ -45,6 +56,8 @@ export function buildItineraryRepairContext(input: {
     `<VALIDATION_ISSUES>${bounded(input.validation.issues, 8_000)}</VALIDATION_ISSUES>`,
     `<VERIFIED_EVIDENCE>${bounded(input.evidence.slice(0, 100), 10_000)}</VERIFIED_EVIDENCE>`,
     `<LIVE_TRAVEL_EVIDENCE>${bounded((input.liveEvidence ?? []).slice(0, 200), 20_000)}</LIVE_TRAVEL_EVIDENCE>`,
+    `<CANONICAL_DESTINATION>${bounded(input.destinationResolution ?? null, 4_000)}</CANONICAL_DESTINATION>`,
+    "<DESTINATION_IDENTITY_POLICY>Repair content only. Preserve the application-owned canonical destination resolution ID, identity, NPS park code, coordinates binding, and semantic hash.</DESTINATION_IDENTITY_POLICY>",
     "<LIVE_EVIDENCE_POLICY>Official closures take precedence. Preserve unavailable, stale, inferred, and conflicting states. Never invent availability, confirmation, or booking.</LIVE_EVIDENCE_POLICY>",
   ]
     .join("\n")

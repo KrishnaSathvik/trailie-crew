@@ -36,7 +36,6 @@ async function safeProviderMatchProfile(destination) {
     );
     mapboxUrl.searchParams.set("q", providerQuery);
     mapboxUrl.searchParams.set("limit", "10");
-    mapboxUrl.searchParams.set("permanent", "true");
     mapboxUrl.searchParams.set("access_token", process.env.MAPBOX_ACCESS_TOKEN);
     const npsUrl = new URL("https://developer.nps.gov/api/v1/parks");
     npsUrl.searchParams.set("q", providerQuery);

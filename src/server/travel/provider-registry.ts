@@ -63,7 +63,11 @@ export function createTravelProviderRegistry(
   if (!mapboxAccessToken || !npsApiKey || !openWeatherApiKey || !ridbApiKey)
     throw new Error("travel_provider_configuration_incomplete");
   const registry: TravelProviderRegistry = {
-    geocoding: createMapboxAdapter({ accessToken: mapboxAccessToken }),
+    geocoding: createMapboxAdapter({
+      accessToken: mapboxAccessToken,
+      geocodingStorageMode:
+        configuration.environment.mapboxGeocodingStorageMode,
+    }),
     weather: createOpenWeatherAdapter({ apiKey: openWeatherApiKey }),
     parks: createNpsAdapter({ apiKey: npsApiKey }),
     recreation: createRidbAdapter({ apiKey: ridbApiKey }),

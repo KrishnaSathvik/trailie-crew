@@ -147,7 +147,7 @@ export function createCachedTravelProviderAdapter(
       await record({
         provider: configuration.adapter.providerId,
         capability,
-        requestKey: "cache_bypass",
+        requestKey: "cache_bypass_request",
         cacheStatus: "bypass",
         status:
           response.state === "available" || response.state === "partial"
@@ -168,7 +168,7 @@ export function createCachedTravelProviderAdapter(
       environment: configuration.environment,
       provider: configuration.adapter.providerId,
       capability,
-      schemaVersion: "1",
+      schemaVersion: "2",
       ...input,
     });
     const policy = travelCachePolicyFor(capability);
@@ -236,14 +236,18 @@ export function createCachedTravelProviderAdapter(
       response.state !== "available" && response.state !== "partial";
     const ttl = negative ? policy.negativeTtlSeconds : policy.ttlSeconds;
     const expiresAt = addSeconds(now, ttl);
-    await configuration.cache.put(key, {
-      response,
-      expiresAt,
-      staleUntil: policy.staleWhileRevalidate
-        ? addSeconds(expiresAt, Math.min(policy.ttlSeconds, 86_400))
-        : null,
-      negative,
-    });
+    const storageProhibited = response.evidence.some(
+      (entry) => entry.restrictions.storage === "prohibited",
+    );
+    if (!storageProhibited)
+      await configuration.cache.put(key, {
+        response,
+        expiresAt,
+        staleUntil: policy.staleWhileRevalidate
+          ? addSeconds(expiresAt, Math.min(policy.ttlSeconds, 86_400))
+          : null,
+        negative,
+      });
     await record({
       provider: configuration.adapter.providerId,
       capability,

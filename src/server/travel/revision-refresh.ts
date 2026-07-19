@@ -84,17 +84,14 @@ export async function refreshRevisionTravelEvidence(input: Input) {
       ...segments.map((segment) => segment.id),
     ]),
   ];
-  await input.repository.copySnapshots({
-    baseTripPlanId: input.baseTripPlanId,
-    candidateTripPlanId: input.candidateTripPlanId,
-    excludedTargetItemIds,
-    excludedEvidenceTypes: scope.destination ? [...fullRefreshTypes] : [],
-  });
-
   const evidence: Array<{
     evidence: TravelEvidenceV1;
     targetItemId: string | null;
   }> = [];
+  let destinationResolution: {
+    resolutionId: string;
+    semanticHash: string;
+  } | null = null;
   if (scope.destination) {
     const destination = await collectDestinationTravelEvidence({
       destination: input.candidate.destinationSummary,
@@ -103,6 +100,18 @@ export async function refreshRevisionTravelEvidence(input: Input) {
       providers: input.providers,
       maximumCallsPerProvider: input.maximumCallsPerProvider,
     });
+    const resolutionId = await input.repository.storeDestinationResolution({
+      tripPlanId: input.candidateTripPlanId,
+      resolution: destination.destinationResolution,
+    });
+    const authoritative = await input.repository.loadDestinationResolution({
+      resolutionId,
+      semanticHash: destination.destinationResolution.semanticHash,
+    });
+    destinationResolution = {
+      resolutionId,
+      semanticHash: authoritative.semanticHash,
+    };
     evidence.push(
       ...destination.evidence.map((item) => ({
         evidence: item,
@@ -110,6 +119,12 @@ export async function refreshRevisionTravelEvidence(input: Input) {
       })),
     );
   }
+  await input.repository.copySnapshots({
+    baseTripPlanId: input.baseTripPlanId,
+    candidateTripPlanId: input.candidateTripPlanId,
+    excludedTargetItemIds,
+    excludedEvidenceTypes: scope.destination ? [...fullRefreshTypes] : [],
+  });
   for (const segment of segments) {
     if (
       segment.origin.latitude === null ||
@@ -146,7 +161,13 @@ export async function refreshRevisionTravelEvidence(input: Input) {
   }
 
   for (const item of evidence) {
+    if (item.evidence.restrictions.storage === "prohibited") continue;
     const storedEvidenceId = await input.repository.store(item.evidence);
+    if (destinationResolution)
+      await input.repository.bindDestinationResolutionEvidence({
+        resolutionId: destinationResolution.resolutionId,
+        storedEvidenceId,
+      });
     await input.repository.bindSnapshot({
       tripPlanId: input.candidateTripPlanId,
       storedEvidenceId,

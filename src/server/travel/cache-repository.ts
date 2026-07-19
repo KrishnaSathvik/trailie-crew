@@ -29,7 +29,7 @@ const cacheEnvelopeSchema = z
 
 function identity(key: string) {
   const match = key.match(
-    /^travel:1:([a-zA-Z0-9_-]{1,40}):([a-zA-Z0-9._-]{1,80}):([a-z_]{1,80}):[a-f0-9]{64}$/,
+    /^travel:2:([a-zA-Z0-9_-]{1,40}):([a-zA-Z0-9._-]{1,80}):([a-z_]{1,80}):[a-f0-9]{64}$/,
   );
   if (!match) throw new Error("invalid_travel_cache_key");
   return {

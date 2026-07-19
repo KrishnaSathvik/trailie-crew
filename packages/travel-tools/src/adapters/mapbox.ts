@@ -85,6 +85,8 @@ const directionsPayloadSchema = z.object({
 
 type Configuration = {
   accessToken: string;
+  geocodingStorageMode?: "disabled" | "temporary" | "permanent";
+  onPermanentGeocodingRequest?: () => void;
   fetcher?: TravelFetcher;
   now?: () => string;
   timeoutMs?: number;
@@ -118,6 +120,7 @@ function geocodeEvidence(
   feature: z.infer<typeof geocodingPayloadSchema>["features"][number],
   ambiguous: boolean,
   retrievedAt: string,
+  storageMode: "temporary" | "permanent",
 ) {
   const canonicalPlaceId =
     feature.properties.mapbox_id ?? feature.id ?? "mapbox:unknown";
@@ -159,8 +162,11 @@ function geocodeEvidence(
     },
     providerMetadata: {},
     attribution,
-    storage: "permanent",
-    displayRestriction,
+    storage: storageMode === "permanent" ? "permanent" : "prohibited",
+    displayRestriction:
+      storageMode === "permanent"
+        ? displayRestriction
+        : "Temporary Mapbox geocoding result; do not persist or publish",
   });
 }
 
@@ -204,6 +210,17 @@ async function performGeocode(
   reverse: boolean,
   signal?: AbortSignal,
 ) {
+  const storageMode = configuration.geocodingStorageMode ?? "disabled";
+  if (storageMode === "disabled")
+    return makeUnsupported({
+      provider,
+      evidenceType: "geocode",
+      sourceName,
+      sourceUrl: geocodingSource,
+      now: now(configuration),
+      attribution,
+      displayRestriction: "Mapbox geocoding is disabled",
+    });
   const url = new URL(
     reverse
       ? "https://api.mapbox.com/search/geocode/v6/reverse"
@@ -223,7 +240,10 @@ async function performGeocode(
     url.searchParams.set("autocomplete", "false");
   }
   url.searchParams.set("limit", reverse ? "1" : "10");
-  url.searchParams.set("permanent", "true");
+  if (storageMode === "permanent") {
+    url.searchParams.set("permanent", "true");
+    configuration.onPermanentGeocodingRequest?.();
+  }
   url.searchParams.set("language", input.locale.split("-")[0]);
   url.searchParams.set("access_token", configuration.accessToken);
   const payload = geocodingPayloadSchema.parse(
@@ -242,7 +262,9 @@ async function performGeocode(
   const retrievedAt = now(configuration);
   return makeTravelResponse(
     ambiguous ? "ambiguous" : "available",
-    features.map((feature) => geocodeEvidence(feature, ambiguous, retrievedAt)),
+    features.map((feature) =>
+      geocodeEvidence(feature, ambiguous, retrievedAt, storageMode),
+    ),
   );
 }
 
