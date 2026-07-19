@@ -6,6 +6,11 @@ import { PrintButton } from "./print-button";
 import { TrustLinks } from "@/components/shared/trust-links";
 import type { MapConfiguration } from "@/features/maps/config";
 import { PublicItineraryMap } from "@/features/maps/components/public-itinerary-map";
+import { CommentThread } from "@/features/guest-comments/components/comment-thread";
+import type {
+  GuestComment,
+  GuestRole,
+} from "@/features/guest-comments/contracts";
 
 function Status({ value }: { value: string }) {
   return (
@@ -48,6 +53,7 @@ export function PublicItinerary({
   generatedAt = itinerary.publishedAt,
   contentHash,
   map,
+  commenting,
 }: {
   itinerary: PublicSharedItinerary;
   generatedAt?: string;
@@ -56,6 +62,10 @@ export function PublicItinerary({
     projection: ItineraryMapProjectionV1;
     configuration: MapConfiguration;
   } | null;
+  commenting?: {
+    mode: GuestRole;
+    comments: GuestComment[];
+  };
 }) {
   const travel = itinerary.days.flatMap((day) =>
     day.travelSegments.map((segment) => ({ date: day.date, segment })),
@@ -105,6 +115,21 @@ export function PublicItinerary({
             <Status value={`source version ${itinerary.version}`} />
           </div>
         </section>
+        {commenting ? (
+          <CommentThread
+            mode={commenting.mode}
+            comments={commenting.comments.filter(
+              (comment) => !comment.dayKey && !comment.itemKey,
+            )}
+            target={{
+              label: `Version ${itinerary.version}`,
+              dayKey: null,
+              itemKey: null,
+            }}
+            roomId=""
+            planVersion={itinerary.version}
+          />
+        ) : null}
 
         <section
           aria-labelledby="overview-heading"
@@ -169,6 +194,22 @@ export function PublicItinerary({
                         {day.summary}
                       </p>
                     ) : null}
+                    {commenting ? (
+                      <CommentThread
+                        mode={commenting.mode}
+                        comments={commenting.comments.filter(
+                          (comment) =>
+                            comment.dayKey === day.date && !comment.itemKey,
+                        )}
+                        target={{
+                          label: day.title,
+                          dayKey: day.date,
+                          itemKey: null,
+                        }}
+                        roomId=""
+                        planVersion={itinerary.version}
+                      />
+                    ) : null}
                     <ol className="border-border mt-6 border-l">
                       {day.items.map((item) => (
                         <li
@@ -198,6 +239,23 @@ export function PublicItinerary({
                               value={`reservation ${item.reservationStatus}`}
                             />
                           </div>
+                          {commenting ? (
+                            <CommentThread
+                              mode={commenting.mode}
+                              comments={commenting.comments.filter(
+                                (comment) =>
+                                  comment.dayKey === day.date &&
+                                  comment.itemKey === item.key,
+                              )}
+                              target={{
+                                label: item.title,
+                                dayKey: day.date,
+                                itemKey: item.key,
+                              }}
+                              roomId=""
+                              planVersion={itinerary.version}
+                            />
+                          ) : null}
                         </li>
                       ))}
                     </ol>

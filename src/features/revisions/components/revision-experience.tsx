@@ -10,6 +10,9 @@ import type {
 import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { ShareControls } from "@/features/sharing/components/share-controls";
+import { GuestInviteControls } from "@/features/guest-comments/components/guest-invite-controls";
+import { listMemberCommentsAction } from "@/features/guest-comments/actions";
+import type { GuestComment } from "@/features/guest-comments/contracts";
 import { SpatialCompare } from "@/features/maps/components/spatial-compare";
 import {
   cancelPlanChangeAction,
@@ -451,10 +454,15 @@ export function RevisionExperience({
   const [error, setError] = useState<string | null>(null);
   const [historical, setHistorical] = useState<TripPlanView | null>(null);
   const [comparison, setComparison] = useState<PlanVersionDiff | null>(null);
+  const [comments, setComments] = useState<GuestComment[]>([]);
+  const [historicalComments, setHistoricalComments] = useState<GuestComment[]>(
+    [],
+  );
   const refresh = useCallback(async () => {
-    const [requestResult, versionsResult] = await Promise.all([
+    const [requestResult, versionsResult, commentsResult] = await Promise.all([
       getPlanChangeRequestAction(roomId),
       listPlanVersionsAction(roomId),
+      listMemberCommentsAction(roomId, plan.version),
     ]);
     if (requestResult.ok) {
       setRequest(requestResult.data);
@@ -476,6 +484,7 @@ export function RevisionExperience({
       }
     }
     if (versionsResult.ok) setVersions(versionsResult.data);
+    if (commentsResult.ok) setComments(commentsResult.data);
   }, [roomId, plan.version, onPlanPublished]);
   useEffect(() => {
     const initial = window.setTimeout(() => void refresh(), 0);
@@ -541,9 +550,13 @@ export function RevisionExperience({
     await refresh();
   }
   async function viewVersion(version: number) {
-    const result = await getPlanVersionAction(roomId, version);
+    const [result, commentsResult] = await Promise.all([
+      getPlanVersionAction(roomId, version),
+      listMemberCommentsAction(roomId, version),
+    ]);
     if (result.ok) {
       setHistorical(result.data);
+      setHistoricalComments(commentsResult.ok ? commentsResult.data : []);
       setComparison(null);
     }
   }
@@ -581,11 +594,24 @@ export function RevisionExperience({
           version={historical.version}
           isHost={isHost}
         />
+        <GuestInviteControls
+          roomId={roomId}
+          participantId={participantId}
+          planVersionId={historical.id}
+          planVersion={historical.version}
+          isHost={isHost}
+        />
         <ItineraryExperience
           key={preferMap ? "historical-map" : "historical-plan"}
           plan={historical}
           initialView={preferMap ? "Map" : "Overview"}
           readOnly
+          commenting={{
+            mode: "member",
+            comments: historicalComments,
+            roomId,
+            participantId,
+          }}
           onHistory={() => {
             setHistorical(null);
             setHistory(true);
@@ -602,6 +628,13 @@ export function RevisionExperience({
         version={plan.version}
         isHost={isHost}
       />
+      <GuestInviteControls
+        roomId={roomId}
+        participantId={participantId}
+        planVersionId={plan.id}
+        planVersion={plan.version}
+        isHost={isHost}
+      />
       <ItineraryExperience
         key={preferMap ? "current-map" : "current-plan"}
         plan={plan}
@@ -609,6 +642,12 @@ export function RevisionExperience({
         onRequestChange={() => start()}
         onChangeItem={(id, title) => start({ id, title })}
         onHistory={() => setHistory(true)}
+        commenting={{
+          mode: "member",
+          comments,
+          roomId,
+          participantId,
+        }}
       />
       {form ? (
         <div

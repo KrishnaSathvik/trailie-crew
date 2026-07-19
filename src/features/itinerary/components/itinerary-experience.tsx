@@ -2,6 +2,8 @@
 import { useState } from "react";
 import type { CostEstimate, TripPlanView } from "@trailie/schemas";
 import { ItineraryMapLoader } from "@/features/maps/components/itinerary-map-loader";
+import { CommentThread } from "@/features/guest-comments/components/comment-thread";
+import type { GuestComment } from "@/features/guest-comments/contracts";
 
 const progressCopy = {
   generation_started: "Preparing the approved trip details",
@@ -177,10 +179,17 @@ function Days({
   plan,
   onChangeItem,
   readOnly,
+  commenting,
 }: {
   plan: TripPlanView;
   onChangeItem?: (itemId: string, title: string) => void;
   readOnly?: boolean;
+  commenting?: {
+    mode: "member";
+    comments: GuestComment[];
+    roomId: string;
+    participantId: string;
+  };
 }) {
   return (
     <div className="space-y-10">
@@ -194,6 +203,22 @@ function Days({
               {day.date}
             </time>
           </div>
+          {commenting ? (
+            <CommentThread
+              mode={commenting.mode}
+              comments={commenting.comments.filter(
+                (comment) => comment.dayKey === day.date && !comment.itemKey,
+              )}
+              target={{
+                label: day.title,
+                dayKey: day.date,
+                itemKey: null,
+              }}
+              roomId={commenting.roomId}
+              planVersion={plan.version}
+              participantId={commenting.participantId}
+            />
+          ) : null}
           <ol className="border-border ml-2 border-l">
             {day.items.map((item) => (
               <li key={item.id} className="relative py-5 pl-6">
@@ -219,6 +244,24 @@ function Days({
                     {costLabel(item.cost)}
                   </span>
                 </div>
+                {commenting ? (
+                  <CommentThread
+                    mode={commenting.mode}
+                    comments={commenting.comments.filter(
+                      (comment) =>
+                        comment.dayKey === day.date &&
+                        comment.itemKey === item.id,
+                    )}
+                    target={{
+                      label: item.title,
+                      dayKey: day.date,
+                      itemKey: item.id,
+                    }}
+                    roomId={commenting.roomId}
+                    planVersion={plan.version}
+                    participantId={commenting.participantId}
+                  />
+                ) : null}
                 {!readOnly && onChangeItem ? (
                   <button
                     type="button"
@@ -477,6 +520,7 @@ export function ItineraryExperience({
   onRetry,
   readOnly = false,
   initialView = "Overview",
+  commenting,
 }: {
   plan: TripPlanView;
   onRequestChange?: () => void;
@@ -485,6 +529,12 @@ export function ItineraryExperience({
   onRetry?: () => void;
   readOnly?: boolean;
   initialView?: ItineraryView;
+  commenting?: {
+    mode: "member";
+    comments: GuestComment[];
+    roomId: string;
+    participantId: string;
+  };
 }) {
   const [view, setView] = useState<ItineraryView>(initialView);
   if (plan.status === "blocked" || plan.status === "failed") {
@@ -568,6 +618,22 @@ export function ItineraryExperience({
             Trailie adjusted the schedule after checking travel time.
           </p>
         ) : null}
+        {commenting ? (
+          <CommentThread
+            mode={commenting.mode}
+            comments={commenting.comments.filter(
+              (comment) => !comment.dayKey && !comment.itemKey,
+            )}
+            target={{
+              label: `Version ${plan.version}`,
+              dayKey: null,
+              itemKey: null,
+            }}
+            roomId={commenting.roomId}
+            planVersion={plan.version}
+            participantId={commenting.participantId}
+          />
+        ) : null}
         <div
           className="mt-7 overflow-x-auto"
           role="tablist"
@@ -598,7 +664,12 @@ export function ItineraryExperience({
         <div className="mx-auto w-full max-w-5xl px-5 py-8 pb-28 sm:px-8 lg:pb-12">
           {view === "Overview" ? <Overview plan={plan} /> : null}
           {view === "Day-by-day" ? (
-            <Days plan={plan} onChangeItem={onChangeItem} readOnly={readOnly} />
+            <Days
+              plan={plan}
+              onChangeItem={onChangeItem}
+              readOnly={readOnly}
+              commenting={commenting}
+            />
           ) : null}
           {view === "Travel" ? <Travel plan={plan} /> : null}
           {view === "Stay" ? <Stay plan={plan} /> : null}

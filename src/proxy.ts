@@ -4,10 +4,16 @@ import { refreshSupabaseSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
   const isShare = request.nextUrl.pathname.startsWith("/share/");
-  const response = isShare
-    ? NextResponse.next({ request })
-    : await refreshSupabaseSession(request);
-  if (isShare || /\/plans\/\d+\/print$/.test(request.nextUrl.pathname)) {
+  const isGuest = request.nextUrl.pathname.startsWith("/guest/");
+  const response =
+    isShare || isGuest
+      ? NextResponse.next({ request })
+      : await refreshSupabaseSession(request);
+  if (
+    isShare ||
+    isGuest ||
+    /\/plans\/\d+\/print$/.test(request.nextUrl.pathname)
+  ) {
     response.headers.set("Cache-Control", "private, no-store, max-age=0");
     response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
     response.headers.set("Referrer-Policy", "no-referrer");
@@ -17,5 +23,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/trips/:path*", "/join/:path*", "/share/:path*"],
+  matcher: ["/trips/:path*", "/join/:path*", "/share/:path*", "/guest/:path*"],
 };
