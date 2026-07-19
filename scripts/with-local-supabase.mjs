@@ -42,6 +42,8 @@ const child = spawnSync(command, args, {
     CAPTCHA_TEST_MODE: process.env.CAPTCHA_TEST_MODE ?? "true",
     NEXT_PUBLIC_CAPTCHA_TEST_MODE:
       process.env.NEXT_PUBLIC_CAPTCHA_TEST_MODE ?? "true",
+    MAPBOX_MAPS_ENABLED: process.env.MAPBOX_MAPS_ENABLED ?? "true",
+    MAPBOX_MAP_ADAPTER: process.env.MAPBOX_MAP_ADAPTER ?? "deterministic",
     SUPABASE_AUTH_CAPTCHA_ENABLED:
       process.env.SUPABASE_AUTH_CAPTCHA_ENABLED ?? "false",
     RECOVERY_SECRET:

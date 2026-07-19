@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { CostEstimate, TripPlanView } from "@trailie/schemas";
+import { ItineraryMapLoader } from "@/features/maps/components/itinerary-map-loader";
 
 const progressCopy = {
   generation_started: "Preparing the approved trip details",
@@ -12,16 +13,18 @@ const progressCopy = {
   published: "Itinerary published",
   failed: "Itinerary generation stopped",
 } as const;
-type View =
+export type ItineraryView =
   | "Overview"
+  | "Map"
   | "Day-by-day"
   | "Travel"
   | "Stay"
   | "Food"
   | "Evidence"
   | "Validation";
-const views: View[] = [
+const views: ItineraryView[] = [
   "Overview",
+  "Map",
   "Day-by-day",
   "Travel",
   "Stay",
@@ -473,6 +476,7 @@ export function ItineraryExperience({
   onHistory,
   onRetry,
   readOnly = false,
+  initialView = "Overview",
 }: {
   plan: TripPlanView;
   onRequestChange?: () => void;
@@ -480,8 +484,9 @@ export function ItineraryExperience({
   onHistory?: () => void;
   onRetry?: () => void;
   readOnly?: boolean;
+  initialView?: ItineraryView;
 }) {
-  const [view, setView] = useState<View>("Overview");
+  const [view, setView] = useState<ItineraryView>(initialView);
   if (plan.status === "blocked" || plan.status === "failed") {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12">
@@ -584,17 +589,24 @@ export function ItineraryExperience({
           </div>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-5xl px-5 py-8 pb-28 sm:px-8 lg:pb-12">
-        {view === "Overview" ? <Overview plan={plan} /> : null}
-        {view === "Day-by-day" ? (
-          <Days plan={plan} onChangeItem={onChangeItem} readOnly={readOnly} />
-        ) : null}
-        {view === "Travel" ? <Travel plan={plan} /> : null}
-        {view === "Stay" ? <Stay plan={plan} /> : null}
-        {view === "Food" ? <Food plan={plan} /> : null}
-        {view === "Evidence" ? <Evidence plan={plan} /> : null}
-        {view === "Validation" ? <Validation plan={plan} /> : null}
-      </div>
+      {view === "Map" ? (
+        <ItineraryMapLoader
+          plan={plan}
+          onViewEvidence={() => setView("Evidence")}
+        />
+      ) : (
+        <div className="mx-auto w-full max-w-5xl px-5 py-8 pb-28 sm:px-8 lg:pb-12">
+          {view === "Overview" ? <Overview plan={plan} /> : null}
+          {view === "Day-by-day" ? (
+            <Days plan={plan} onChangeItem={onChangeItem} readOnly={readOnly} />
+          ) : null}
+          {view === "Travel" ? <Travel plan={plan} /> : null}
+          {view === "Stay" ? <Stay plan={plan} /> : null}
+          {view === "Food" ? <Food plan={plan} /> : null}
+          {view === "Evidence" ? <Evidence plan={plan} /> : null}
+          {view === "Validation" ? <Validation plan={plan} /> : null}
+        </div>
+      )}
     </div>
   );
 }

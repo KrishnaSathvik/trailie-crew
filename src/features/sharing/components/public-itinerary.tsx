@@ -1,6 +1,11 @@
-import type { PublicSharedItinerary } from "@trailie/schemas";
+import type {
+  ItineraryMapProjectionV1,
+  PublicSharedItinerary,
+} from "@trailie/schemas";
 import { PrintButton } from "./print-button";
 import { TrustLinks } from "@/components/shared/trust-links";
+import type { MapConfiguration } from "@/features/maps/config";
+import { PublicItineraryMap } from "@/features/maps/components/public-itinerary-map";
 
 function Status({ value }: { value: string }) {
   return (
@@ -42,10 +47,15 @@ export function PublicItinerary({
   itinerary,
   generatedAt = itinerary.publishedAt,
   contentHash,
+  map,
 }: {
   itinerary: PublicSharedItinerary;
   generatedAt?: string;
   contentHash?: string;
+  map?: {
+    projection: ItineraryMapProjectionV1;
+    configuration: MapConfiguration;
+  } | null;
 }) {
   const travel = itinerary.days.flatMap((day) =>
     day.travelSegments.map((segment) => ({ date: day.date, segment })),
@@ -121,6 +131,14 @@ export function PublicItinerary({
             ))}
           </div>
         </section>
+
+        {map ? (
+          <PublicItineraryMap
+            title={itinerary.title}
+            projection={map.projection}
+            configuration={map.configuration}
+          />
+        ) : null}
 
         <section
           aria-labelledby="days-heading"

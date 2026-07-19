@@ -23,10 +23,10 @@ const destinations = [
   { label: "Chat", icon: MessageCircle, enabled: true },
   { label: "Plan", icon: CalendarRange, enabled: true },
   { label: "Settings", icon: Settings, enabled: true },
-  { label: "Map", icon: Map, enabled: false },
+  { label: "Map", icon: Map, enabled: true },
 ];
 
-type Area = "Chat" | "Plan" | "Settings";
+type Area = "Chat" | "Plan" | "Map" | "Settings";
 
 export function TripShell({ data }: { data: TripShellData }) {
   const isHost = data.currentParticipant.role === "host";
@@ -142,18 +142,21 @@ export function TripShell({ data }: { data: TripShellData }) {
                 ? "Shared conversation"
                 : area === "Plan"
                   ? "Planning review"
-                  : "Trip settings"}
+                  : area === "Map"
+                    ? "Spatial itinerary"
+                    : "Trip settings"}
             </p>
           </div>
           <ThemeToggle />
         </header>
         {area === "Chat" ? (
           <ChatExperience data={data} onPresenceChange={handlePresenceChange} />
-        ) : area === "Plan" ? (
+        ) : area === "Plan" || area === "Map" ? (
           <PlanExperience
             roomId={data.room.id}
             participantId={data.currentParticipant.id}
             participantRole={data.currentParticipant.role}
+            preferMap={area === "Map"}
           />
         ) : isHost ? (
           <TripDangerZone

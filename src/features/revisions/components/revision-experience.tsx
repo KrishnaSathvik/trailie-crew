@@ -10,6 +10,7 @@ import type {
 import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { ShareControls } from "@/features/sharing/components/share-controls";
+import { SpatialCompare } from "@/features/maps/components/spatial-compare";
 import {
   cancelPlanChangeAction,
   comparePlanVersionsAction,
@@ -427,12 +428,14 @@ export function RevisionExperience({
   plan,
   isHost,
   onPlanPublished,
+  preferMap = false,
 }: {
   roomId: string;
   participantId: string;
   plan: TripPlanView;
   isHost: boolean;
   onPlanPublished: () => Promise<void>;
+  preferMap?: boolean;
 }) {
   const [request, setRequest] = useState<PlanChangeRequest | null>(null);
   const [versions, setVersions] = useState<PlanVersionSummary[]>([]);
@@ -579,7 +582,9 @@ export function RevisionExperience({
           isHost={isHost}
         />
         <ItineraryExperience
+          key={preferMap ? "historical-map" : "historical-plan"}
           plan={historical}
+          initialView={preferMap ? "Map" : "Overview"}
           readOnly
           onHistory={() => {
             setHistorical(null);
@@ -598,7 +603,9 @@ export function RevisionExperience({
         isHost={isHost}
       />
       <ItineraryExperience
+        key={preferMap ? "current-map" : "current-plan"}
         plan={plan}
+        initialView={preferMap ? "Map" : "Overview"}
         onRequestChange={() => start()}
         onChangeItem={(id, title) => start({ id, title })}
         onHistory={() => setHistory(true)}
@@ -689,7 +696,7 @@ export function RevisionExperience({
       ) : null}
       {history ? (
         <div
-          className="border-border bg-background fixed inset-x-3 top-20 bottom-20 z-20 overflow-y-auto rounded-lg border p-5 shadow-xl sm:right-6 sm:left-auto sm:w-[34rem]"
+          className={`border-border bg-background fixed inset-x-3 top-20 bottom-20 z-20 overflow-y-auto rounded-lg border p-5 shadow-xl sm:right-6 sm:left-auto ${comparison ? "sm:w-[min(70rem,calc(100vw-3rem))]" : "sm:w-[34rem]"}`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="history-title"
@@ -710,7 +717,15 @@ export function RevisionExperience({
             </button>
           </div>
           {comparison ? (
-            <Diff diff={comparison} />
+            <>
+              <Diff diff={comparison} />
+              <SpatialCompare
+                key={`${comparison.baseVersion}:${comparison.candidateVersion}`}
+                roomId={roomId}
+                baseVersion={comparison.baseVersion}
+                candidateVersion={comparison.candidateVersion}
+              />
+            </>
           ) : (
             <ul className="border-border mt-5 divide-y border-y">
               {versions.map((version) => (

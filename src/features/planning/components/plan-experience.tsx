@@ -57,10 +57,12 @@ export function PlanExperience({
   roomId,
   participantId,
   participantRole = "member",
+  preferMap = false,
 }: {
   roomId: string;
   participantId: string;
   participantRole?: ParticipantRole;
+  preferMap?: boolean;
 }) {
   const [request, setRequest] = useState<PlanningRequestView | null>(null);
   const [plan, setPlan] = useState<TripPlanView | null>(null);
@@ -214,13 +216,16 @@ export function PlanExperience({
         isHost={participantRole === "host"}
         plan={plan}
         onPlanPublished={refresh}
+        preferMap={preferMap}
       />
     );
   if (plan)
     return (
       <>
         <ItineraryExperience
+          key={preferMap ? "map" : "plan"}
           plan={plan}
+          initialView={preferMap ? "Map" : "Overview"}
           onRetry={
             plan.status === "failed" &&
             [
