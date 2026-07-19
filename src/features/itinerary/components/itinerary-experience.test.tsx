@@ -4,6 +4,13 @@ import type { TripPlanView } from "@trailie/schemas";
 import { createFakeItineraryProvider } from "../provider";
 import { ItineraryExperience } from "./itinerary-experience";
 
+vi.mock("@/features/maps/actions", () => ({
+  getPlanMapProjectionAction: vi.fn().mockResolvedValue({
+    ok: false,
+    error: "projection_unavailable",
+  }),
+}));
+
 const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 
 describe("ItineraryExperience", () => {
@@ -173,6 +180,40 @@ describe("ItineraryExperience", () => {
       }),
     ).toBeVisible();
     expect(screen.queryByText(/sql|stack|provider/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the published itinerary usable when its map projection is unavailable", async () => {
+    const generated = await createFakeItineraryProvider().generate({
+      operationKey: "map-test",
+      model: "gpt-5.6-sol",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1000),
+    });
+    const plan = {
+      id,
+      roomId: id,
+      planningRequestId: id,
+      version: 1,
+      status: "published",
+      validationStatus: "pass",
+      basisSummaryVersion: 1,
+      itinerary: generated.itinerary,
+      validationSummary: null,
+      progressEvents: [],
+      createdAt: "2026-07-13T18:00:00.000Z",
+      updatedAt: "2026-07-13T18:01:00.000Z",
+      publishedAt: "2026-07-13T18:01:00.000Z",
+      errorCode: null,
+    } satisfies TripPlanView;
+    render(<ItineraryExperience plan={plan} initialView="Map" />);
+    expect(
+      await screen.findByText(
+        "Map view is unavailable. Your itinerary remains fully usable.",
+      ),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: "Day-by-day" }));
+    expect(screen.getByText("Glacier Point sunset")).toBeVisible();
   });
 
   it("offers an explicit retry for a transient failed generation", () => {

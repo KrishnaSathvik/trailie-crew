@@ -100,6 +100,17 @@ describe("TripShell", () => {
     expect(screen.getByText("Start the conversation")).toBeVisible();
   });
 
+  it("opens the map entry point without replacing the planning workflow", async () => {
+    renderShell(<TripShell data={shell} />);
+    const mapButton = screen.getAllByRole("button", { name: "Map" })[0];
+    expect(mapButton).toBeEnabled();
+    fireEvent.click(mapButton);
+    expect(
+      await screen.findByRole("button", { name: "Build Our Itinerary" }),
+    ).toBeVisible();
+    expect(screen.getByText("Spatial itinerary")).toBeVisible();
+  });
+
   it("limits members to safe room-code information", () => {
     renderShell(
       <TripShell

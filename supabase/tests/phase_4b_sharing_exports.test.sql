@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(57);
+select plan(60);
 
 select has_type('public','plan_share_mode','share mode enum exists');
 select has_type('public','plan_share_status','share status enum exists');
@@ -105,9 +105,11 @@ select ok((select public_snapshot::text !~* 'Maya|Alex|Private Street|ABC123|evi
 
 set local role service_role;
 create temporary table valid_verification as select public.verify_plan_share_token_hash(repeat('1',64)) payload;
+create temporary table valid_map_source as select public.get_public_plan_map_projection_source(repeat('1',64)) payload;
 reset role;
 select is((select payload->'itinerary'->>'version' from valid_verification),'1','valid token returns pinned Version 1 while room current is Version 2');
 select is((select payload->'itinerary'->>'title' from valid_verification),'Yosemite Version One','Version 1 token never resolves latest Version 2');
+select is((select payload->>'planVersion' from valid_map_source),'1','public map source remains pinned to shared Version 1');
 
 select set_config('request.jwt.claim.sub','a0000000-0000-4000-8000-000000000002',true);
 set local role authenticated;
@@ -126,6 +128,7 @@ select isnt((select payload->>'id' from rotated_share),(select payload->>'id' fr
 
 set local role service_role;
 select is(public.verify_plan_share_token_hash(repeat('1',64)),null,'rotated old token is unavailable immediately');
+select is(public.get_public_plan_map_projection_source(repeat('1',64)),null,'rotated old token cannot load a map source');
 select is(public.verify_plan_share_token_hash(repeat('2',64))->'itinerary'->>'version','1','new rotated token works');
 reset role;
 
@@ -137,6 +140,9 @@ create temporary table expiring_share as select public.create_plan_share_link('a
 reset role;
 select is((select status::text from public.plan_share_links where id=((select payload->>'id' from rotated_share)::uuid)),'revoked','revoke is idempotent');
 select is((select mode::text from public.plan_share_links where id=((select payload->>'id' from expiring_share)::uuid)),'expiring_link','expiring mode is persisted');
+set local role service_role;
+select is(public.get_public_plan_map_projection_source(repeat('2',64)),null,'revoked share cannot load its map projection source');
+reset role;
 
 update public.plan_share_links set expires_at=now()-interval '1 second' where id=((select payload->>'id' from expiring_share)::uuid);
 set local role service_role;

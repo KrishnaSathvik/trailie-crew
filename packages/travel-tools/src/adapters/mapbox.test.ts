@@ -172,7 +172,13 @@ describe("Mapbox TravelProviderAdapter", () => {
             {
               distance: 104_123.4,
               duration: 7_245,
-              geometry: "encoded-geometry",
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-119.5383, 37.8651],
+                  [-119.5936, 37.7459],
+                ],
+              },
               warnings: [],
             },
           ],
@@ -195,6 +201,9 @@ describe("Mapbox TravelProviderAdapter", () => {
     expect(String(successFetcher.mock.calls[0][0])).toContain(
       "/mapbox/driving-traffic/",
     );
+    const routeUrl = new URL(String(successFetcher.mock.calls[0][0]));
+    expect(routeUrl.searchParams.get("overview")).toBe("simplified");
+    expect(routeUrl.searchParams.get("geometries")).toBe("geojson");
     expect(result.evidence[0]).toMatchObject({
       evidenceType: "route",
       verificationState: "verified",
@@ -203,6 +212,13 @@ describe("Mapbox TravelProviderAdapter", () => {
           distanceMeters: 104123,
           durationMinutes: 121,
           trafficBasis: "live_and_historical",
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [-119.5383, 37.8651],
+              [-119.5936, 37.7459],
+            ],
+          },
         },
       },
     });

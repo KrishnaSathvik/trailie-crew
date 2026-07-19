@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(17);
+select plan(25);
 
 select has_table(
   'private','canonical_destination_resolutions',
@@ -39,6 +39,34 @@ select function_privs_are(
   'public','store_canonical_destination_resolution',array['uuid','jsonb'],
   'authenticated',array[]::text[],
   'browser cannot store canonical resolution'
+);
+select has_function(
+  'private','plan_map_projection_source',array['uuid'],
+  'private exact-version map source assembler exists'
+);
+select has_function(
+  'public','get_plan_map_projection_source',array['uuid','integer'],
+  'member exact-version map source reader exists'
+);
+select has_function(
+  'public','get_public_plan_map_projection_source',array['text'],
+  'service-only public share map source reader exists'
+);
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.get_plan_map_projection_source(uuid,integer)',
+    'execute'
+  ),
+  'authenticated members may invoke the membership-checking map source function'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.get_public_plan_map_projection_source(text)',
+    'execute'
+  ),
+  'browser roles cannot invoke the public share map source reader'
 );
 
 insert into auth.users(id,instance_id,aud,role,created_at,updated_at,is_anonymous)
@@ -256,6 +284,54 @@ select is(
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   'plan snapshot retains canonical semantic hash'
 );
+
+update public.trip_plans
+set status='published',validation_status='pass',published_at=now()
+where id='6b600000-0000-4000-8000-000000000001';
+
+select set_config(
+  'request.jwt.claim.sub',
+  '6b100000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+select ok(
+  public.get_plan_map_projection_source(
+    '6b200000-0000-4000-8000-000000000001',
+    1
+  )->'destinationResolution'->>'canonicalPlaceId'='nps:yose'
+  and jsonb_array_length(
+    public.get_plan_map_projection_source(
+      '6b200000-0000-4000-8000-000000000001',
+      1
+    )->'evidenceSnapshots'
+  )=1,
+  'active member receives exact-version immutable evidence and canonical destination'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claim.sub',
+  '6b100000-0000-4000-8000-000000000099',
+  true
+);
+set local role authenticated;
+select throws_ok(
+  $$select public.get_plan_map_projection_source(
+    '6b200000-0000-4000-8000-000000000001',1
+  )$$,
+  'P0001','Membership required.',
+  'cross-room map projection access is denied'
+);
+reset role;
+
+set local role service_role;
+select is(
+  public.get_public_plan_map_projection_source(repeat('f',64)),
+  null,
+  'unknown public share map token has one generic unavailable state'
+);
+reset role;
 
 select * from finish();
 rollback;

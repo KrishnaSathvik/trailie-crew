@@ -79,6 +79,23 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     });
   }
 
+  await member.getByRole("button", { name: "Map" }).first().click();
+  await expect(member.getByText("Deterministic local adapter")).toBeVisible({
+    timeout: 15_000,
+  });
+  const destinationMarker = member.getByRole("button", {
+    name: /Yosemite National Park.*verified location/i,
+  });
+  await destinationMarker.click();
+  await expect(member.getByRole("status")).toContainText(
+    "Yosemite National Park selected",
+  );
+  await member.getByRole("button", { name: /Day 2/ }).click();
+  await expect(
+    member.getByRole("heading", { name: "Yosemite Falls" }),
+  ).toBeVisible();
+  await openPlan(member);
+
   await member.getByRole("tab", { name: "Day-by-day" }).click();
   const sunset = member
     .getByRole("heading", { name: "Glacier Point sunset" })
@@ -172,6 +189,12 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
   await expect(
     member.getByRole("button", { name: "Request a Change" }),
   ).toHaveCount(0);
+  await member.getByRole("tab", { name: "Map" }).click();
+  await expect(
+    member.getByText(
+      "Viewing Version 1 — evidence as checked when this version was published.",
+    ),
+  ).toBeVisible();
   await member.getByRole("button", { name: "Back to current" }).click();
   await member.getByRole("button", { name: "Version history" }).click();
   await member.getByRole("button", { name: "Compare to previous" }).click();
@@ -189,6 +212,26 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     .getByRole("dialog")
     .getByRole("button", { name: "Close" })
     .click();
+  await member.getByRole("button", { name: "Map" }).first().click();
+  await expect(member.getByRole("button", { name: "Map mode" })).toBeVisible();
+  await member.getByRole("button", { name: "Map mode" }).click();
+  await member.getByRole("button", { name: "Expand place sheet" }).click();
+  await expect(member.getByTestId("place-sheet")).toHaveAttribute(
+    "data-position",
+    "half",
+  );
+  await member.keyboard.press("Escape");
+  await expect(member.getByTestId("place-sheet")).toHaveAttribute(
+    "data-position",
+    "collapsed",
+  );
+  await member.getByRole("button", { name: "Plan mode" }).click();
+  await expect(member.getByLabel("Spatial itinerary")).toBeVisible();
+  expect(
+    await member.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   const chatButton = member.getByRole("button", { name: "Chat" }).first();
   await chatButton.focus();
   await chatButton.press("Enter");

@@ -5,6 +5,7 @@ import {
   classifyTravelFreshness,
   semanticTravelEvidenceHashInput,
   travelEvidenceTypeSchema,
+  travelEvidenceSnapshotV1Schema,
   travelEvidenceV1Schema,
   travelFreshnessStateSchema,
   travelVerificationStateSchema,
@@ -64,6 +65,25 @@ const evidence = {
 describe("TravelEvidenceV1", () => {
   it("accepts strict, independently classified evidence", () => {
     expect(travelEvidenceV1Schema.parse(evidence)).toEqual(evidence);
+  });
+
+  it("accepts the immutable publication subset without live provider metadata", () => {
+    const snapshot = Object.fromEntries(
+      Object.entries(evidence).filter(
+        ([key]) =>
+          ![
+            "locationBinding",
+            "entityBinding",
+            "providerMetadata",
+            "cacheStatus",
+            "requestId",
+          ].includes(key),
+      ),
+    );
+    expect(travelEvidenceSnapshotV1Schema.parse(snapshot)).toEqual(snapshot);
+    expect(travelEvidenceSnapshotV1Schema.safeParse(evidence).success).toBe(
+      false,
+    );
   });
 
   it("rejects a single verification boolean and mismatched normalized kind", () => {

@@ -138,10 +138,17 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
   const publicContext = await browser.newContext();
   const visitor = await publicContext.newPage();
   const publicResponse = await visitor.goto(versionOneUrl);
-  await expect(
-    visitor.getByRole("heading", { name: "Yosemite crew escape" }),
-  ).toBeVisible();
+  await expect(visitor.locator("#shared-title")).toHaveText(
+    "Yosemite crew escape",
+  );
   await expect(visitor.getByLabel("Pinned Version 1")).toBeVisible();
+  await expect(
+    visitor.getByRole("heading", { name: "Privacy-safe map" }),
+  ).toBeVisible();
+  await expect(visitor.getByText("Deterministic local adapter")).toBeVisible();
+  await expect(
+    visitor.getByText(/Private locations are hidden/i),
+  ).toBeVisible();
   await expect(visitor.getByText("Version 2", { exact: true })).toHaveCount(0);
   await expect(visitor.getByText("Maya", { exact: true })).toHaveCount(0);
   await expect(visitor.getByText("Alex", { exact: true })).toHaveCount(0);

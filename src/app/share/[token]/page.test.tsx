@@ -4,15 +4,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revisionItinerary } from "@/features/revisions/test-fixtures";
 import { projectPublicItinerary } from "@/features/sharing/public-projection";
 import { verifyPlanShareToken } from "@/features/sharing/repository";
+import { loadPublicMapProjection } from "@/features/maps/repository";
 import SharePage from "./page";
 import { metadata } from "./layout";
 
 vi.mock("@/features/sharing/repository", () => ({
   verifyPlanShareToken: vi.fn(),
 }));
+vi.mock("@/features/maps/repository", () => ({
+  loadPublicMapProjection: vi.fn(),
+}));
+vi.mock("@/features/maps/actions", () => ({
+  getServerMapConfiguration: vi.fn().mockResolvedValue({
+    enabled: false,
+    browserToken: null,
+    styleUrl: "mapbox://styles/mapbox/standard",
+    unavailableReason: "maps_disabled",
+    adapter: "mapbox",
+  }),
+}));
 
 describe("public share page", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadPublicMapProjection).mockResolvedValue(null);
+  });
 
   it("verifies the opaque token server-side and renders only the projection", async () => {
     vi.mocked(verifyPlanShareToken).mockResolvedValue({
