@@ -1,7 +1,7 @@
 # Phase 6B interactive map
 
-Status: local implementation complete; protected hosted map acceptance pending a
-separate restricted browser token. Production was not deployed.
+Status: local implementation complete; protected hosted map acceptance remains
+blocked by browser/server token reuse. Production was not deployed.
 
 ## Baseline and scope
 
@@ -97,6 +97,34 @@ configuration. A real hosted map smoke therefore requires a new URL-restricted,
 minimum-scope public token and a protected Preview redeployment. Until that
 input exists, the accepted Phase 6A Preview remains intact and no Phase 6B
 hosted acceptance is claimed.
+
+### Protected Preview attempt — July 19, 2026
+
+Migration `20260719021138` is applied and matched locally/remotely. Protected
+deployment `dpl_8GKuEsvwwsx4uNxTLFFT3ckarUXh` reached Ready on the stable Preview
+alias with Vercel Authentication retained; every temporary automation bypass
+was revoked and the final bypass count was zero.
+
+The three map variables and allowlisted standard style were present, and an
+isolated SDK probe confirmed that the restricted token accepted the stable
+alias, rejected an unrelated origin, and made no geocoding request. The actual
+application nevertheless failed closed before SDK load: safe trace inspection
+reported `server_token_reused`, zero Mapbox requests, and local boolean
+inspection also confirmed that the browser and server entries were not
+separate. No token value, hash, or export was produced.
+
+The disposable hosted flow also repeated the legacy AI reliability issue: one
+attempt exhausted planning-summary retries and another produced an unpublishable
+Version 1 after bounded recovery. No AI behavior was changed. Hosted map/history,
+public-map privacy, and complete Version 1→2 acceptance therefore remain
+unaccepted.
+
+Clean local reruns passed 629 Vitest assertions, 605 pgTAP assertions, and all
+16 runnable Playwright tests with three hosted-only skips; the production build,
+lint/typecheck, client-secret scan, and dependency audit also passed. The full
+Playwright run emitted a deterministic public-map hydration warning without
+failing a test, so that warning remains follow-up evidence rather than a hosted
+fix in this acceptance-only pass.
 
 ## Mapbox compliance
 
