@@ -65,7 +65,7 @@ async function createVersionOne(browser: Browser) {
     .getByLabel("One-time invitation URL")
     .inputValue();
 
-  await member.goto(inviteUrl);
+  await member.goto(appUrl(inviteUrl));
   await member.getByLabel("Your display name").fill("Alex");
   await member.getByRole("button", { name: "Join Trip" }).click();
   await host.reload();
