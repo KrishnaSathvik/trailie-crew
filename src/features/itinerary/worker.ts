@@ -302,6 +302,83 @@ function evidenceFromResult<T>(
   };
 }
 
+function normalizedPlaceName(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+const officialItemEvidenceTypes = new Set<TravelEvidenceV1["evidenceType"]>([
+  "park",
+  "visitor_center",
+  "campground",
+  "trail",
+  "place",
+]);
+
+/** Bind only unique, durable official evidence to an exact generated item. */
+export function bindOfficialItemEvidence(
+  itinerary: Itinerary,
+  liveEvidence: TravelEvidenceV1[],
+  destinationResolution?: CanonicalDestinationResolutionV1 | null,
+) {
+  const candidates = liveEvidence.filter(
+    (entry) =>
+      officialItemEvidenceTypes.has(entry.evidenceType) &&
+      (entry.provider === "nps" || entry.provider === "ridb") &&
+      entry.verificationState === "verified" &&
+      entry.confidence === "high" &&
+      entry.restrictions.storage !== "prohibited" &&
+      entry.locationBinding?.coordinates !== null &&
+      entry.locationBinding?.privacy === "public" &&
+      entry.entityBinding !== null,
+  );
+  for (const day of itinerary.days) {
+    for (const item of day.items) {
+      if (item.location?.latitude !== null && item.location?.latitude !== undefined)
+        continue;
+      const byId = item.sourceEntityId
+        ? candidates.filter(
+            (entry) =>
+              entry.sourceEntityId === item.sourceEntityId ||
+              entry.entityBinding?.canonicalId === item.sourceEntityId,
+          )
+        : [];
+      const byName = candidates.filter((entry) => {
+        const itemName = normalizedPlaceName(item.location?.name ?? item.title);
+        const officialName = normalizedPlaceName(entry.entityBinding!.name);
+        return itemName === officialName;
+      });
+      const matches = byId.length ? byId : byName;
+      if (matches.length !== 1) continue;
+      const evidence = matches[0];
+      const coordinates = evidence.locationBinding!.coordinates!;
+      if (
+        destinationResolution?.npsParkCode &&
+        evidence.provider === "nps" &&
+        evidence.sourceEntityId &&
+        !evidence.sourceEntityId.toLocaleLowerCase("en-US").includes(
+          destinationResolution.npsParkCode.toLocaleLowerCase("en-US"),
+        )
+      )
+        continue;
+      item.location = {
+        name: evidence.entityBinding!.name,
+        address: null,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        timezone: itinerary.timezone,
+        verificationStatus: "verified",
+      };
+      item.sourceEntityId = evidence.entityBinding!.canonicalId;
+      item.evidenceRefs = [...new Set([...item.evidenceRefs, evidence.evidenceId])];
+    }
+  }
+  return itinerarySchema.parse(itinerary);
+}
+
 export async function enrichWithTravelEvidence(
   tripPlanId: string,
   source: Itinerary,
@@ -476,9 +553,14 @@ async function validateAndRecord(
     draft,
     destinationResolution,
   );
+  const boundDraft = bindOfficialItemEvidence(
+    normalizedDraft,
+    liveEvidence,
+    destinationResolution?.resolution,
+  );
   const enriched = await enrichWithTravelEvidence(
     id,
-    normalizedDraft,
+    boundDraft,
     evidence,
     dependencies,
   );

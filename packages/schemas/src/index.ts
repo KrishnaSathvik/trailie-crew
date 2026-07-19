@@ -630,6 +630,7 @@ export const itineraryItemSchema = z
   .object({
     id: itineraryIdSchema,
     type: itineraryItemTypeSchema,
+    sourceEntityId: z.string().trim().min(1).max(200).nullable().optional(),
     startTime: localTimeSchema,
     endTime: localTimeSchema,
     title: itineraryShortTextSchema,

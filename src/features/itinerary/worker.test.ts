@@ -4,13 +4,47 @@ import {
   createFakeTravelProvider,
   createUnavailableTravelProvider,
 } from "@trailie/travel-tools";
-import type { PlanningSummary } from "@trailie/schemas";
+import type { PlanningSummary, TravelEvidenceV1 } from "@trailie/schemas";
+import { revisionItinerary } from "@/features/revisions/test-fixtures";
 import { createFakeItineraryProvider } from "./provider";
 import {
   enrichWithTravelEvidence,
+  bindOfficialItemEvidence,
   parseItineraryDates,
   processItineraryGeneration,
 } from "./worker";
+
+function officialEvidence(name: string, type: TravelEvidenceV1["evidenceType"]): TravelEvidenceV1 {
+  return {
+    schemaVersion: "1", evidenceId: `evidence:${name.toLowerCase().replaceAll(" ", "-")}`,
+    evidenceType: type, provider: type === "campground" ? "ridb" : "nps",
+    sourceName: "Official source", sourceUrl: "https://www.nps.gov", sourceEntityId: `official:${name}`,
+    retrievedAt: "2026-07-19T00:00:00.000Z", observedAt: null, validFrom: null, validUntil: null,
+    freshnessState: "fresh", verificationState: "verified", confidence: "high", availabilityState: "available",
+    locationBinding: { coordinates: { latitude: 37, longitude: -119 }, boundingBox: null, timezone: "America/Los_Angeles", precision: "place", privacy: "public" },
+    entityBinding: { entityType: type === "campground" ? "campground" : "visitor_center", canonicalId: `official:${name}`, name },
+    normalizedValue: { kind: type, data: {} }, providerMetadata: {}, attribution: { label: "Official", url: "https://www.nps.gov", required: true },
+    restrictions: { storage: "permanent", display: "Official source" }, cacheStatus: "miss", requestId: null, errorState: null,
+  };
+}
+
+describe("official item evidence binding", () => {
+  it("binds one exact official item and leaves ambiguous items unresolved", () => {
+    const itinerary = structuredClone(revisionItinerary());
+    const item = itinerary.days[0].items[0];
+    item.title = "Visitor Center";
+    item.location = null;
+    const evidence = officialEvidence("Visitor Center", "visitor_center");
+    const bound = bindOfficialItemEvidence(itinerary, [evidence]);
+    expect(bound.days[0].items[0].sourceEntityId).toBe("official:Visitor Center");
+    expect(bound.days[0].items[0].location?.verificationStatus).toBe("verified");
+    const unresolvedInput = structuredClone(revisionItinerary());
+    unresolvedInput.days[0].items[0].title = "Visitor Center";
+    unresolvedInput.days[0].items[0].location = null;
+    const unresolved = bindOfficialItemEvidence(unresolvedInput, [evidence, { ...evidence, evidenceId: "evidence:other", entityBinding: { ...evidence.entityBinding!, canonicalId: "official:other", name: "Visitor Center" } }]);
+    expect(unresolved.days[0].items[0].location).toBeNull();
+  });
+});
 import type {
   ItineraryGenerationContext,
   ItineraryRepository,
