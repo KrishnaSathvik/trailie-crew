@@ -37,3 +37,20 @@ Model output may supply a display label but cannot redefine canonical identity.
 Equivalent display variation is normalized to the canonical official name.
 Material destination drift is rejected separately and never reclassifies the
 original canonical resolution as ambiguous.
+
+## Phase 6B map projection
+
+`TravelEvidenceSnapshotV1` is the immutable publication subset. It intentionally
+omits live provider metadata, cache/request fields, and private binding objects.
+`ItineraryMapProjectionV1` consumes only that exact-version subset plus the
+snapshot target binding and immutable canonical destination resolution.
+Official RIDB/NPS or approved permanent normalized coordinates may be projected;
+temporary Mapbox coordinates remain prohibited. A route carries geometry only
+when the publication snapshot contains bounded verified geometry. Missing
+geometry remains endpoint-only or unavailable and never becomes a synthetic
+line.
+
+Map freshness and warning labels are publication-time evidence labels for a
+historical version. Opening Version 1 must not fetch current evidence to replace
+its snapshot. Public map projection additionally removes internal identifiers
+and exact private lodging coordinates.

@@ -71,7 +71,7 @@ pnpm exec supabase test db
 
 ## Current implementation status
 
-Implemented through Phase 5B locally (hosted Phase 5B acceptance is reported separately):
+Implemented through Phase 6B locally (hosted map acceptance is reported separately):
 
 - production-oriented Next.js and pnpm workspace foundation
 - strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
@@ -118,7 +118,8 @@ Implemented through Phase 5B locally (hosted Phase 5B acceptance is reported sep
 Not yet implemented:
 
 - booking, public editing/comments, external guest collaboration, password-protected links, and public indexing
-- live place/reservation, hotel/flight, weather, and TrailVerse/NPS service integration
+- live hotel/flight inventory, booking, and a stable TrailVerse service integration
+- protected hosted Mapbox GL acceptance with a dedicated restricted browser token
 - paid Production backup/PITR and restore proof, provider/platform alert ownership, professional legal review, and final manual accessibility acceptance
 
 Phase 5B details and the intentionally blocked Production verdict are in [`docs/build-week/phase-5b-production-hardening.md`](docs/build-week/phase-5b-production-hardening.md). Operational release documents are under [`docs/production/`](docs/production/).
@@ -141,3 +142,13 @@ Phase 3B adds the explicit **Generate Itinerary** action, strict itinerary schem
 Phase 4A adds explicit crew-approved revisions and immutable historical comparison. Phase 4B adds exact-version sharing and exports: the room may be on Version 2 while a Version 1 link, calendar, or print view remains Version 1 until its host revokes it. Raw share tokens are shown once and never stored. Public pages are strict, read-only, non-indexed projections with conservative cache headers.
 
 Phase 6A adds server-only live travel intelligence from Mapbox, OpenWeather One Call 3.0, NPS, and RIDB. Every external fact is normalized as versioned evidence with provenance, freshness, verification, confidence, bindings, and explicit unavailable/conflicting states before Sol or deterministic validation can use it. Published plan versions pin immutable privacy-safe evidence snapshots. See [Phase 6A](docs/build-week/phase-6a-live-travel-intelligence.md) and the [travel provider inventory](docs/production/travel-provider-inventory.md).
+
+Phase 6B adds a lazy, version-aware itinerary map backed by a strict server
+projection rather than raw provider data. Desktop and mobile views synchronize
+map markers with itinerary cards, render only verified route geometry, preserve
+historical evidence, and provide a privacy-redacted exact-version public map.
+Local acceptance uses a deterministic no-provider adapter; protected hosted map
+acceptance requires a separate URL-restricted public Mapbox token. See
+[Phase 6B](docs/build-week/phase-6b-interactive-map.md), [map
+architecture](docs/production/map-architecture.md), and [map
+privacy](docs/production/map-privacy-policy.md).

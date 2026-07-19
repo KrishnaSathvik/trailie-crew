@@ -188,3 +188,20 @@
 - [x] Live itinerary smoke and full-schema Version 1 publication passed
 - [ ] Live travel-tools smoke (requires `MAPBOX_ACCESS_TOKEN`)
 - [ ] Durable production queue/cron scheduling for recovery
+
+## Phase 6B interactive map
+
+- [x] Strict exact-version `ItineraryMapProjectionV1`
+- [x] Separate public/server Mapbox token contract and style allowlist
+- [x] Itinerary-first desktop split and mobile Map/Plan sheet
+- [x] Bidirectional local selection and day filters
+- [x] Verified-only route geometry with textual unavailable equivalent
+- [x] Immutable Version 1 map after Version 2 publication
+- [x] Spatial compare annotations without revision authority
+- [x] Privacy-redacted, revocable exact-version public map
+- [x] Disabled, missing-coordinate, SDK, and offline fallbacks
+- [x] Deterministic desktop and 390×844 browser acceptance
+- [ ] Protected hosted Mapbox SDK/style/tile acceptance (restricted public token required)
+- [ ] Complete manual VoiceOver/zoom/high-contrast map review
+- [ ] Written Mapbox clarification for the complete Production workflow
+- [ ] Unrestricted Production deployment (not authorized)

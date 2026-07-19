@@ -29,3 +29,12 @@ Never suppress `change_scope_exceeded`, lower unrelated-drift severity, edit a m
 ## Phase 6A evidence refresh
 
 Evidence refresh targets remain subordinate to the approved change manifest. Route/timing changes refresh only affected segment evidence; broader destination/item changes may refresh destination, official park, alert, weather, daylight, reservation, and operating-hours evidence. Unaffected snapshots are copied explicitly to the candidate version. Metadata-only refresh does not expand itinerary scope or require a new plan version; a new closure proposes a normal revision and never silently rewrites the published plan.
+
+## Phase 6B spatial reading
+
+Map selection, filters, camera, and mobile sheet state are local presentation
+state and never enter a revision manifest. Spatial compare is derived from the
+same immutable base/candidate versions and may annotate added, removed, moved,
+route-changed, or warning-changed elements; it cannot authorize a change.
+Version 2 geometry or marker refresh is bound to Version 2 snapshots. Version 1
+map data is not mutated or silently refreshed.

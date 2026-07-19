@@ -17,6 +17,10 @@ No values belong in this document or browser logs.
 | `TRAVEL_PROVIDERS_ENABLED`                                      | server-only             | `true` only in protected acceptance         | `false` until release approval       | global travel-provider circuit breaker |
 | `MAPBOX_ACCESS_TOKEN`                                           | server-only             | Preview-scoped                              | Production-scoped                    | geocoding and routing                  |
 | `MAPBOX_GEOCODING_STORAGE_MODE`                                 | server-only             | `disabled` or approved `temporary`          | `disabled` until compliance approval | explicit geocoding storage boundary    |
+| `NEXT_PUBLIC_MAPBOX_MAP_TOKEN`                                  | browser-visible         | restricted to protected Preview hosts       | absent until Production approval     | Mapbox GL styles and tiles only        |
+| `MAPBOX_STYLE_URL`                                              | server-selected public  | allowlisted Mapbox style                    | allowlisted reviewed style           | fixed map style                        |
+| `MAPBOX_MAPS_ENABLED`                                           | server-only declaration | `true` only for protected map acceptance    | `false` until release approval       | map rendering circuit breaker          |
+| `MAPBOX_MAP_ADAPTER`                                            | server-only declaration | `mapbox`; deterministic local/test only     | `mapbox`                             | renderer selection                     |
 | `NPS_API_KEY`                                                   | server-only             | Preview-scoped                              | Production-scoped                    | official park records and alerts       |
 | `OPENWEATHER_API_KEY`                                           | server-only             | One Call 3.0-entitled                       | One Call 3.0-entitled                | forecast, alerts, timezone, daylight   |
 | `RIDB_API_KEY`                                                  | server-only             | Preview-scoped                              | Production-scoped                    | recreation entities and official links |
@@ -36,4 +40,4 @@ No values belong in this document or browser logs.
 
 Rotate immediately after suspected exposure and at ownership changes. Rotate service/OpenAI/Cron/Turnstile secrets independently, redeploy, verify the old credential fails, and record only the rotation timestamp and owner. A client-bundle scan must allow only `NEXT_PUBLIC_*` keys.
 
-Travel credentials must be verified only for presence and a minimal capability result. Never print, hash, export, or place values in logs/evidence. Browser code may not read any travel credential.
+Travel credentials must be verified only for presence and a minimal capability result. Never print, hash, export, or place values in logs/evidence. Browser code may not read any travel credential. The dedicated public Mapbox map token is the sole exception to server-only provider credentials: its browser exposure is intentional, its scopes and allowed URLs must be minimal, and it must never equal `MAPBOX_ACCESS_TOKEN`.

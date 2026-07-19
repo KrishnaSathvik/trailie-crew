@@ -160,3 +160,19 @@ temporary bypasses ended at zero. Vercel Authentication remains enabled.
 
 Protected Preview is `accepted` for Phase 6A.1 conditions. Production remains
 undeployed and `not_ready`.
+
+## Phase 6B protected-Preview status — July 18, 2026
+
+Phase 6B adds a strict exact-version map projection, lazy Mapbox GL renderer,
+deterministic local adapter, itinerary/map synchronization, mobile sheet,
+spatial history/compare, and privacy-redacted public maps. Local deterministic
+member and public-share flows pass, including 390×844 behavior and immediate
+share revocation.
+
+The existing accepted Phase 6A.1 protected deployment remains intact. At the
+start of Phase 6B, `hosted-acceptance` had no separate
+`NEXT_PUBLIC_MAPBOX_MAP_TOKEN`, style variable, or map enable flag. The
+server-only Mapbox token was not copied into the browser. Real SDK/style/tile
+smoke and the complete protected map flow therefore remain pending a
+minimum-scope URL-restricted browser token. No Phase 6B protected acceptance and
+no Production deployment are claimed yet.

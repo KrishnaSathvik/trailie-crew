@@ -124,3 +124,24 @@ generic ambiguity. The final protected fresh-provider run still failed closed
 with `destination_ambiguous`, so Version 1/2 snapshot and share/export acceptance
 did not complete. Vercel Authentication remained enabled, bypass and recovery
 backlogs returned to zero, and Production was not deployed.
+
+## 2026-07-18 — Phase 6B
+
+Started from `7e71983e53ae6d6b4ff8eef2b219801080f93e52` on `main`.
+Human direction required an editorial itinerary-first map, exact historical
+versions, privacy-redacted public sharing, complete non-map equivalence,
+separate browser/server tokens, verified-only routes, and no Phase 6C/7 or
+Production deployment.
+
+Codex implemented the versioned map schema and projection, narrow member/public
+database source functions, bounded route geometry normalization, lazy
+`mapbox-gl` rendering, deterministic local rendering, desktop/mobile
+itinerary-map synchronization, history/compare annotations, public redaction,
+offline/failure states, accessibility controls, and documentation. Browser
+testing first exposed an unrelated application already occupying port 3000,
+then a non-async export in a Server Actions module, and finally a mismatch
+between live evidence and the intentionally reduced immutable evidence
+snapshot. Each was corrected without widening public data or mutating history.
+The protected environment lacks a separate restricted browser token, so hosted
+map acceptance remains explicitly pending and the accepted Phase 6A.1 Preview
+was left intact.

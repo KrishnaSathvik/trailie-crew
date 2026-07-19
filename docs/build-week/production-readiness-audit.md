@@ -265,3 +265,18 @@ planning-only use, so unrestricted Mapbox use and Production remain blocked.
 Production readiness remains `not_ready`: no Production deployment occurred,
 and prior backup/restore, external alert ownership, WAF/abuse, legal/privacy,
 manual accessibility, load, and provider-compliance blockers remain open.
+
+## Phase 6B audit addendum — July 18, 2026
+
+The map implementation preserves exact-version evidence, Phase 5D revision
+scope, public-share revocation, and temporary-geocoding write barriers. A
+service-only public projection removes internal identifiers and exact private
+lodging coordinates. Route geometry is bounded and rendered only when verified;
+endpoint-only/unavailable routes do not receive a fake line. Local unit,
+database, and deterministic desktop/mobile browser acceptance is implemented.
+
+Protected hosted acceptance remains pending because the existing custom Preview
+environment does not contain a separate URL-restricted browser map token. The
+accepted Phase 6A.1 deployment was not replaced with a server-token workaround.
+Mapbox Production compliance remains conditional on written terms
+clarification. Production remains `not_ready` and undeployed.

@@ -83,6 +83,20 @@ expected. Permanent spend can occur only after an explicit permanent-mode
 configuration. Safe counters make that invocation observable without logging
 query text, coordinates, or credentials.
 
+## Phase 6B map relationship
+
+Phase 6B renders exact-version itinerary projections with Mapbox GL when a
+separate restricted public token is configured. This changes the product
+surface, but it does not automatically resolve the Geocoding API terms
+assessment. Some planning and validation operations still use geocoding outside
+the map surface. Temporary responses remain transient and excluded from
+snapshots; permanent results remain explicitly paid and configured. Production
+still requires written Mapbox/provider or qualified legal clarification for the
+complete workflow.
+
+Map load itself uses styles and tiles only. It performs no browser geocoding and
+does not add a Permanent Geocoding request.
+
 ## Open question
 
 Production use of Mapbox Geocoding remains blocked until the “in conjunction
