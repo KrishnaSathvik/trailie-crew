@@ -71,7 +71,11 @@ async function createVersionOne(browser: Browser) {
   await host.reload();
   await send(
     host,
-    "We all decided on Yosemite and must see Glacier Point sunset",
+    "We all decided on Yosemite National Park, California from July 22 through July 25, 2026. We arrive by 10 AM on July 22, depart after 4 PM on July 25, want a moderate budget, and must see Glacier Point sunset.",
+  );
+  await send(
+    member,
+    "I confirm Yosemite and Glacier Point sunset. I need accessible low-strain alternatives and peanut-free restaurant options.",
   );
   await openPlan(host);
   await host.getByRole("button", { name: "Build Our Itinerary" }).click();
@@ -82,6 +86,12 @@ async function createVersionOne(browser: Browser) {
   await expect(
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 20_000 });
+  await expect(
+    host.getByRole("button", { name: "Approve summary" }),
+  ).toBeEnabled({ timeout: 30_000 });
+  await expect(
+    member.getByRole("button", { name: "Approve summary" }),
+  ).toBeEnabled({ timeout: 30_000 });
   await host.getByRole("button", { name: "Approve summary" }).click();
   await member.getByRole("button", { name: "Approve summary" }).click();
   await member.getByRole("button", { name: "Generate Itinerary" }).click();
