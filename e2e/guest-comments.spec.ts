@@ -10,6 +10,8 @@ import {
 const hosted = process.env.HOSTED_ACCEPTANCE === "1";
 const hostedBaseUrl = process.env.HOSTED_BASE_URL;
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const workflowTimeout = (local: number, live: number) =>
+  hosted ? live : local;
 
 if (hosted && (!hostedBaseUrl || !bypassSecret))
   throw new Error("guest_hosted_acceptance_environment_incomplete");
@@ -81,7 +83,7 @@ async function createVersionOne(browser: Browser) {
   await host.getByRole("button", { name: "Build Our Itinerary" }).click();
   await expect(
     host.getByRole("heading", { name: "Before I build the trip" }),
-  ).toBeVisible({ timeout: 30_000 });
+  ).toBeVisible({ timeout: workflowTimeout(30_000, 120_000) });
   await openPlan(member);
   await expect(
     member.getByRole("heading", { name: "Before I build the trip" }),
@@ -96,7 +98,7 @@ async function createVersionOne(browser: Browser) {
   await member.getByRole("button", { name: "Approve summary" }).click();
   await member.getByRole("button", { name: "Generate Itinerary" }).click();
   await expect(host.getByText("Published itinerary · Version 1")).toBeVisible({
-    timeout: 90_000,
+    timeout: workflowTimeout(90_000, 300_000),
   });
 
   return { hostContext, memberContext, host, member, roomUrl };
@@ -119,7 +121,7 @@ async function createGuestLink(
 test("Viewer and Commenter stay pinned to one safe plan version and revoke immediately", async ({
   browser,
 }) => {
-  test.setTimeout(hosted ? 12 * 60_000 : 180_000);
+  test.setTimeout(hosted ? 18 * 60_000 : 180_000);
   const { hostContext, memberContext, host, member, roomUrl } =
     await createVersionOne(browser);
   const viewerContext = await scopedContext(browser);
@@ -201,7 +203,7 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
     await host.getByRole("button", { name: "Submit change request" }).click();
     await expect(
       host.getByRole("heading", { name: "Move an itinerary item later" }),
-    ).toBeVisible({ timeout: 30_000 });
+    ).toBeVisible({ timeout: workflowTimeout(30_000, 120_000) });
     await host.getByRole("button", { name: "Approve analysis" }).click();
     await expect(
       member.getByRole("heading", { name: "Move an itinerary item later" }),
@@ -209,14 +211,14 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
     await member.getByRole("button", { name: "Approve analysis" }).click();
     await expect(
       host.getByRole("heading", { name: "Ready to publish Version 2" }),
-    ).toBeVisible({ timeout: 90_000 });
+    ).toBeVisible({ timeout: workflowTimeout(90_000, 300_000) });
     await host.getByRole("button", { name: "Confirm Version 2" }).click();
     await expect(
       member.getByRole("heading", { name: "Ready to publish Version 2" }),
     ).toBeVisible({ timeout: 20_000 });
     await member.getByRole("button", { name: "Confirm Version 2" }).click();
     await expect(host.getByText("Published itinerary · Version 2")).toBeVisible(
-      { timeout: 30_000 },
+      { timeout: workflowTimeout(30_000, 60_000) },
     );
 
     await commenter.reload();
