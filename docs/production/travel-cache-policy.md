@@ -1,6 +1,6 @@
 # Travel cache policy
 
-Travel cache keys are SHA-256 identities over environment, provider, capability, schema version, normalized input, date/time window, route mode, and locale. Credential-like keys are removed before canonicalization. Keys never contain raw credentials or cross environments.
+Travel cache keys are version 2 SHA-256 identities over environment, provider, capability, schema version, normalized input, date/time window, route mode, and locale. Credential-like keys are removed before canonicalization. Keys never contain raw credentials or cross environments. Version 1 ambiguity/cache entries are not reused by the Phase 6A.1 resolution algorithm.
 
 | Capability                                          |  Fresh TTL | Stale use                                                                  |
 | --------------------------------------------------- | ---------: | -------------------------------------------------------------------------- |
@@ -12,10 +12,18 @@ Travel cache keys are SHA-256 identities over environment, provider, capability,
 | health                                              | 60 seconds | no reader-facing stale use                                                 |
 | negative result                                     |  2 minutes | explicit unavailable/not-found only                                        |
 
-Mapbox geocoding uses permanent-result mode because the cache is durable. Provider rules take precedence over these initial TTLs; a more restrictive provider rule shortens or disables storage.
+Mapbox geocoding does not inherit the general geocode TTL automatically.
+Disabled mode makes no request. Temporary mode bypasses durable writes and marks
+every result storage-prohibited. Permanent mode may use the geocode TTL only
+when explicitly configured and approved. Provider rules always take precedence.
 
-Fresh hits become `cached_fresh`. Safe stale hits become `stale`. Negative hits remain unavailable. Acceptance can use `TRAVEL_CACHE_BYPASS=true`; Production should not. `TRAVEL_PROVIDERS_ENABLED=false` stops live calls but still permits environment-isolated cached records and immutable historical snapshots to be read.
+Fresh hits become `cached_fresh`. Safe stale hits become `stale`. Negative hits remain unavailable. Acceptance can use `TRAVEL_CACHE_BYPASS=true`; the bypass skips both reads and writes and uses a schema-valid safe operation sentinel. Production should not use it. `TRAVEL_PROVIDERS_ENABLED=false` stops live calls but still permits environment-isolated cached records and immutable historical snapshots to be read.
 
 The database cache is forced-RLS, service-only, response-size bounded, and keyed by environment. Upsert cannot change another environment. Short-lived in-process deduplication prevents identical calls within a workflow. OpenWeather also shares one One Call payload across weather, alerts, timezone, sunrise, and sunset for the same coordinates.
 
 Cleanup removes expired cache records, old completed provider operations, completed refresh jobs, and only evidence that is neither cached nor referenced by an immutable plan snapshot. Cleanup is bounded and service-only.
+
+Provider candidates and canonical destination resolutions are separate concepts:
+temporary candidates are never cached, while the application-owned canonical NPS
+resolution is immutable and loaded by durable ID/hash. See
+[Mapbox geocoding compliance](./mapbox-geocoding-compliance.md).

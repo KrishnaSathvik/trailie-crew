@@ -245,3 +245,23 @@ behind the critical blocker. Deployment `dpl_GHch4Kd2VvBg3ercSBrQSotyyTag`
 stayed protected, temporary bypass and recovery backlog counts returned to
 zero, and Production was not deployed. Phase 6A Production readiness is
 `not_ready`.
+
+## Phase 6A.1/6A.2 audit addendum — July 18, 2026
+
+The destination propagation and OpenWeather blockers are cleared in protected
+Preview. The complete hosted flow published immutable Versions 1 and 2 with
+NPS/RIDB/OpenWeather snapshots, preserved Version 1 evidence through the narrow
+revision, passed pinned share/ICS/print and revocation, and ended with zero
+provider/recovery backlog and zero temporary bypasses. Destination resolution,
+weather/daylight, provider integration, and protected Preview are `pass`.
+
+Mapbox Permanent Geocoding cost exposure is structurally contained by explicit
+disabled/temporary/permanent modes and temporary-result write barriers. The
+account's 15 Permanent Geocoding calls produced a $5 invoice line. Mapbox's
+official documentation also restricts Geocoding API responses to use with a
+Mapbox map. Trailie does not yet have provider/legal confirmation for its
+planning-only use, so unrestricted Mapbox use and Production remain blocked.
+
+Production readiness remains `not_ready`: no Production deployment occurred,
+and prior backup/restore, external alert ownership, WAF/abuse, legal/privacy,
+manual accessibility, load, and provider-compliance blockers remain open.

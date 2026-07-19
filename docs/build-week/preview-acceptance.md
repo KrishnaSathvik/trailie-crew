@@ -136,3 +136,27 @@ official-name match, but itinerary validation still reported
 historical-share, ICS, and print tail could not run. OpenWeather One Call 3.0
 also remains unusable with the supplied credential (HTTP 401). Production was
 not deployed.
+
+## Phase 6A.1/6A.2 protected-Preview result — July 18, 2026
+
+The targeted reacceptance corrected provider-specific destination query
+normalization, equivalent-entity collapse, durable canonical identity/hash
+propagation, natural-language weather date normalization, and acceptance
+operation telemetry. Destination ambiguity severity was not reduced; two
+materially different official entities still block publication.
+
+One Call 3.0 activation and the refreshed protected credential returned live
+forecast, sunrise, and sunset evidence. Protected acceptance uses temporary
+Mapbox geocoding with structural no-storage barriers; NPS is the durable park
+identity. The documented Mapbox map-use requirement remains a Production
+compliance blocker.
+
+Deployment `dpl_A419ZJxdoq4U1zYbgwSiKPi7xjQk` passed the complete protected
+two-user flow: planning/approvals, duplicate-content repair, validated Version
+1, evidence presentation, pinned Version 1 share/ICS/print, narrow revision,
+immutable Version 2, historical Version 1 preservation, and revocation.
+Provider/recovery backlogs, browser provider requests, console problems, and
+temporary bypasses ended at zero. Vercel Authentication remains enabled.
+
+Protected Preview is `accepted` for Phase 6A.1 conditions. Production remains
+undeployed and `not_ready`.

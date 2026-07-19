@@ -6,6 +6,11 @@ Each cache miss is authorized through a service-only durable provider-request cl
 
 Stored operation metadata is limited to provider, capability, safe environment/workflow/request identity, status, cache status, safe request ID when supplied, duration, normalized error class, retryability, next retry time, and bounded cost metadata. Query text, coordinates, credentials, authorization headers, and raw payloads are forbidden.
 
+Acceptance cache bypass uses the schema-valid sentinel
+`cache_bypass_request`. The earlier shorter sentinel was rejected by the
+database request-key constraint, which hid otherwise successful provider
+operations; Phase 6A.1 adds a regression test for this boundary.
+
 Retryable classes are timeout, rate limit, and provider unavailable. Invalid input, invalid credentials/entitlement, not found, malformed response, unsupported capability, and policy rejection are not blindly retried. Multi-provider itinerary and revision work inherits the existing durable workflow claim/recovery boundary; provider cache identity prevents a recovered parent workflow from charging again for a completed call. Travel refresh jobs add bounded leases, `next_retry_at`, three-attempt ceilings, and exactly-once snapshot binding for explicit refresh work.
 
 `TRAVEL_PROVIDERS_ENABLED=false` is the global emergency switch. `TRAVEL_DISABLED_PROVIDERS` is a comma-separated allowlisted subset of `mapbox`, `openweather`, `nps`, and `ridb`. Historical snapshots remain readable and human/AI planning degrades with explicit unavailable evidence.
@@ -13,3 +18,7 @@ Retryable classes are timeout, rate limit, and provider unavailable. Invalid inp
 Operator metrics are provider/capability status, latency, cache status, normalized error class, and bounded retry state. Alert on sustained failure/rate-limit rate, invalid credentials, high latency, limit rejection, or nonzero recoverable backlog. Never log raw provider errors.
 
 Hosted acceptance must keep Vercel Authentication enabled, use server-only Preview credentials, create disposable rooms, use a one-run automation bypass only when necessary, and revoke it in `finally`. Production deployment is not authorized by Phase 6A.
+
+Permanent Mapbox geocoding invokes a safe count hook. Local and protected
+acceptance must not select permanent mode without explicit approval. See
+[Mapbox geocoding compliance](./mapbox-geocoding-compliance.md).

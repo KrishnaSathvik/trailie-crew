@@ -8,7 +8,7 @@ Phase 6A adds a strict evidence layer between external travel providers and itin
 
 - strict versioned `TravelEvidenceV1` with independent freshness, verification, confidence, availability, binding, provenance, attribution, restriction, and safe error states;
 - server-only provider adapters, input validation, HTTPS host allowlists, timeouts, response bounds, safe error classification, deterministic fixtures, and explicit unavailable adapters;
-- permanent Mapbox geocoding with ambiguity handling and Directions route evidence for driving/walking/cycling;
+- explicit disabled/temporary/permanent Mapbox geocoding modes, storage barriers, deterministic ambiguity handling, and separate Directions route evidence for driving/walking/cycling;
 - OpenWeather forecast/alerts/timezone/sunrise/sunset normalization with horizon and polar unavailable states and one-call workflow deduplication;
 - official NPS park, alert/closure, operating-hours, fee, accessibility, contact, directions, weather-summary, and URL evidence;
 - RIDB recreation-area and trusted official reservation/entity links without availability claims;
@@ -19,25 +19,32 @@ Phase 6A adds a strict evidence layer between external travel providers and itin
 
 ## Acceptance state
 
-Local gates pass: formatting, lint, type checking, 589 unit/component
-assertions, the local production build, 60 travel-provider assertions, 577
-pgTAP assertions, local Playwright, database lint, dependency audit, diff/secret
-checks, and the focused provider/snapshot/revision/recovery/quota suites. Live
-credential presence and capability smokes were checked without printing,
-hashing, exporting, or logging credential values. Mapbox geocoding/routing, NPS
-park/alerts, and RIDB recreation-area smokes returned HTTP 200. OpenWeather One
-Call 3.0 returned HTTP 401, so weather/daylight remain explicit unavailable
-evidence.
+Phase 6A.1/6A.2 reacceptance passed on July 18, 2026. Destination normalization
+now preserves the official entity type for Mapbox while using the distinctive
+name stem for NPS. Duplicate Mapbox representations of one NPS park collapse to
+one canonical NPS identity; materially different official entities remain
+ambiguous. The application-owned `CanonicalDestinationResolutionV1` is stored
+once, reloaded by durable ID and semantic hash, and preserved through generation,
+repair, validation, snapshots, and revision copying.
 
-Protected hosted acceptance is **not accepted for release**. The final
-acceptance-only deployment `dpl_GHch4Kd2VvBg3ercSBrQSotyyTag` remained behind
-Vercel Authentication, used `TRAVEL_CACHE_BYPASS=true`, and left zero temporary
-bypasses and zero provider/recovery backlog. Fresh provider diagnostics found
-one unique Mapbox/NPS official-name match, but the assembled itinerary still
-failed closed with `destination_ambiguous`; repairable duplicate-item findings
-could not run while that critical identity blocker remained. Version 1 did not
-publish, so immutable Version 1/2 hosted evidence, sharing, print, and ICS were
-not accepted. Production remains undeployed.
+OpenWeather One Call 3.0 activation and the refreshed protected credential were
+accepted with live forecast, timezone-bound daylight, sunrise, and sunset
+evidence. A deterministic parser now converts supported natural-language date
+ranges to bounded ISO dates before requesting weather.
+
+Protected deployment `dpl_A419ZJxdoq4U1zYbgwSiKPi7xjQk` remained behind Vercel
+Authentication on the `hosted-acceptance` target. The complete two-user flow
+published immutable Versions 1 and 2, preserved Version 1 evidence, rendered
+evidence safely, kept Version 1 sharing/ICS/print pinned, revoked the share, and
+ended with zero provider/recovery backlog, zero browser provider requests, zero
+console problems, and zero temporary bypasses. Production remains undeployed.
+
+Mapbox geocoding is `temporary` in protected acceptance and no temporary Mapbox
+result enters the durable cache, canonical resolution fields, semantic hashes,
+evidence rows, snapshots, or public projections. NPS supplies the durable park
+identity and coordinates. Mapbox's documented map-use restriction remains an
+external compliance question, so unrestricted use and Production remain blocked
+pending provider/legal confirmation or a compatible map surface.
 
 ## Deferred or unsupported
 

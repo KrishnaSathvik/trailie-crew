@@ -1,5 +1,30 @@
 # Codex Collaboration Log
 
+## 2026-07-18 — Phase 6A.1 destination/weather and Phase 6A.2 Mapbox boundary
+
+Started from `e3dcdf8` on `main`. Human direction kept the work narrow:
+preserve strict ambiguity, repair canonical destination propagation, accept
+OpenWeather One Call 3.0, contain Permanent Geocoding cost/storage risk, deploy
+only to protected hosted acceptance, and do not begin Phase 6B.
+
+Test-first diagnosis found three connected seams: official destination
+normalization sent only `Yosemite` to Mapbox while NPS needed that stem;
+duplicate Mapbox representations needed entity collapse by NPS park code; and
+the acceptance cache-bypass telemetry sentinel violated the database minimum
+length. A natural-language planning date range also prevented weather lookup.
+Codex added provider-specific normalization, immutable
+`CanonicalDestinationResolutionV1`, durable ID/hash propagation through repair
+and revision, safe stage traces, cache version 2, temporary Mapbox write
+barriers, explicit storage modes, natural date normalization, and schema-valid
+operation telemetry without weakening ambiguity or model-drift validation.
+
+One temporary live smoke resolved one canonical NPS park with two corroboration
+sources and returned verified Mapbox, NPS, OpenWeather forecast/daylight, and
+RIDB evidence. Protected deployment `dpl_A419ZJxdoq4U1zYbgwSiKPi7xjQk`
+completed Versions 1 and 2, immutable historical evidence, share/ICS/print,
+revocation, and zero backlogs/bypasses. Production was not deployed. The
+Mapbox-map use restriction remains an explicit compliance blocker.
+
 ## 2026-07-17 — Phase 5E provider resilience
 
 Started from clean `main` baseline `614cf33`. Upgraded the Vercel CLI to 56.3.1, diagnosed the Phase 5D upstream focused 503 plus independent aggregate recovery failure, and implemented test-first provider normalization, distinct durable focused attempts, stream completion joining, staged focused recovery, Luna retry eligibility, one logical quota reservation, safe recovery summaries, reliability UI, content-free metrics, and private migrations. Revision validation was not changed.
