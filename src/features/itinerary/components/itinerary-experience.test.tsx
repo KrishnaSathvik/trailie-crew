@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TripPlanView } from "@trailie/schemas";
+import type { GuestComment } from "@/features/guest-comments/contracts";
 import { createFakeItineraryProvider } from "../provider";
 import { ItineraryExperience } from "./itinerary-experience";
 
@@ -214,6 +215,68 @@ describe("ItineraryExperience", () => {
     ).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "Day-by-day" }));
     expect(screen.getByText("Glacier Point sunset")).toBeVisible();
+  });
+
+  it("places exact-version comments beside their itinerary item", async () => {
+    const generated = await createFakeItineraryProvider().generate({
+      operationKey: "comments-test",
+      model: "gpt-5.6-sol",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1000),
+    });
+    const plan = {
+      id,
+      roomId: id,
+      planningRequestId: id,
+      version: 1,
+      status: "published",
+      validationStatus: "pass",
+      basisSummaryVersion: 1,
+      itinerary: generated.itinerary,
+      validationSummary: null,
+      progressEvents: [],
+      createdAt: "2026-07-13T18:00:00.000Z",
+      updatedAt: "2026-07-13T18:01:00.000Z",
+      publishedAt: "2026-07-13T18:01:00.000Z",
+      errorCode: null,
+    } satisfies TripPlanView;
+    const item = plan.itinerary.days[0].items[0];
+    const comment = {
+      id: id.replace(/2$/, "8"),
+      planVersionId: id,
+      planVersion: 1,
+      dayKey: plan.itinerary.days[0].date,
+      itemKey: item.id,
+      authorType: "guest",
+      authorDisplayName: "Jordan",
+      body: "Could we start 30 minutes earlier?",
+      resolved: false,
+      deleted: false,
+      createdAt: "2026-07-19T00:10:00.000Z",
+      updatedAt: "2026-07-19T00:10:00.000Z",
+    } satisfies GuestComment;
+
+    render(
+      <ItineraryExperience
+        plan={plan}
+        commenting={{
+          mode: "member",
+          comments: [comment],
+          roomId: id,
+          participantId: id,
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Day-by-day" }));
+    const itemHeading = screen.getByRole("heading", { name: item.title });
+    const itemContainer = itemHeading.closest("li");
+    expect(itemContainer).toHaveTextContent(
+      "Could we start 30 minutes earlier?",
+    );
+    expect(
+      itemContainer?.querySelector(`[aria-label="Comments on ${item.title}"]`),
+    ).not.toBeNull();
   });
 
   it("offers an explicit retry for a transient failed generation", () => {

@@ -16,6 +16,8 @@ describe("security response proxy", () => {
   it("forces non-cacheable, non-indexable responses for token and print routes", async () => {
     for (const path of [
       "/share/opaque-token",
+      "/guest/opaque-token",
+      "/guest/plan",
       "/trips/00000000-0000-4000-8000-000000000001/plans/1/print",
     ]) {
       const response = await proxy(new NextRequest(`http://localhost${path}`));
@@ -27,5 +29,6 @@ describe("security response proxy", () => {
       );
       expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     }
+    expect(refreshSupabaseSession).toHaveBeenCalledTimes(1);
   });
 });
