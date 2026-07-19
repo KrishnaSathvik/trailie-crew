@@ -12,6 +12,7 @@ describe("createTravelProviderRegistry", () => {
       environment: {
         enabled: true,
         mapboxAccessToken: "mapbox-test",
+        mapboxGeocodingStorageMode: "temporary",
         npsApiKey: "nps-test",
         openWeatherApiKey: "weather-test",
         ridbApiKey: "ridb-test",
@@ -32,6 +33,7 @@ describe("createTravelProviderRegistry", () => {
       environment: {
         enabled: false,
         mapboxAccessToken: null,
+        mapboxGeocodingStorageMode: "disabled",
         npsApiKey: null,
         openWeatherApiKey: null,
         ridbApiKey: null,
@@ -58,6 +60,7 @@ describe("createTravelProviderRegistry", () => {
       environment: {
         enabled: true,
         mapboxAccessToken: null,
+        mapboxGeocodingStorageMode: "disabled",
         npsApiKey: null,
         openWeatherApiKey: null,
         ridbApiKey: null,
@@ -88,6 +91,7 @@ describe("createTravelProviderRegistry", () => {
       environment: {
         enabled: true,
         mapboxAccessToken: "mapbox-test",
+        mapboxGeocodingStorageMode: "temporary",
         npsApiKey: "nps-test",
         openWeatherApiKey: "weather-test",
         ridbApiKey: "ridb-test",

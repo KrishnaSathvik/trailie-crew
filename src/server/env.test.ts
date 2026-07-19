@@ -157,6 +157,7 @@ describe("server environment validation", () => {
       }),
     ).toMatchObject({
       enabled: true,
+      mapboxGeocodingStorageMode: "disabled",
       mapboxAccessToken: "mapbox-test",
       npsApiKey: "nps-test",
       openWeatherApiKey: "openweather-test",
@@ -175,12 +176,30 @@ describe("server environment validation", () => {
     ).toThrow("Travel provider server configuration is incomplete.");
   });
 
+  it("requires explicit Mapbox geocoding storage mode and never defaults to permanent", () => {
+    const configured = parseTravelProviderEnv({
+      TRAVEL_PROVIDERS_ENABLED: "true",
+      MAPBOX_ACCESS_TOKEN: "mapbox-test",
+      MAPBOX_GEOCODING_STORAGE_MODE: "temporary",
+      NPS_API_KEY: "nps-test",
+      OPENWEATHER_API_KEY: "openweather-test",
+      RIDB_API_KEY: "ridb-test",
+    });
+    expect(configured.mapboxGeocodingStorageMode).toBe("temporary");
+    expect(
+      parseTravelProviderEnv({
+        MAPBOX_GEOCODING_STORAGE_MODE: "permanent",
+      }).mapboxGeocodingStorageMode,
+    ).toBe("permanent");
+  });
+
   it("keeps planning available with null travel credentials when providers are disabled", () => {
     expect(
       parseTravelProviderEnv({ TRAVEL_PROVIDERS_ENABLED: "false" }),
     ).toEqual({
       enabled: false,
       mapboxAccessToken: null,
+      mapboxGeocodingStorageMode: "disabled",
       npsApiKey: null,
       openWeatherApiKey: null,
       ridbApiKey: null,

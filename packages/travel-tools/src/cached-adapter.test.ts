@@ -42,17 +42,57 @@ describe("cached TravelProviderAdapter", () => {
     const source = createFakeTravelProviderAdapter({ scenario: "baseline" });
     const geocode = vi.spyOn(source, "geocode");
     const cache = { get: vi.fn(), put: vi.fn() };
+    const recordRequest = vi.fn(async () => undefined);
     const adapter = createCachedTravelProviderAdapter({
       adapter: source,
       cache,
       environment: "test",
       bypass: true,
+      recordRequest,
     });
 
     await adapter.geocode({ query: "Yosemite", locale: "en-US" });
     expect(cache.get).not.toHaveBeenCalled();
     expect(cache.put).not.toHaveBeenCalled();
     expect(geocode).toHaveBeenCalledOnce();
+    expect(recordRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestKey: "cache_bypass_request",
+        cacheStatus: "bypass",
+      }),
+    );
+  });
+
+  it("never writes storage-prohibited temporary provider results", async () => {
+    const source = createFakeTravelProviderAdapter({ scenario: "baseline" });
+    const originalGeocode = source.geocode.bind(source);
+    source.geocode = async (input, signal) => {
+      const response = await originalGeocode(input, signal);
+      return {
+        ...response,
+        evidence: response.evidence.map((entry) => ({
+          ...entry,
+          restrictions: {
+            ...entry.restrictions,
+            storage: "prohibited" as const,
+          },
+        })),
+      };
+    };
+    const cache = { get: vi.fn(async () => null), put: vi.fn() };
+    const adapter = createCachedTravelProviderAdapter({
+      adapter: source,
+      cache,
+      environment: "test",
+    });
+
+    const response = await adapter.geocode({
+      query: "Yosemite",
+      locale: "en-US",
+    });
+
+    expect(response.evidence[0]?.restrictions.storage).toBe("prohibited");
+    expect(cache.put).not.toHaveBeenCalled();
   });
 
   it("enforces a provider budget before a cache-miss network call", async () => {

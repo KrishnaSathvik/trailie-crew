@@ -94,7 +94,7 @@ describe("collectDestinationTravelEvidence", () => {
       ...baseline,
       providerId: "mapbox",
       async geocode(input: { query: string }) {
-        expect(input.query).toBe("Yosemite");
+        expect(input.query).toBe("Yosemite National Park");
         return {
           state: "ambiguous" as const,
           warnings: [],
@@ -108,6 +108,22 @@ describe("collectDestinationTravelEvidence", () => {
                 ...geocode.normalizedValue,
                 data: {
                   ...geocode.normalizedValue.data,
+                  name: "Yosemite National Park",
+                },
+              },
+            },
+            {
+              ...geocode,
+              evidenceId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2",
+              sourceEntityId: "mapbox.yosemite.duplicate-representation",
+              provider: "mapbox",
+              availabilityState: "ambiguous" as const,
+              verificationState: "partially_verified" as const,
+              normalizedValue: {
+                ...geocode.normalizedValue,
+                data: {
+                  ...geocode.normalizedValue.data,
+                  canonicalPlaceId: "mapbox.yosemite.duplicate-representation",
                   name: "Yosemite National Park",
                 },
               },
@@ -184,6 +200,19 @@ describe("collectDestinationTravelEvidence", () => {
     });
 
     expect(result.destinationState).toBe("resolved");
+    expect(result.destinationResolution).toMatchObject({
+      schemaVersion: "1",
+      status: "resolved",
+      canonicalPlaceId: expect.stringMatching(/^nps:/),
+      canonicalName: "Yosemite National Park",
+      providerPlaceId: null,
+      resolutionMethod: "exact_official_match",
+      corroborationSources: ["mapbox", "nps"],
+    });
+    expect(result.destinationResolution.semanticHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(result.destinationResolution)).not.toContain(
+      "duplicate-representation",
+    );
     expect(
       result.evidence.filter((entry) => entry.evidenceType === "geocode"),
     ).toEqual([
@@ -201,5 +230,93 @@ describe("collectDestinationTravelEvidence", () => {
         (entry) => entry.evidenceType === "weather_forecast",
       ),
     ).toBe(true);
+  });
+
+  it("keeps genuinely different official destinations ambiguous", async () => {
+    const baseline = createFakeTravelProviderAdapter({
+      scenario: "baseline",
+      now: "2026-07-17T20:00:00.000Z",
+    });
+    const geocode = (
+      await baseline.geocode({ query: "Yosemite", locale: "en-US" })
+    ).evidence[0];
+    const park = (
+      await baseline.getPark({ query: "Yosemite", locale: "en-US" })
+    ).evidence[0];
+    const ambiguousGeocode = (name: string, id: string) => ({
+      ...geocode,
+      evidenceId: `evidence:mapbox:${id}`,
+      provider: "mapbox",
+      sourceEntityId: id,
+      availabilityState: "ambiguous" as const,
+      verificationState: "partially_verified" as const,
+      normalizedValue: {
+        ...geocode.normalizedValue,
+        data: { ...geocode.normalizedValue.data, name },
+      },
+    });
+    const ambiguousPark = (name: string, parkCode: string) => ({
+      ...park,
+      evidenceId: `evidence:nps:${parkCode}`,
+      provider: "nps",
+      sourceEntityId: parkCode,
+      availabilityState: "ambiguous" as const,
+      verificationState: "partially_verified" as const,
+      normalizedValue: {
+        ...park.normalizedValue,
+        data: {
+          ...park.normalizedValue.data,
+          parkCode,
+          officialName: name,
+        },
+      },
+    });
+    const result = await collectDestinationTravelEvidence({
+      destination: "Twin official park result",
+      dates: ["2026-07-18"],
+      locale: "en-US",
+      providers: {
+        geocoding: {
+          ...baseline,
+          providerId: "mapbox",
+          async geocode() {
+            return {
+              state: "ambiguous" as const,
+              warnings: [],
+              evidence: [
+                ambiguousGeocode("Alpha National Park", "alpha"),
+                ambiguousGeocode("Beta National Park", "beta"),
+              ],
+            };
+          },
+        },
+        parks: {
+          ...baseline,
+          providerId: "nps",
+          async getPark() {
+            return {
+              state: "ambiguous" as const,
+              warnings: [],
+              evidence: [
+                ambiguousPark("Alpha National Park", "alph"),
+                ambiguousPark("Beta National Park", "beta"),
+              ],
+            };
+          },
+        },
+        weather: baseline,
+        recreation: baseline,
+      },
+      maximumCallsPerProvider: 8,
+    });
+
+    expect(result.destinationState).toBe("ambiguous");
+    expect(result.destinationResolution).toMatchObject({
+      status: "ambiguous",
+      resolutionMethod: "unresolved",
+      canonicalPlaceId: null,
+      ambiguityReasons: ["multiple_materially_distinct_candidates"],
+    });
+    expect(result.callsByCapability.weather).toBeUndefined();
   });
 });

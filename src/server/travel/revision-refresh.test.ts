@@ -16,6 +16,11 @@ describe("refreshRevisionTravelEvidence", () => {
     const copySnapshots = vi.fn(async () => 4);
     const store = vi.fn(async () => crypto.randomUUID());
     const bindSnapshot = vi.fn(async () => crypto.randomUUID());
+    const destinationRepository = {
+      storeDestinationResolution: vi.fn(async () => crypto.randomUUID()),
+      loadDestinationResolution: vi.fn(),
+      bindDestinationResolutionEvidence: vi.fn(async () => crypto.randomUUID()),
+    };
 
     const result = await refreshRevisionTravelEvidence({
       requestType: "change_route",
@@ -29,7 +34,12 @@ describe("refreshRevisionTravelEvidence", () => {
         parks: fixture,
         recreation: fixture,
       },
-      repository: { copySnapshots, store, bindSnapshot },
+      repository: {
+        copySnapshots,
+        store,
+        bindSnapshot,
+        ...destinationRepository,
+      },
       locale: "en-US",
       maximumCallsPerProvider: 8,
     });
@@ -69,6 +79,11 @@ describe("refreshRevisionTravelEvidence", () => {
         copySnapshots: vi.fn(async () => 4),
         store,
         bindSnapshot,
+        storeDestinationResolution: vi.fn(async () => crypto.randomUUID()),
+        loadDestinationResolution: vi.fn(),
+        bindDestinationResolutionEvidence: vi.fn(async () =>
+          crypto.randomUUID(),
+        ),
       },
       locale: "en-US",
       maximumCallsPerProvider: 8,

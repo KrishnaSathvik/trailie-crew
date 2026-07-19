@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canonicalDestinationResolutionV1Schema,
   classifyTravelFreshness,
   semanticTravelEvidenceHashInput,
   travelEvidenceTypeSchema,
@@ -163,5 +164,42 @@ describe("TravelEvidenceV1", () => {
         providerMetadata: { requestId: "safe-request-2" },
       }),
     ).toEqual(semanticTravelEvidenceHashInput(evidence));
+  });
+
+  it("requires a resolved canonical destination to carry application-owned identity", () => {
+    const resolution = {
+      schemaVersion: "1",
+      originalQuery: "Yosemite National Park",
+      normalizedQuery: "Yosemite",
+      status: "resolved",
+      canonicalPlaceId: "nps:yose",
+      canonicalName: "Yosemite National Park",
+      providerPlaceId: null,
+      npsParkCode: "yose",
+      coordinates: { latitude: 37.8651, longitude: -119.5383 },
+      boundingBox: null,
+      locality: null,
+      region: "California",
+      country: "United States",
+      candidateCount: 3,
+      selectedCandidateIndex: 0,
+      resolutionMethod: "exact_official_match",
+      corroborationSources: ["mapbox", "nps"],
+      corroborationScore: 1,
+      confidence: "high",
+      ambiguityReasons: [],
+      evidenceIds: ["evidence:nps:yose"],
+      semanticHash: "a".repeat(64),
+    } as const;
+
+    expect(canonicalDestinationResolutionV1Schema.parse(resolution)).toEqual(
+      resolution,
+    );
+    expect(
+      canonicalDestinationResolutionV1Schema.safeParse({
+        ...resolution,
+        canonicalPlaceId: null,
+      }).success,
+    ).toBe(false);
   });
 });

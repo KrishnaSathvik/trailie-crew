@@ -3,7 +3,54 @@ import { describe, expect, it, vi } from "vitest";
 import { createMapboxAdapter } from "./mapbox";
 
 describe("Mapbox TravelProviderAdapter", () => {
+  it("performs zero geocoding requests when storage mode is not explicitly enabled", async () => {
+    const fetcher = vi.fn();
+    const adapter = createMapboxAdapter({
+      accessToken: "test-token",
+      fetcher,
+    });
+
+    const result = await adapter.geocode({
+      query: "Yosemite",
+      locale: "en-US",
+    });
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.state).toBe("unsupported");
+  });
+
+  it("uses temporary geocoding without durable storage rights", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          features: [
+            {
+              id: "place.one",
+              geometry: { coordinates: [-119.5383, 37.8651] },
+              properties: {
+                mapbox_id: "mapbox.one",
+                name: "Yosemite National Park",
+                feature_type: "place",
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const result = await createMapboxAdapter({
+      accessToken: "test-token",
+      geocodingStorageMode: "temporary",
+      fetcher,
+    }).geocode({ query: "Yosemite National Park", locale: "en-US" });
+
+    const requested = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requested.searchParams.has("permanent")).toBe(false);
+    expect(result.evidence[0]?.restrictions.storage).toBe("prohibited");
+  });
+
   it("uses permanent geocoding and preserves ambiguous matches without selecting one", async () => {
+    const onPermanentGeocodingRequest = vi.fn();
     const fetcher = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -40,6 +87,8 @@ describe("Mapbox TravelProviderAdapter", () => {
     );
     const result = await createMapboxAdapter({
       accessToken: "test-token",
+      geocodingStorageMode: "permanent",
+      onPermanentGeocodingRequest,
       fetcher,
       now: () => "2026-07-17T20:00:00.000Z",
     }).geocode({ query: "Yosemite", locale: "en-US" });
@@ -47,6 +96,7 @@ describe("Mapbox TravelProviderAdapter", () => {
     const requested = new URL(String(fetcher.mock.calls[0][0]));
     expect(requested.searchParams.get("permanent")).toBe("true");
     expect(requested.searchParams.get("limit")).toBe("10");
+    expect(onPermanentGeocodingRequest).toHaveBeenCalledOnce();
     expect(result.state).toBe("ambiguous");
     expect(result.evidence).toHaveLength(2);
     expect(result.evidence[0]).toMatchObject({
@@ -69,6 +119,7 @@ describe("Mapbox TravelProviderAdapter", () => {
   it("resolves one exact canonical match while preserving unrelated alternatives", async () => {
     const result = await createMapboxAdapter({
       accessToken: "test-token",
+      geocodingStorageMode: "temporary",
       fetcher: vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({

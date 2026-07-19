@@ -228,7 +228,123 @@ function validate(plan = itinerary(), facts = evidence()) {
   });
 }
 
+function canonicalDestination(status: "resolved" | "ambiguous" = "resolved") {
+  const semanticHash = "a".repeat(64);
+  return {
+    resolutionId: "6a000000-0000-4000-8000-000000000020",
+    semanticHash,
+    resolution: {
+      schemaVersion: "1" as const,
+      originalQuery: "Yosemite National Park",
+      normalizedQuery: "Yosemite",
+      status,
+      canonicalPlaceId: status === "resolved" ? "nps:yose" : null,
+      canonicalName: status === "resolved" ? "Yosemite National Park" : null,
+      providerPlaceId: null,
+      npsParkCode: status === "resolved" ? "yose" : null,
+      coordinates:
+        status === "resolved"
+          ? { latitude: 37.8651, longitude: -119.5383 }
+          : null,
+      boundingBox: null,
+      locality: null,
+      region: null,
+      country: null,
+      candidateCount: 3,
+      selectedCandidateIndex: status === "resolved" ? 0 : null,
+      resolutionMethod:
+        status === "resolved"
+          ? ("exact_official_match" as const)
+          : ("unresolved" as const),
+      corroborationSources: ["mapbox", "nps"],
+      corroborationScore: status === "resolved" ? 1 : 0,
+      confidence:
+        status === "resolved" ? ("high" as const) : ("medium" as const),
+      ambiguityReasons:
+        status === "ambiguous"
+          ? ["multiple_materially_distinct_candidates"]
+          : [],
+      evidenceIds: ["evidence:nps:yose"],
+      semanticHash,
+    },
+  };
+}
+
 describe("deterministic itinerary validation", () => {
+  it("trusts a hash-matched durable resolution instead of reclassifying equivalent raw candidates", async () => {
+    const response = await createFakeTravelProviderAdapter({
+      scenario: "baseline",
+    }).geocode({ query: "Yosemite", locale: "en-US" });
+    const report = validateItinerary({
+      itinerary: itinerary(),
+      approvedSummary: approvedSummary(),
+      evidence: evidence(),
+      liveEvidence: response.evidence.map((entry) => ({
+        ...entry,
+        availabilityState: "ambiguous" as const,
+      })),
+      destinationResolution: canonicalDestination("resolved"),
+      now: "2026-07-13T19:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+
+    expect(report.issues.map((entry) => entry.code)).not.toContain(
+      "destination_ambiguous",
+    );
+  });
+
+  it("keeps a genuinely ambiguous canonical resolution blocking", async () => {
+    const response = await createFakeTravelProviderAdapter({
+      scenario: "baseline",
+    }).geocode({ query: "Yosemite", locale: "en-US" });
+    const report = validateItinerary({
+      itinerary: itinerary(),
+      approvedSummary: approvedSummary(),
+      evidence: evidence(),
+      liveEvidence: response.evidence.map((entry) => ({
+        ...entry,
+        availabilityState: "ambiguous" as const,
+      })),
+      destinationResolution: canonicalDestination("ambiguous"),
+      now: "2026-07-13T19:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "destination_ambiguous",
+        severity: "critical",
+        repairable: false,
+      }),
+    );
+  });
+
+  it("classifies model destination drift separately from canonical ambiguity", () => {
+    const plan = itinerary();
+    plan.destinationSummary = "Yellowstone National Park";
+    const report = validateItinerary({
+      itinerary: plan,
+      approvedSummary: approvedSummary(),
+      evidence: evidence(),
+      destinationResolution: canonicalDestination("resolved"),
+      now: "2026-07-13T19:00:00.000Z",
+      minimumTravelBufferMinutes: 15,
+      maximumDailyDriveMinutes: 360,
+    });
+
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "destination_drift",
+        repairable: true,
+      }),
+    );
+    expect(report.issues.map((entry) => entry.code)).not.toContain(
+      "destination_ambiguous",
+    );
+  });
+
   it("passes a valid itinerary while keeping unknown costs unknown", () => {
     const report = validate();
     expect(report.status).toBe("pass");

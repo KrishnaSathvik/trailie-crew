@@ -17,7 +17,7 @@ describe("travel cache repository", () => {
         error: null,
       });
     const repository = createTravelProviderCacheRepository({ rpc });
-    const key = `travel:1:test:mapbox:geocode:${"a".repeat(64)}`;
+    const key = `travel:2:test:mapbox:geocode:${"a".repeat(64)}`;
 
     await expect(repository.get(key)).resolves.toBeNull();
     await repository.put(key, {

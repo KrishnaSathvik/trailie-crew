@@ -6,7 +6,11 @@ import {
 } from "@trailie/travel-tools";
 import type { PlanningSummary } from "@trailie/schemas";
 import { createFakeItineraryProvider } from "./provider";
-import { enrichWithTravelEvidence, processItineraryGeneration } from "./worker";
+import {
+  enrichWithTravelEvidence,
+  parseItineraryDates,
+  processItineraryGeneration,
+} from "./worker";
 import type {
   ItineraryGenerationContext,
   ItineraryRepository,
@@ -114,6 +118,15 @@ function repository() {
 }
 
 describe("itinerary worker", () => {
+  it("normalizes a bounded natural-language planning date range for weather", () => {
+    expect(parseItineraryDates(["July 22 through July 25, 2026"])).toEqual([
+      "2026-07-22",
+      "2026-07-23",
+      "2026-07-24",
+      "2026-07-25",
+    ]);
+  });
+
   it("handles an empty day without crashing during evidence enrichment", async () => {
     const output = await createFakeItineraryProvider().generate({
       operationKey: "empty-day",
@@ -259,12 +272,14 @@ describe("itinerary worker", () => {
     const { repo, calls } = repository();
     const itineraryProvider = createFakeItineraryProvider();
     const generate = vi.spyOn(itineraryProvider, "generate");
+    const repair = vi.spyOn(itineraryProvider, "repair");
     const fixture = createFakeTravelProviderAdapter({
       scenario: "baseline",
       now: "2026-07-13T19:00:00.000Z",
     });
     const store = vi.fn(async () => crypto.randomUUID());
     const bindSnapshot = vi.fn(async () => crypto.randomUUID());
+    const resolutionId = crypto.randomUUID();
 
     await processItineraryGeneration("plan-live-evidence", {
       repository: repo,
@@ -281,6 +296,34 @@ describe("itinerary worker", () => {
           store,
           bindSnapshot,
           copySnapshots: vi.fn(async () => 0),
+          storeDestinationResolution: vi.fn(async () => resolutionId),
+          loadDestinationResolution: vi.fn(async (input) => ({
+            schemaVersion: "1" as const,
+            originalQuery: "Yosemite National Park",
+            normalizedQuery: "Yosemite",
+            status: "resolved" as const,
+            canonicalPlaceId: "nps:yose",
+            canonicalName: "Yosemite National Park",
+            providerPlaceId: null,
+            npsParkCode: "yose",
+            coordinates: { latitude: 37.8651, longitude: -119.5383 },
+            boundingBox: null,
+            locality: null,
+            region: null,
+            country: null,
+            candidateCount: 1,
+            selectedCandidateIndex: 0,
+            resolutionMethod: "exact_official_match" as const,
+            corroborationSources: ["trailie-fake-v1"],
+            corroborationScore: 0.8,
+            confidence: "high" as const,
+            ambiguityReasons: [],
+            evidenceIds: [],
+            semanticHash: input.semanticHash,
+          })),
+          bindDestinationResolutionEvidence: vi.fn(async () =>
+            crypto.randomUUID(),
+          ),
         },
         maximumCallsPerProvider: 8,
       },
@@ -294,6 +337,12 @@ describe("itinerary worker", () => {
     expect(generate.mock.calls[0][0].context).toContain(
       '"evidenceType":"weather_forecast"',
     );
+    expect(generate.mock.calls[0][0].context).toContain(
+      "<CANONICAL_DESTINATION>",
+    );
+    expect(generate.mock.calls[0][0].context).toContain(resolutionId);
+    if (repair.mock.calls.length)
+      expect(repair.mock.calls[0][0].context).toContain(resolutionId);
     expect(store).toHaveBeenCalled();
     expect(bindSnapshot).toHaveBeenCalled();
     expect(bindSnapshot.mock.calls.length).toBeLessThanOrEqual(
