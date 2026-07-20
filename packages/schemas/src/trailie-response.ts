@@ -326,6 +326,33 @@ export const trailieResponseBlockV1Schema = z.discriminatedUnion("type", [
   stateBlock("empty_state"),
   stateBlock("error_state"),
 ]);
+type TrailieResponseBlockSchema =
+  (typeof trailieResponseBlockV1Schema.options)[number];
+const trailieResponseBlockSchemasV1 = {
+  markdown: markdownBlock,
+  destination_options: destinationOptionsBlock,
+  destination_comparison: destinationComparisonBlock,
+  understanding_summary: understandingSummaryBlock,
+  clarification: clarificationBlock,
+  itinerary_preview: itineraryPreviewBlock,
+  itinerary: itineraryBlock,
+  itinerary_change_summary: itineraryChangeSummaryBlock,
+  approval_status: approvalStatusBlock,
+  map_locations: mapLocationsBlock,
+  route_summary: routeSummaryBlock,
+  hotel_options: hotelOptionsBlock,
+  flight_guidance: flightGuidanceBlock,
+  booking_options: bookingOptionsBlock,
+  reservation_requirements: reservationRequirementsBlock,
+  weather_summary: weatherSummaryBlock,
+  evidence_summary: evidenceSummaryBlock,
+  warning: warningBlock,
+  empty_state: stateBlock("empty_state"),
+  error_state: stateBlock("error_state"),
+} satisfies Record<
+  z.infer<typeof trailieResponseBlockV1Schema>["type"],
+  TrailieResponseBlockSchema
+>;
 
 export const trailieResponseSourceV1Schema = z
   .object({
@@ -388,6 +415,22 @@ export const trailieResponseDraftV1Schema = z
     privacyLevel: z.enum(["room", "public"]),
   })
   .strict();
+
+export function createTrailieResponseDraftV1SchemaForBlocks(
+  blockTypes: readonly TrailieResponseBlockV1["type"][],
+) {
+  const uniqueTypes = [...new Set(blockTypes)];
+  if (uniqueTypes.length === 0)
+    throw new Error("At least one Trailie response block is required.");
+  const blockSchemas = uniqueTypes.map(
+    (blockType) => trailieResponseBlockSchemasV1[blockType],
+  ) as [TrailieResponseBlockSchema, ...TrailieResponseBlockSchema[]];
+  return trailieResponseDraftV1Schema
+    .extend({
+      blocks: z.array(z.discriminatedUnion("type", blockSchemas)).max(12),
+    })
+    .strict();
+}
 
 export const trailieResponseV1Schema = trailieResponseDraftV1Schema
   .extend({

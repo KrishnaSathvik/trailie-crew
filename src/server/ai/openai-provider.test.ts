@@ -90,6 +90,12 @@ describe("focused-answer OpenAI boundary", () => {
 
     expect(request.store).toBe(false);
     expect(request.input).toContain("<DETECTED_INTENT>direct_question");
+    expect(JSON.stringify(request.text.format.schema)).not.toContain(
+      "destination_options",
+    );
+    expect(JSON.stringify(request.text.format.schema)).toContain(
+      "evidence_summary",
+    );
     expect(request.text.format.schema.required).toEqual(
       expect.arrayContaining([
         "schemaVersion",

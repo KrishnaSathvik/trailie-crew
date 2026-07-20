@@ -16,6 +16,7 @@ const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const recoverySecret = process.env.RECOVERY_SECRET;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecret = process.env.SUPABASE_SECRET_KEY;
+const simpleSmokeOnly = process.env.PHASE8B_SIMPLE_SMOKE_ONLY === "1";
 
 test.skip(!hosted, "Run only during controlled hosted acceptance.");
 
@@ -78,10 +79,13 @@ async function sendTrailie(page: Page, text: string): Promise<BrowserTiming> {
   await expect(activity).toBeVisible({ timeout: 2_000 });
   const visibleStateMs = Math.round(performance.now() - startedAt);
   const retry = conversation.getByRole("button", { name: "Try again" });
-  await expect(trailieMessages.nth(countBefore).or(retry)).toBeVisible({
-    timeout: 90_000,
-  });
+  const failure = conversation.getByRole("alert");
+  await expect(
+    trailieMessages.nth(countBefore).or(retry).or(failure),
+  ).toBeVisible({ timeout: 90_000 });
   if (await retry.isVisible().catch(() => false)) await retry.click();
+  else if (await failure.isVisible().catch(() => false))
+    throw new Error("trailie_hosted_answer_failed");
   await expect(trailieMessages).toHaveCount(countBefore + 1, {
     timeout: 120_000,
   });
@@ -179,12 +183,46 @@ test("protected hosted Phase 8B runtime benchmark and acceptance", async ({
     .getByLabel("Private invitation link")
     .inputValue();
 
-  for (const request of [
-    "@Trailie Say hello in one short sentence.",
-    "@Trailie Give me one concise packing reminder.",
-    "@Trailie Name one good question for a travel crew.",
-  ])
+  const simpleRequests = simpleSmokeOnly
+    ? ["@Trailie Say hello in one short sentence."]
+    : [
+        "@Trailie Say hello in one short sentence.",
+        "@Trailie Give me one concise packing reminder.",
+        "@Trailie Name one good question for a travel crew.",
+      ];
+  for (const request of simpleRequests)
     browserTimings.push(await sendTrailie(page, request));
+
+  if (simpleSmokeOnly) {
+    await expect
+      .poll(
+        async () =>
+          (
+            (await runtimeReport(roomId, windowStartedAt)) as {
+              requestCount?: number;
+            }
+          ).requestCount ?? 0,
+        { timeout: 15_000 },
+      )
+      .toBe(1);
+    const report = await runtimeReport(roomId, windowStartedAt);
+    expect(report).toMatchObject({
+      requestCount: 1,
+      categories: { normal_chat: expect.any(Object) },
+      failures: 0,
+    });
+    expect(browserProviderRequests).toEqual([]);
+    expect(browserProblems).toEqual([]);
+    console.log(
+      `PHASE8B_HOSTED_SIMPLE_SMOKE ${JSON.stringify({
+        status: "pass",
+        browserTimings,
+        report,
+      })}`,
+    );
+    await context.close();
+    return;
+  }
 
   const beforeContext = await memoryVersion(roomId);
   await send(

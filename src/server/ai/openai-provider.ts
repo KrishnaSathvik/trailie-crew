@@ -3,6 +3,7 @@ import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import {
+  createTrailieResponseDraftV1SchemaForBlocks,
   trailieResponseDraftV1Schema,
   type TrailieIntent,
 } from "@trailie/schemas";
@@ -47,7 +48,10 @@ export function buildFocusedAnswerRequest(input: {
     ].join("\n\n"),
     reasoning: { effort: "low" as const },
     text: {
-      format: zodTextFormat(focusedAnswerModelSchema, "trailie_focused_answer"),
+      format: zodTextFormat(
+        createTrailieResponseDraftV1SchemaForBlocks(policy.outputBlocks),
+        "trailie_focused_answer",
+      ),
     },
     max_output_tokens: 900,
     safety_identifier: input.safetyIdentifier,
