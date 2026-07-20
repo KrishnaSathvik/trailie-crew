@@ -119,9 +119,7 @@ export function SuggestionThread({
       );
       reset();
       setMessage(
-        editing
-          ? "Suggestion updated."
-          : "Suggestion sent for crew review.",
+        editing ? "Suggestion updated." : "Suggestion sent for crew review.",
       );
     } else {
       setMessage(
@@ -184,9 +182,7 @@ export function SuggestionThread({
                 aria-label={`Suggestion type for ${target.label}`}
                 value={suggestionType}
                 onChange={(event) =>
-                  setSuggestionType(
-                    event.target.value as GuestSuggestionType,
-                  )
+                  setSuggestionType(event.target.value as GuestSuggestionType)
                 }
                 className="border-border mt-1 min-h-10 w-full rounded-md border bg-transparent px-3"
               >

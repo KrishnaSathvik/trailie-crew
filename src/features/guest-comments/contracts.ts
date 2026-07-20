@@ -46,9 +46,7 @@ export const guestSuggestionStatusSchema = z.enum([
   "dismissed",
   "converted",
 ]);
-export type GuestSuggestionStatus = z.infer<
-  typeof guestSuggestionStatusSchema
->;
+export type GuestSuggestionStatus = z.infer<typeof guestSuggestionStatusSchema>;
 export const guestSuggestionTitleSchema = safePlainText.max(120);
 export const guestSuggestionDetailsSchema = safePlainText.max(2000);
 

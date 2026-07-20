@@ -58,8 +58,7 @@ function mapError(error: { message?: string } | null): GuestActionError {
   if (/rate limited/i.test(message)) return "rate_limited";
   if (/membership|authentication/i.test(message)) return "permission_denied";
   if (/expiration/i.test(message)) return "invalid_expiration";
-  if (/no longer applies/i.test(message))
-    return "suggestion_no_longer_applies";
+  if (/no longer applies/i.test(message)) return "suggestion_no_longer_applies";
   if (/immutable/i.test(message)) return "suggestion_immutable";
   return "guest_unavailable";
 }
@@ -575,8 +574,7 @@ export async function convertGuestSuggestionAction(
   });
   if (error) return { ok: false, error: mapError(error) };
   const result = conversionSchema.safeParse(data);
-  if (!result.success)
-    return { ok: false, error: "suggestion_unavailable" };
+  if (!result.success) return { ok: false, error: "suggestion_unavailable" };
   if (result.data.revisionRequestId && result.data.created)
     schedulePlanChange(result.data.revisionRequestId);
   return { ok: true, data: result.data };

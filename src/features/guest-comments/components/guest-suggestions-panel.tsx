@@ -7,10 +7,7 @@ import {
   dismissGuestSuggestionAction,
   listMemberGuestSuggestionsAction,
 } from "../actions";
-import type {
-  GuestSuggestion,
-  GuestSuggestionStatus,
-} from "../contracts";
+import type { GuestSuggestion, GuestSuggestionStatus } from "../contracts";
 
 const filters: Array<{ value: GuestSuggestionStatus; label: string }> = [
   { value: "open", label: "Open" },
@@ -48,10 +45,7 @@ export function GuestSuggestionsPanel({
     return () => window.clearTimeout(timer);
   }, [refresh]);
 
-  async function convert(
-    suggestion: GuestSuggestion,
-    confirmRebase: boolean,
-  ) {
+  async function convert(suggestion: GuestSuggestion, confirmRebase: boolean) {
     setBusy(true);
     setMessage(null);
     const result = await convertGuestSuggestionAction({
@@ -148,8 +142,8 @@ export function GuestSuggestionsPanel({
               {confirming.warning}
             </p>
             <p className="text-muted-foreground mt-2 text-xs">
-              Trailie will re-resolve the target and stop safely if it no
-              longer applies.
+              Trailie will re-resolve the target and stop safely if it no longer
+              applies.
             </p>
             <div className="mt-3 flex gap-2">
               <button

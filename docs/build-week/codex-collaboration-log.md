@@ -170,3 +170,15 @@ snapshot. Each was corrected without widening public data or mutating history.
 The protected environment lacks a separate restricted browser token, so hosted
 map acceptance remains explicitly pending and the accepted Phase 6A.1 Preview
 was left intact.
+
+## 2026-07-19 — Phase 6C.2 protected acceptance
+
+Started from commits `d169cfe` and `91d9e68` on `main`. The guest-suggestion
+migration was applied to the linked Supabase project and local/remote migration
+state matched. Focused Vitest (37 tests), focused pgTAP (5 tests), lint,
+typecheck, formatting, and the network-enabled production build passed. The
+protected Vercel deployment `dpl_ERLVqTMtjZGsguKhH4EWoQdHDPtN` reached READY
+with Authentication enabled and zero bypasses afterward. The hosted E2E could
+not start because this environment lacks a Supabase access token for retrieving
+the hosted test keys; no bypass was retained and unrestricted Production was
+not deployed.
