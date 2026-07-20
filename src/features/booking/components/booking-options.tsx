@@ -29,11 +29,15 @@ function BookingOptionsDrawer({ handoffs }: { handoffs: BookingHandoff[] }) {
   return (
     <details className="border-border mt-8 rounded-md border">
       <summary className="cursor-pointer list-none px-5 py-4 font-semibold">
-        Booking options <span className="text-muted-foreground text-sm">({handoffs.length})</span>
+        Booking options{" "}
+        <span className="text-muted-foreground text-sm">
+          ({handoffs.length})
+        </span>
       </summary>
       <div className="border-border border-t px-5 py-4">
         <p className="text-muted-foreground mb-4 text-sm">
-          Trailie does not complete bookings. Continue on the official or approved provider site.
+          Trailie does not complete bookings. Continue on the official or
+          approved provider site.
         </p>
         <ul className="divide-border divide-y">
           {handoffs.map((handoff) => (
@@ -42,7 +46,8 @@ function BookingOptionsDrawer({ handoffs }: { handoffs: BookingHandoff[] }) {
                 <div>
                   <p className="font-semibold">{handoff.title}</p>
                   <p className="text-muted-foreground mt-1 text-xs capitalize">
-                    {handoff.provider} · {label(handoff.category)} · {label(handoff.bookingRequirement)}
+                    {handoff.provider} · {label(handoff.category)} ·{" "}
+                    {label(handoff.bookingRequirement)}
                   </p>
                 </div>
                 <a
@@ -51,14 +56,21 @@ function BookingOptionsDrawer({ handoffs }: { handoffs: BookingHandoff[] }) {
                   rel="noreferrer noopener"
                   className="text-sm font-semibold underline underline-offset-4"
                 >
-                  {handoff.officialOrApproved ? "Open official site" : "Open provider"}
+                  {handoff.officialOrApproved
+                    ? "Open official site"
+                    : "Open provider"}
                 </a>
               </div>
               <p className="text-muted-foreground mt-2 text-xs capitalize">
-                Availability {label(handoff.availabilityState)} · Price {label(handoff.priceState)}
-                {handoff.retrievedAt ? ` · Checked ${new Date(handoff.retrievedAt).toLocaleString()}` : ""}
+                Availability {label(handoff.availabilityState)} · Price{" "}
+                {label(handoff.priceState)}
+                {handoff.retrievedAt
+                  ? ` · Checked ${new Date(handoff.retrievedAt).toLocaleString()}`
+                  : ""}
               </p>
-              {handoff.warning ? <p className="mt-2 text-xs font-medium">{handoff.warning}</p> : null}
+              {handoff.warning ? (
+                <p className="mt-2 text-xs font-medium">{handoff.warning}</p>
+              ) : null}
             </li>
           ))}
         </ul>

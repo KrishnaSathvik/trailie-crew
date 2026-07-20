@@ -182,3 +182,15 @@ with Authentication enabled and zero bypasses afterward. The hosted E2E could
 not start because this environment lacks a Supabase access token for retrieving
 the hosted test keys; no bypass was retained and unrestricted Production was
 not deployed.
+
+## 2026-07-20 — Phase 7 booking handoffs
+
+Implemented the narrow booking-discovery boundary: exact-version private
+handoffs, forced RLS, safe click metadata, HTTPS/allowlisted provider URL
+validation, and a compact booking-options drawer with official/approved
+disclosure. Trailie does not complete bookings and never claims guaranteed
+price or inventory. Handoffs are server-created from trusted evidence; private
+traveler data is excluded from search URLs. Focused contract tests and 8 pgTAP
+assertions pass. Hosted acceptance and Production deployment remain pending;
+checkout, payments, reservations, notifications, and booking confirmation are
+out of scope.

@@ -1,0 +1,12 @@
+begin;
+select plan(8);
+select has_table('private','booking_handoffs','booking handoffs table exists');
+select has_table('private','booking_handoff_clicks','safe click analytics table exists');
+select ok((select relrowsecurity and relforcerowsecurity from pg_class where oid='private.booking_handoffs'::regclass),'handoffs force RLS');
+select ok((select relrowsecurity and relforcerowsecurity from pg_class where oid='private.booking_handoff_clicks'::regclass),'clicks force RLS');
+select ok(not has_table_privilege('anon','private.booking_handoffs','select'),'browser cannot read private handoffs');
+select ok(not has_table_privilege('authenticated','private.booking_handoff_clicks','insert'),'browser cannot write analytics directly');
+select ok(not has_function_privilege('anon','public.store_booking_handoff(jsonb)','execute'),'browser cannot store handoffs');
+select ok(not has_function_privilege('authenticated','public.store_booking_handoff(jsonb)','execute'),'members cannot bypass server handoff path');
+select * from finish();
+rollback;
