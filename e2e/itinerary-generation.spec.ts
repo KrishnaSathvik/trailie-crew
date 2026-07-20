@@ -104,6 +104,21 @@ test("approved crew receives one repaired, validated, immutable itinerary", asyn
   await expect(
     member.getByText("Published itinerary · Version 1"),
   ).toBeVisible();
+  await member.getByRole("button", { name: "Chat" }).first().click();
+  await send(member, "@Trailie What time does the hike start?");
+  await expect(
+    member.getByText("I couldn’t verify that detail from the current plan."),
+  ).toBeVisible({ timeout: 20_000 });
+  await send(member, "@Trailie What changed from Version 1?");
+  await expect(
+    member
+      .getByLabel("Trip conversation")
+      .getByRole("article", { name: "Message from Trailie" })
+      .filter({
+        hasText:
+          "I couldn’t verify the exact changes from the available plan details.",
+      }),
+  ).toBeVisible({ timeout: 20_000 });
 
   await member.setViewportSize({ width: 390, height: 844 });
   expect(

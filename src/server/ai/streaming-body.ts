@@ -4,12 +4,17 @@ export class StructuredBodyExtractor {
   private escaped = false;
   private unicode = "";
 
+  constructor(private readonly field = "body") {}
+
   push(chunk: string) {
     if (this.state === "done") return "";
     let source = chunk;
     if (this.state === "search") {
       this.searchBuffer += chunk;
-      const match = /"body"\s*:\s*"/.exec(this.searchBuffer);
+      const escapedField = this.field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = new RegExp(`"${escapedField}"\\s*:\\s*"`).exec(
+        this.searchBuffer,
+      );
       if (!match) {
         this.searchBuffer = this.searchBuffer.slice(-32);
         return "";

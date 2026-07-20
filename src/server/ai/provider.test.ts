@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createFakeFocusedAnswerProvider } from "./provider";
+import type { FocusedAnswerProviderInput } from "./provider";
 
 describe("deterministic fake provider", () => {
   it("streams ordered safe text and returns a validated answer", async () => {
@@ -9,14 +10,16 @@ describe("deterministic fake provider", () => {
       request: "compare driving and flying",
       context: "context",
       model: "gpt-5.6-terra",
+      intent: "destination_comparison",
       safetyIdentifier: "trailie_test",
       signal: new AbortController().signal,
     });
     let text = "";
     for await (const delta of stream.textDeltas) text += delta;
     const result = await stream.completed;
-    expect(text).toBe(result.answer.body);
-    expect(result.answer.responseType).toBe("comparison");
+    expect(text).toBe(result.answer.message);
+    expect(result.answer.intent).toBe("destination_comparison");
+    expect(result.answer.blocks[0]?.type).toBe("destination_comparison");
     expect(result.usage.totalTokens).toBeGreaterThan(0);
   });
 
@@ -26,6 +29,7 @@ describe("deterministic fake provider", () => {
       request: "simulate provider failure",
       context: "",
       model: "gpt-5.6-terra",
+      intent: "direct_question",
       safetyIdentifier: "trailie_test",
       signal: new AbortController().signal,
     });
@@ -36,11 +40,12 @@ describe("deterministic fake provider", () => {
 
   it("fails once and succeeds on a deliberate retry when configured", async () => {
     const provider = createFakeFocusedAnswerProvider({ failOnce: true });
-    const input = {
+    const input: FocusedAnswerProviderInput = {
       operationKey: "retryable-operation",
       request: "simulate provider failure",
       context: "",
       model: "gpt-5.6-terra",
+      intent: "direct_question",
       safetyIdentifier: "trailie_test",
       signal: new AbortController().signal,
     };
@@ -52,6 +57,6 @@ describe("deterministic fake provider", () => {
     const second = await provider.stream(input);
     let body = "";
     for await (const delta of second.textDeltas) body += delta;
-    expect(body).toMatch(/focused question/i);
+    expect(body).toMatch(/couldn’t verify current details/i);
   });
 });

@@ -131,6 +131,42 @@ describe("Phase 1C message mappers", () => {
       createdAt,
       editedAt: null,
       deletedAt: null,
+      trailieResponse: null,
+    });
+  });
+
+  it("maps the validated Trailie contract without exposing invocation metadata", () => {
+    expect(
+      mapRoomMessage({
+        ...rawMessage,
+        message_type: "trailie",
+        trailie_response: {
+          schemaVersion: "1",
+          responseId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950c0",
+          sourceMessageId: rawMessage.id,
+          createdAt: rawMessage.created_at,
+          intent: "direct_question",
+          message: "October can work, with seasonal tradeoffs.",
+          blocks: [
+            {
+              type: "markdown",
+              markdown: "October can work, with seasonal tradeoffs.",
+            },
+          ],
+          warnings: [],
+          sources: [],
+          assumptions: [],
+          unresolvedQuestions: [],
+          suggestedActions: [],
+          persistenceDirective: "none",
+          approvalDirective: "not_required",
+          freshness: "not_applicable",
+          privacyLevel: "room",
+        },
+      }).trailieResponse,
+    ).toMatchObject({
+      intent: "direct_question",
+      message: "October can work, with seasonal tradeoffs.",
     });
   });
 

@@ -32,6 +32,7 @@ export function mapRoomMessage(row: DbRoomMessage): RoomMessage {
     participantId: row.participant_id,
     messageType: row.message_type,
     body: row.body,
+    trailieResponse: row.trailie_response ?? null,
     clientMessageId: row.client_message_id,
     replyToMessageId: row.reply_to_message_id,
     sender: {

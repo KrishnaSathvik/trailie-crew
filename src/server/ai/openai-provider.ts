@@ -2,9 +2,13 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { trailieFocusedAnswerSchema } from "@trailie/schemas";
+import {
+  trailieResponseDraftV1Schema,
+  type TrailieIntent,
+} from "@trailie/schemas";
 
 import { FOCUSED_ANSWER_PROMPT } from "@/features/trailie/prompts/focused-answer";
+import { getTrailieIntentPolicy } from "@/features/trailie/intelligence/intent";
 import { createOpenAIClient } from "@/server/ai/openai-client";
 import {
   TrailieProviderError,
@@ -15,28 +19,32 @@ import { StructuredBodyExtractor } from "@/server/ai/streaming-body";
 import { extractUsage } from "@/server/ai/usage";
 import { normalizeProviderError } from "@/server/ai/reliability-policy";
 
-const focusedAnswerModelSchema = trailieFocusedAnswerSchema
-  .extend({
-    title: trailieFocusedAnswerSchema.shape.title.unwrap().nullable(),
-    comparisonItems: trailieFocusedAnswerSchema.shape.comparisonItems
-      .unwrap()
-      .nullable(),
-    followUpQuestion: trailieFocusedAnswerSchema.shape.followUpQuestion
-      .unwrap()
-      .nullable(),
-  })
-  .strict();
+const focusedAnswerModelSchema = trailieResponseDraftV1Schema;
 
 export function buildFocusedAnswerRequest(input: {
   model: string;
   safetyIdentifier: string;
   context: string;
   request: string;
+  intent: TrailieIntent;
 }) {
+  const policy = getTrailieIntentPolicy(input.intent);
   return {
     model: input.model,
     instructions: FOCUSED_ANSWER_PROMPT,
-    input: `${input.context}\n\n<CURRENT EXPLICIT REQUEST>\n${input.request}\n</CURRENT EXPLICIT REQUEST>`,
+    input: [
+      input.context,
+      `<DETECTED_INTENT>${input.intent}</DETECTED_INTENT>`,
+      `<INTENT_POLICY>${JSON.stringify({
+        permittedTools: policy.permittedTools,
+        outputBlocks: policy.outputBlocks,
+        persistence: policy.persistence,
+        approvalRequired: policy.approvalRequired,
+        externalEvidence: policy.externalEvidence,
+        safeFallback: policy.safeFallback,
+      })}</INTENT_POLICY>`,
+      `<CURRENT_EXPLICIT_REQUEST>${input.request}</CURRENT_EXPLICIT_REQUEST>`,
+    ].join("\n\n"),
     reasoning: { effort: "low" as const },
     text: {
       format: zodTextFormat(focusedAnswerModelSchema, "trailie_focused_answer"),
@@ -48,18 +56,7 @@ export function buildFocusedAnswerRequest(input: {
 }
 
 export function normalizeFocusedAnswerModelOutput(value: unknown) {
-  const parsed = focusedAnswerModelSchema.parse(value);
-  return trailieFocusedAnswerSchema.parse({
-    responseType: parsed.responseType,
-    body: parsed.body,
-    ...(parsed.title === null ? {} : { title: parsed.title }),
-    ...(parsed.comparisonItems === null
-      ? {}
-      : { comparisonItems: parsed.comparisonItems }),
-    ...(parsed.followUpQuestion === null
-      ? {}
-      : { followUpQuestion: parsed.followUpQuestion }),
-  });
+  return focusedAnswerModelSchema.parse(value);
 }
 
 export function mapFocusedProviderError(error: unknown) {
@@ -130,6 +127,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
             safetyIdentifier: input.safetyIdentifier,
             context: input.context,
             request: input.request,
+            intent: input.intent,
           }),
           { signal: input.signal },
         );
@@ -161,7 +159,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
 
       return {
         textDeltas: (async function* () {
-          const extractor = new StructuredBodyExtractor();
+          const extractor = new StructuredBodyExtractor("message");
           try {
             for await (const event of stream) {
               if (event.type !== "response.output_text.delta") continue;

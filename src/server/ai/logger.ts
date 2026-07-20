@@ -17,6 +17,12 @@ type SafeAiLog = {
   providerStatus?: string | number | null;
   recoveryCount?: number;
   quotaStatus?: string;
+  detectedIntent?: string;
+  selectedTools?: readonly string[];
+  contextSections?: readonly string[];
+  responseContractVersion?: string;
+  validationResult?: "pass" | "failed";
+  repairCount?: number;
 };
 
 export function logAiEvent(event: string, metadata: SafeAiLog) {
@@ -35,5 +41,11 @@ export function logAiEvent(event: string, metadata: SafeAiLog) {
     providerStatus: metadata.providerStatus,
     recoveryCount: metadata.recoveryCount,
     quotaStatus: metadata.quotaStatus,
+    detectedIntent: metadata.detectedIntent,
+    selectedTools: metadata.selectedTools,
+    contextSections: metadata.contextSections,
+    responseContractVersion: metadata.responseContractVersion,
+    validationResult: metadata.validationResult,
+    repairCount: metadata.repairCount,
   });
 }

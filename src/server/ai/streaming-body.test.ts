@@ -4,21 +4,21 @@ import { StructuredBodyExtractor } from "./streaming-body";
 
 describe("safe structured body streaming", () => {
   it("emits only decoded body text and never envelope metadata", () => {
-    const extractor = new StructuredBodyExtractor();
+    const extractor = new StructuredBodyExtractor("message");
     const chunks = [
-      '{"responseType":"plain_answer","bo',
-      'dy":"Drive \\"early\\"',
-      '.","title":"Secret"}',
+      '{"schemaVersion":"1","mes',
+      'sage":"Drive \\"early\\"',
+      '.","intent":"direct_question"}',
     ];
     const output = chunks.map((chunk) => extractor.push(chunk)).join("");
     expect(output).toBe('Drive "early".');
-    expect(output).not.toContain("responseType");
-    expect(output).not.toContain("Secret");
+    expect(output).not.toContain("schemaVersion");
+    expect(output).not.toContain("direct_question");
   });
 
   it("decodes escaped newlines across chunk boundaries", () => {
-    const extractor = new StructuredBodyExtractor();
-    expect(extractor.push('{"body":"Line one\\')).toBe("Line one");
+    const extractor = new StructuredBodyExtractor("message");
+    expect(extractor.push('{"message":"Line one\\')).toBe("Line one");
     expect(extractor.push('nLine two"}')).toBe("\nLine two");
   });
 });

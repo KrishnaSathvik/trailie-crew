@@ -4,6 +4,7 @@ import { MessageCircle, Sparkles } from "lucide-react";
 
 import type { ReactionType } from "@trailie/schemas";
 import type { ClientRoomMessage } from "@/features/chat/lib/chat-state";
+import { TrailieResponse } from "@/features/trailie/rendering/trailie-response";
 
 import { ReactionControls } from "./reaction-controls";
 
@@ -100,9 +101,13 @@ export function MessageList({
                   </span>
                 </blockquote>
               ) : null}
-              <p className="mt-2 text-[0.9375rem] leading-6 break-words whitespace-pre-wrap">
-                {message.body}
-              </p>
+              {isTrailie && message.trailieResponse ? (
+                <TrailieResponse response={message.trailieResponse} />
+              ) : (
+                <p className="mt-2 text-[0.9375rem] leading-6 break-words whitespace-pre-wrap">
+                  {message.body}
+                </p>
+              )}
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <ReactionControls
                   message={message}

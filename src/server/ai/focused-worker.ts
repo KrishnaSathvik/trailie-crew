@@ -2,10 +2,12 @@ import "server-only";
 
 import { z } from "zod";
 import {
-  trailieResponseEnvelopeSchema,
-  type TrailieResponseEnvelope,
+  trailieResponseV1Schema,
+  type TrailieResponseV1,
 } from "@trailie/schemas";
 
+import { classifyTrailieIntent } from "@/features/trailie/intelligence/intent";
+import { finalizeTrailieResponse } from "@/features/trailie/intelligence/response-contract";
 import { parseOpenAIEnv, requireAiGeneration } from "@/server/env";
 import { assembleFocusedContext } from "@/server/ai/context";
 import { consumeFocusedStream } from "@/server/ai/focused-stream";
@@ -77,12 +79,12 @@ export type FocusedRecoveryDependencies = {
   complete(
     invocationId: string,
     runId: string,
-    envelope: TrailieResponseEnvelope,
-    result: ProviderAttemptExecutionResult<TrailieResponseEnvelope>,
+    envelope: TrailieResponseV1,
+    result: ProviderAttemptExecutionResult<TrailieResponseV1>,
   ): Promise<void>;
   fail(invocationId: string, runId: string, code: string): Promise<void>;
   provider: FocusedAnswerProvider;
-  attempts: DurableProviderAttemptController<TrailieResponseEnvelope>;
+  attempts: DurableProviderAttemptController<TrailieResponseV1>;
   policy: WorkflowReliabilityPolicy;
   quota(
     subject: AiQuotaSubject & { invocationId: string; model: string },
@@ -119,6 +121,7 @@ export async function processFocusedRecovery(
     maxCharacters: 12_000,
     requiredMessageIds: [context.sourceMessageId],
   });
+  const intent = classifyTrailieIntent({ request: context.normalizedRequest });
   const quota = dependencies.quota({
     userId: context.userId,
     roomId: context.roomId,
@@ -147,17 +150,30 @@ export async function processFocusedRecovery(
             request: context.normalizedRequest,
             context: focusedContext.text,
             model: context.model,
+            intent,
             safetyIdentifier: dependencies.safetyIdentifier(context.userId),
             signal,
           }),
         );
         const result = consumed.result;
-        const envelope = trailieResponseEnvelopeSchema.parse({
-          schemaVersion: "1",
-          ...result.answer,
+        const envelope = finalizeTrailieResponse({
+          draft: result.answer,
+          expectedIntent: intent,
+          responseId: invocationId,
           sourceMessageId: context.sourceMessageId,
-          status: "completed",
+          now: new Date().toISOString(),
+          referenceResolutionStatus:
+            intent === "itinerary_revision" ? "unresolved" : undefined,
         });
+        const responseRepairCount =
+          result.answer.message !== envelope.message ||
+          JSON.stringify(result.answer.blocks) !==
+            JSON.stringify(envelope.blocks) ||
+          result.answer.privacyLevel !== envelope.privacyLevel ||
+          JSON.stringify(result.answer.unresolvedQuestions) !==
+            JSON.stringify(envelope.unresolvedQuestions)
+            ? 1
+            : 0;
         return {
           value: envelope,
           responseId: result.responseId,
@@ -166,10 +182,10 @@ export async function processFocusedRecovery(
           providerDurationMs: Date.now() - providerStartedAt,
           totalDurationMs: Date.now() - startedAt,
           retryCount,
-          repairCount: 0,
+          repairCount: responseRepairCount,
         };
       },
-      parse: (value) => trailieResponseEnvelopeSchema.parse(value),
+      parse: (value) => trailieResponseV1Schema.parse(value),
       afterStage: async (result) => {
         providerResultStaged = true;
         await quota.reconcile(result.usage.totalTokens ?? 4_000);
@@ -238,10 +254,23 @@ function productionDependencies(): FocusedRecoveryDependencies {
       return typeof record.run_id === "string" ? record.run_id : null;
     },
     async complete(invocationId, runId, envelope, result) {
+      const { error: stageError } = await admin.rpc(
+        "stage_ai_response_contract",
+        {
+          target_invocation_id: invocationId,
+          target_run_id: runId,
+          validated_response_contract: envelope,
+          target_detected_intent: envelope.intent,
+          target_context_sections: ["recent_messages"],
+          target_validation_result: "pass",
+          target_repair_count: result.repairCount,
+        },
+      );
+      if (stageError) throw new Error("focused_contract_application_failed");
       const { error } = await admin.rpc("complete_ai_run", {
         target_invocation_id: invocationId,
         target_run_id: runId,
-        response_body: envelope.body,
+        response_body: envelope.message,
         provider_response_id: result.responseId,
         provider_request_id: result.requestId,
         used_input_tokens: result.usage.inputTokens,
@@ -262,7 +291,7 @@ function productionDependencies(): FocusedRecoveryDependencies {
     },
     provider,
     attempts: createDurableProviderAttemptController(
-      createProviderAttemptRepository<TrailieResponseEnvelope>(),
+      createProviderAttemptRepository<TrailieResponseV1>(),
     ),
     policy: environment.reliabilityPolicy,
     quota({ userId, roomId, invocationId, model }) {

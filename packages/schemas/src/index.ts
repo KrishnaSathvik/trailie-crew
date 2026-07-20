@@ -6,9 +6,11 @@ import {
   travelFreshnessStateSchema,
   travelVerificationStateSchema,
 } from "./travel-evidence";
+import { trailieResponseV1Schema } from "./trailie-response";
 
 export * from "./travel-evidence";
 export * from "./map-projection";
+export * from "./trailie-response";
 
 export const tripIdSchema = z.string().trim().min(1).brand("TripId");
 
@@ -87,14 +89,6 @@ export const evidenceStrengthSchema = z.enum([
   "strong",
   "tentative",
 ]);
-export const trailieResponseTypeSchema = z.enum([
-  "plain_answer",
-  "comparison",
-  "clarifying_question",
-  "warning",
-  "error",
-]);
-
 const tripNameSchema = z.string().trim().min(1).max(100);
 const displayNameSchema = z.string().trim().min(1).max(50);
 const roomCodeSchema = z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/);
@@ -239,31 +233,6 @@ export const trailieInvocationDecisionSchema = z.discriminatedUnion("invoked", [
     .strict(),
 ]);
 
-export const trailieComparisonItemSchema = z
-  .object({
-    label: z.string().min(1).max(80),
-    detail: z.string().min(1).max(500),
-  })
-  .strict();
-
-export const trailieFocusedAnswerSchema = z
-  .object({
-    responseType: trailieResponseTypeSchema,
-    body: z.string().trim().min(1).max(4000),
-    title: z.string().trim().min(1).max(120).optional(),
-    comparisonItems: z.array(trailieComparisonItemSchema).max(6).optional(),
-    followUpQuestion: z.string().trim().min(1).max(300).optional(),
-  })
-  .strict();
-
-export const trailieResponseEnvelopeSchema = trailieFocusedAnswerSchema
-  .extend({
-    schemaVersion: z.literal("1"),
-    sourceMessageId: z.uuid().optional(),
-    status: z.literal("completed"),
-  })
-  .strict();
-
 export const trailieStreamEventSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("invocation_started"), invocationId: z.uuid() })
@@ -282,7 +251,7 @@ export const trailieStreamEventSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("response_completed"),
-      response: trailieResponseEnvelopeSchema,
+      response: trailieResponseV1Schema,
     })
     .strict(),
   z
@@ -1504,6 +1473,7 @@ export const roomMessageSchema = z
     participantId: z.uuid(),
     messageType: messageTypeSchema,
     body: z.string().min(1).max(4000),
+    trailieResponse: trailieResponseV1Schema.nullable().optional(),
     clientMessageId: z.uuid().nullable(),
     replyToMessageId: z.uuid().nullable(),
     sender: messageSenderSummarySchema,
@@ -1600,11 +1570,6 @@ export type TypingEvent = z.infer<typeof typingEventSchema>;
 export type TrailieInvocationType = z.infer<typeof trailieInvocationTypeSchema>;
 export type TrailieInvocationDecision = z.infer<
   typeof trailieInvocationDecisionSchema
->;
-export type TrailieResponseType = z.infer<typeof trailieResponseTypeSchema>;
-export type TrailieFocusedAnswer = z.infer<typeof trailieFocusedAnswerSchema>;
-export type TrailieResponseEnvelope = z.infer<
-  typeof trailieResponseEnvelopeSchema
 >;
 export type TrailieStreamEvent = z.infer<typeof trailieStreamEventSchema>;
 export type AiInvocationStatus = z.infer<typeof aiInvocationStatusSchema>;

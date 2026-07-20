@@ -1,9 +1,27 @@
 import { z } from "zod";
 import {
-  trailieResponseEnvelopeSchema,
+  itinerarySchema,
+  planVersionSummarySchema,
+  roomMemorySnapshotSchema,
+  trailieResponseV1Schema,
   trailieStreamEventSchema,
+  tripPlanViewSchema,
+  type TrailieResponseV1,
 } from "@trailie/schemas";
 
+import {
+  buildTrailieContext,
+  type TrailieContextSection,
+} from "@/features/trailie/intelligence/context";
+import {
+  classifyTrailieIntent,
+  getTrailieIntentPolicy,
+} from "@/features/trailie/intelligence/intent";
+import { finalizeTrailieResponse } from "@/features/trailie/intelligence/response-contract";
+import {
+  resolveTrailieReference,
+  type TrailieReferenceEntity,
+} from "@/features/trailie/intelligence/reference-resolution";
 import { authorizeTrailieSource } from "@/features/trailie/invocation/authorize-source";
 import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
 import { parseOpenAIEnv } from "@/server/env";
@@ -42,6 +60,7 @@ const inputSchema = z
     roomId: z.uuid(),
     participantId: z.uuid(),
     sourceMessageId: z.uuid(),
+    entityId: z.string().trim().min(1).max(200).nullable().optional(),
   })
   .strict();
 
@@ -49,6 +68,92 @@ type SafeRecord = Record<string, unknown>;
 const asRecord = (value: unknown) =>
   typeof value === "object" && value !== null ? (value as SafeRecord) : {};
 const asString = (value: unknown) => (typeof value === "string" ? value : null);
+
+function memoryValue(value: unknown) {
+  const record = asRecord(value);
+  for (const key of ["text", "question", "startDate", "endDate"]) {
+    const item = asString(record[key]);
+    if (item) return item;
+  }
+  return null;
+}
+
+function factValues(items: unknown) {
+  return Array.isArray(items)
+    ? items
+        .map((item) => memoryValue(asRecord(item).value))
+        .filter((item): item is string => item !== null)
+    : [];
+}
+
+function boundedJson(value: unknown, maximum = 5_000) {
+  const serialized = JSON.stringify(value);
+  return serialized.length <= maximum
+    ? serialized
+    : `${serialized.slice(0, maximum - 1)}…`;
+}
+
+export function parseRoomMemory(roomId: string, value: unknown) {
+  const root = asRecord(value);
+  const snapshot = asRecord(root.snapshot ?? value);
+  return roomMemorySnapshotSchema.safeParse({
+    roomId,
+    memoryVersion: snapshot.memory_version ?? snapshot.memoryVersion ?? 0,
+    participantProfiles:
+      snapshot.participant_profiles ?? snapshot.participantProfiles ?? {},
+    sharedContext: snapshot.shared_context ??
+      snapshot.sharedContext ?? {
+        destinationsUnderConsideration: [],
+        dateWindows: [],
+        budgetContext: [],
+        transportContext: [],
+        lodgingContext: [],
+      },
+    confirmedDecisions:
+      snapshot.confirmed_decisions ?? snapshot.confirmedDecisions ?? [],
+    rejectedOptions:
+      snapshot.rejected_options ?? snapshot.rejectedOptions ?? [],
+    openQuestions: snapshot.open_questions ?? snapshot.openQuestions ?? [],
+    updatedAt:
+      snapshot.updated_at ?? snapshot.updatedAt ?? "1970-01-01T00:00:00.000Z",
+  });
+}
+
+function planEntities(value: unknown): TrailieReferenceEntity[] {
+  const parsed = itinerarySchema.safeParse(value);
+  if (!parsed.success) return [];
+  return [
+    ...parsed.data.lodging.map((item) => ({
+      id: item.id,
+      kind: "hotel" as const,
+      label: item.name,
+      aliases: [item.area],
+    })),
+    ...parsed.data.days.flatMap((day) =>
+      day.items.map((item) => ({
+        id: item.id,
+        kind: "itinerary_item" as const,
+        label: item.title,
+        aliases: item.location ? [item.location.name, item.type] : [item.type],
+      })),
+    ),
+  ];
+}
+
+const contextSectionNames = new Set<TrailieContextSection>([
+  "trip",
+  "requester_permissions",
+  "shared_trip_context",
+  "crew_signals",
+  "recent_messages",
+  "current_plan",
+  "version_history",
+  "planning",
+  "revision",
+  "selected_lodging",
+  "selected_flights",
+  "evidence",
+]);
 
 function jsonError(code: string, status: number) {
   return Response.json({ code }, { status });
@@ -202,13 +307,11 @@ export async function POST(request: Request) {
   if (replyTarget && !contextRows.some((item) => item.id === replyTarget.id)) {
     contextRows.push(replyTarget);
   }
-  const participantIds = [
-    ...new Set(contextRows.map((item) => item.participant_id)),
-  ];
-  const { data: contextParticipants } = await admin
+  const { data: contextParticipants } = await client
     .from("participants")
     .select("id,display_name")
-    .in("id", participantIds);
+    .eq("room_id", parsed.data.roomId)
+    .eq("status", "active");
   const names = new Map(
     (contextParticipants ?? []).map((item) => [item.id, item.display_name]),
   );
@@ -230,12 +333,264 @@ export async function POST(request: Request) {
       requiredMessageIds: [source.id, ...(replyTarget ? [replyTarget.id] : [])],
     },
   );
+  const intent = classifyTrailieIntent({ request: decision.normalizedRequest });
+  const [
+    roomResult,
+    memoryResult,
+    planResult,
+    planningResult,
+    revisionResult,
+    versionResult,
+  ] = await Promise.all([
+    client.from("rooms").select("*").eq("id", parsed.data.roomId).maybeSingle(),
+    admin.rpc("get_private_room_memory", {
+      target_room_id: parsed.data.roomId,
+    }),
+    client.rpc("get_trip_plan", {
+      target_room_id: parsed.data.roomId,
+    }),
+    client
+      .from("planning_requests")
+      .select("*")
+      .eq("room_id", parsed.data.roomId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from("plan_change_requests")
+      .select("*")
+      .eq("room_id", parsed.data.roomId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client.rpc("list_plan_versions", {
+      target_room_id: parsed.data.roomId,
+    }),
+  ]);
+  if (roomResult.error || !roomResult.data || memoryResult.error) {
+    logOperation("trailie_ai.context_failed", {
+      correlationId,
+      workflow: "focused_answer",
+      status: "failed",
+      errorCode: roomResult.error
+        ? `room_context_unavailable:${roomResult.error.code ?? "unknown"}`
+        : memoryResult.error
+          ? "memory_context_unavailable"
+          : "room_context_missing",
+    });
+    return jsonError("context_unavailable", 503);
+  }
+
+  const memory = parseRoomMemory(parsed.data.roomId, memoryResult.data);
+  if (!memory.success) {
+    logOperation("trailie_ai.context_failed", {
+      correlationId,
+      workflow: "focused_answer",
+      status: "failed",
+      errorCode: "memory_context_invalid",
+    });
+    return jsonError("context_unavailable", 503);
+  }
+  const [planningApprovalsResult, revisionApprovalsResult] = await Promise.all([
+    planningResult.data
+      ? client
+          .from("planning_approvals")
+          .select("participant_id,decision")
+          .eq("planning_request_id", planningResult.data.id)
+      : Promise.resolve({ data: [], error: null }),
+    revisionResult.data
+      ? client
+          .from("plan_change_approvals")
+          .select("participant_id,decision")
+          .eq("change_request_id", revisionResult.data.id)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const shared = memory.data.sharedContext;
+  const participantProfiles = Object.values(memory.data.participantProfiles);
+  const currentPlan = tripPlanViewSchema.nullable().safeParse(planResult.data);
+  const planVersions = z
+    .array(planVersionSummarySchema)
+    .safeParse(versionResult.data);
+  const intentPolicy = getTrailieIntentPolicy(intent);
+  const requiredContextFailed =
+    (intentPolicy.requiredContext.includes("current_plan") &&
+      (Boolean(planResult.error) || !currentPlan.success)) ||
+    (intentPolicy.requiredContext.includes("planning") &&
+      Boolean(planningResult.error)) ||
+    (intentPolicy.requiredContext.includes("revision") &&
+      Boolean(revisionResult.error)) ||
+    (intentPolicy.requiredContext.includes("version_history") &&
+      (Boolean(versionResult.error) || !planVersions.success)) ||
+    (intentPolicy.requiredContext.includes("approvals") &&
+      (Boolean(planningApprovalsResult.error) ||
+        Boolean(revisionApprovalsResult.error)));
+  if (requiredContextFailed) {
+    logOperation("trailie_ai.context_failed", {
+      correlationId,
+      workflow: "focused_answer",
+      status: "failed",
+      errorCode: "required_context_unavailable",
+    });
+    return jsonError("context_unavailable", 503);
+  }
+  const requestedSections = new Set<TrailieContextSection>([
+    "trip",
+    "requester_permissions",
+    "recent_messages",
+    ...intentPolicy.requiredContext.filter(
+      (section): section is TrailieContextSection =>
+        contextSectionNames.has(section as TrailieContextSection),
+    ),
+  ]);
+  if (intentPolicy.requiredContext.includes("approvals")) {
+    requestedSections.add("planning");
+    requestedSections.add("revision");
+  }
+  if (intentPolicy.externalEvidence !== "not_required")
+    requestedSections.add("evidence");
+  if (intent.startsWith("lodging_")) requestedSections.add("selected_lodging");
+  if (intent.startsWith("flight_")) requestedSections.add("selected_flights");
+  const currentItinerary =
+    currentPlan.success && currentPlan.data?.itinerary
+      ? itinerarySchema.safeParse(currentPlan.data.itinerary)
+      : null;
+  const referenceResolution = resolveTrailieReference({
+    request: decision.normalizedRequest,
+    explicitEntityId: parsed.data.entityId,
+    materialChange: intent === "itinerary_revision",
+    recentEntities: [],
+    currentEntities:
+      currentPlan.success && currentPlan.data?.itinerary
+        ? planEntities(currentPlan.data.itinerary)
+        : [],
+    versionEntities: (planVersions.success ? planVersions.data : []).map(
+      (plan) => ({
+        id: plan.tripPlanId,
+        kind: "plan_version" as const,
+        label: `Version ${plan.version}`,
+        version: plan.version,
+      }),
+    ),
+  });
+  const trailieContext = buildTrailieContext({
+    trip: {
+      id: roomResult.data.id,
+      name: roomResult.data.name,
+      approvalMode: roomResult.data.approval_mode,
+    },
+    requester: {
+      participantId: participant.id,
+      role: participant.role,
+    },
+    recentMessages: context.messages.map((message) => ({
+      id: message.id,
+      author: message.displayName,
+      body: message.body,
+      createdAt: message.createdAt,
+    })),
+    sharedMemory: {
+      destinations: factValues(shared.destinationsUnderConsideration),
+      dates: factValues(shared.dateWindows),
+      decisions: factValues(memory.data.confirmedDecisions),
+      openQuestions: memory.data.openQuestions
+        .map((item) => item.question)
+        .filter(Boolean),
+    },
+    crewSignals: {
+      preferences: participantProfiles.flatMap((profile) => [
+        ...factValues(profile.preferences),
+        ...factValues(profile.mustDos),
+      ]),
+      constraints: participantProfiles.flatMap((profile) => [
+        ...factValues(profile.constraints),
+        ...factValues(profile.avoids),
+      ]),
+    },
+    currentPlan:
+      currentPlan.success && currentPlan.data
+        ? {
+            id: currentPlan.data.id,
+            version: currentPlan.data.version,
+            status: currentPlan.data.status,
+            summary: boundedJson(currentPlan.data.itinerary),
+          }
+        : null,
+    versionHistory: (planVersions.success ? planVersions.data : []).map(
+      (plan) => ({
+        id: plan.tripPlanId,
+        version: plan.version,
+        publishedAt: plan.publishedAt,
+        changeSummary: plan.changeSummary,
+        isCurrent: plan.isCurrent,
+      }),
+    ),
+    planning: planningResult.data
+      ? {
+          id: planningResult.data.id,
+          status: planningResult.data.status,
+          summaryVersion: planningResult.data.current_summary_version,
+          approvalMode: planningResult.data.approval_mode,
+          approvals: (planningApprovalsResult.data ?? []).map((approval) => ({
+            crewMember: names.get(approval.participant_id) ?? "A crew member",
+            decision: approval.decision,
+          })),
+        }
+      : null,
+    revision: revisionResult.data
+      ? {
+          id: revisionResult.data.id,
+          status: revisionResult.data.status,
+          basePlanVersion: revisionResult.data.base_plan_version,
+          requestType: revisionResult.data.request_type,
+          request: revisionResult.data.request_text,
+          approvals: (revisionApprovalsResult.data ?? []).map((approval) => ({
+            crewMember: names.get(approval.participant_id) ?? "A crew member",
+            decision: approval.decision,
+          })),
+          referenceResolution,
+        }
+      : intent === "itinerary_revision" || intent === "version_question"
+        ? { referenceResolution }
+        : null,
+    selectedLodging: currentItinerary?.success
+      ? currentItinerary.data.lodging.map((lodging) => ({
+          name: lodging.name,
+          area: lodging.area,
+          checkInDate: lodging.checkInDate,
+          checkOutDate: lodging.checkOutDate,
+          location: lodging.location.name,
+          reservationStatus: lodging.reservation.status,
+        }))
+      : [],
+    selectedFlights: currentItinerary?.success
+      ? [
+          ...currentItinerary.data.arrivals.map((arrival) => ({
+            direction: "arrival",
+            date: arrival.date,
+            localTime: arrival.localTime,
+            location: arrival.location.name,
+            mode: arrival.mode,
+            reference: arrival.reference,
+          })),
+          ...currentItinerary.data.departures.map((departure) => ({
+            direction: "departure",
+            date: departure.date,
+            localTime: departure.localTime,
+            location: departure.location.name,
+            mode: departure.mode,
+            reference: departure.reference,
+          })),
+        ]
+      : [],
+    evidence: [],
+    requestedSections: [...requestedSections],
+  });
   const route = createModelRouter({
     conversation: environment.conversationModel,
     flagship: environment.flagshipModel,
   }).route({
     request: decision.normalizedRequest,
-    contextCharacters: context.text.length,
+    contextCharacters: trailieContext.text.length,
   });
 
   const { data: runData, error: runError } = await admin.rpc("start_ai_run", {
@@ -272,7 +627,7 @@ export async function POST(request: Request) {
       };
       emit({ type: "invocation_started", invocationId });
       try {
-        type Envelope = z.infer<typeof trailieResponseEnvelopeSchema>;
+        type Envelope = TrailieResponseV1;
         const attempts = createDurableProviderAttemptController<Envelope>(
           createProviderAttemptRepository<Envelope>(),
         );
@@ -313,8 +668,9 @@ export async function POST(request: Request) {
               await providerFor(environment).stream({
                 operationKey: invocationId,
                 request: decision.normalizedRequest,
-                context: context.text,
+                context: trailieContext.text,
                 model: route.model,
+                intent,
                 safetyIdentifier: createSafetyIdentifier(
                   authData.user.id,
                   environment.safetyHmacSecret,
@@ -322,15 +678,26 @@ export async function POST(request: Request) {
                 signal,
               }),
             );
+            const result = consumed.result;
+            const envelope = finalizeTrailieResponse({
+              draft: result.answer,
+              expectedIntent: intent,
+              responseId: invocationId,
+              sourceMessageId: parsed.data.sourceMessageId,
+              now: new Date().toISOString(),
+              referenceResolutionStatus: referenceResolution.status,
+            });
+            const responseRepairCount =
+              result.answer.message !== envelope.message ||
+              JSON.stringify(result.answer.blocks) !==
+                JSON.stringify(envelope.blocks) ||
+              result.answer.privacyLevel !== envelope.privacyLevel ||
+              JSON.stringify(result.answer.unresolvedQuestions) !==
+                JSON.stringify(envelope.unresolvedQuestions)
+                ? 1
+                : 0;
             for (const delta of consumed.bufferedDeltas)
               emit({ type: "text_delta", delta });
-            const result = consumed.result;
-            const envelope = trailieResponseEnvelopeSchema.parse({
-              schemaVersion: "1",
-              ...result.answer,
-              sourceMessageId: parsed.data.sourceMessageId,
-              status: "completed",
-            });
             return {
               value: envelope,
               responseId: result.responseId,
@@ -339,21 +706,35 @@ export async function POST(request: Request) {
               providerDurationMs: Date.now() - providerStartedAt,
               totalDurationMs: Date.now() - startedAt,
               retryCount,
-              repairCount: 0,
+              repairCount: responseRepairCount,
             } satisfies ProviderAttemptExecutionResult<Envelope>;
           },
-          parse: (value) => trailieResponseEnvelopeSchema.parse(value),
+          parse: (value) => trailieResponseV1Schema.parse(value),
           afterStage: async (result) => {
             providerResultStaged = true;
             await durableQuota.reconcile(result.usage.totalTokens ?? 4_000);
           },
           apply: async (envelope, result) => {
+            const { error: stageError } = await admin.rpc(
+              "stage_ai_response_contract",
+              {
+                target_invocation_id: invocationId,
+                target_run_id: runId,
+                validated_response_contract: envelope,
+                target_detected_intent: intent,
+                target_context_sections: trailieContext.usedSections,
+                target_validation_result: "pass",
+                target_repair_count: result.repairCount,
+              },
+            );
+            if (stageError)
+              throw new TrailieProviderError("invalid_model_response", false);
             const { error: completeError } = await admin.rpc(
               "complete_ai_run",
               {
                 target_invocation_id: invocationId,
                 target_run_id: runId,
-                response_body: envelope.body,
+                response_body: envelope.message,
                 provider_response_id: result.responseId,
                 provider_request_id: result.requestId,
                 used_input_tokens: result.usage.inputTokens,
@@ -384,6 +765,12 @@ export async function POST(request: Request) {
           providerStatus: "completed",
           recoveryCount: outcome.recovered ? 1 : 0,
           quotaStatus: "reconciled",
+          detectedIntent: intent,
+          selectedTools: [],
+          contextSections: trailieContext.usedSections,
+          responseContractVersion: "1",
+          validationResult: "pass",
+          repairCount: outcome.result.repairCount,
         });
       } catch (error) {
         if (quota && !providerResultStaged)

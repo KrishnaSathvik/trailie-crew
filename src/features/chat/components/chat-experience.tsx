@@ -392,7 +392,7 @@ export function ChatExperience({
           );
         } else if (event.type === "response_completed") {
           setTrailieAnswer((current) =>
-            current ? { ...current, body: event.response.body } : null,
+            current ? { ...current, body: event.response.message } : null,
           );
           await refreshLatest();
           setTrailieAnswer(null);

@@ -255,6 +255,7 @@ export type DbRoomMessage = {
   participant_id: string;
   message_type: MessageType;
   body: string;
+  trailie_response?: Json | null;
   client_message_id: string | null;
   reply_to_message_id: string | null;
   sender: {
@@ -486,6 +487,18 @@ export type Database = {
           used_cached_input_tokens: number | null;
           used_total_tokens: number | null;
           measured_latency_ms: number;
+        };
+        Returns: Json;
+      };
+      stage_ai_response_contract: {
+        Args: {
+          target_invocation_id: string;
+          target_run_id: string;
+          validated_response_contract: Json;
+          target_detected_intent: string;
+          target_context_sections: string[];
+          target_validation_result: string;
+          target_repair_count: number;
         };
         Returns: Json;
       };

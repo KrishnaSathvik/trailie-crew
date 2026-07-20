@@ -37,7 +37,21 @@ describe("focused stream completion contract", () => {
 
   it("returns visible text only after a validated completion exists", async () => {
     const result = {
-      answer: { responseType: "plain_answer" as const, body: "Complete." },
+      answer: {
+        schemaVersion: "1" as const,
+        intent: "direct_question" as const,
+        message: "Complete.",
+        blocks: [{ type: "markdown" as const, markdown: "Complete." }],
+        warnings: [],
+        sources: [],
+        assumptions: [],
+        unresolvedQuestions: [],
+        suggestedActions: [],
+        persistenceDirective: "none" as const,
+        approvalDirective: "not_required" as const,
+        freshness: "not_applicable" as const,
+        privacyLevel: "room" as const,
+      },
       responseId: "resp_1",
       requestId: "req_1",
       usage: {

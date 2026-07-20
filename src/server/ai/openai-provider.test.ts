@@ -38,7 +38,7 @@ describe("focused-answer OpenAI boundary", () => {
     });
   });
 
-  it("builds a strict model schema with nullable optional app fields", async () => {
+  it("builds the strict TrailieResponseV1 draft schema", async () => {
     const providerModule = (await import("./openai-provider")) as Record<
       string,
       unknown
@@ -52,7 +52,10 @@ describe("focused-answer OpenAI boundary", () => {
         safetyIdentifier: string;
         context: string;
         request: string;
+        intent: string;
       }) => {
+        store: boolean;
+        input: string;
         text: {
           format: {
             schema: {
@@ -67,19 +70,25 @@ describe("focused-answer OpenAI boundary", () => {
       safetyIdentifier: "trailie_safe",
       context: "bounded context",
       request: "What should we pack?",
+      intent: "direct_question",
     });
 
-    expect(request.text.format.schema.required).toEqual([
-      "responseType",
-      "body",
-      "title",
-      "comparisonItems",
-      "followUpQuestion",
-    ]);
-    expect(request.text.format.schema.properties).toHaveProperty("title");
+    expect(request.store).toBe(false);
+    expect(request.input).toContain("<DETECTED_INTENT>direct_question");
+    expect(request.text.format.schema.required).toEqual(
+      expect.arrayContaining([
+        "schemaVersion",
+        "intent",
+        "message",
+        "blocks",
+        "sources",
+        "persistenceDirective",
+        "approvalDirective",
+      ]),
+    );
   });
 
-  it("normalizes model nulls back to omitted app fields", async () => {
+  it("normalizes a schema-valid response draft", async () => {
     const providerModule = (await import("./openai-provider")) as Record<
       string,
       unknown
@@ -90,16 +99,28 @@ describe("focused-answer OpenAI boundary", () => {
     expect(
       (
         normalize as (value: unknown) => {
-          responseType: string;
-          body: string;
+          intent: string;
+          message: string;
         }
       )({
-        responseType: "plain_answer",
-        body: "Pack layers.",
-        title: null,
-        comparisonItems: null,
-        followUpQuestion: null,
+        schemaVersion: "1",
+        intent: "direct_question",
+        message: "Pack layers.",
+        blocks: [{ type: "markdown", markdown: "Pack layers." }],
+        warnings: [],
+        sources: [],
+        assumptions: [],
+        unresolvedQuestions: [],
+        suggestedActions: [],
+        persistenceDirective: "none",
+        approvalDirective: "not_required",
+        freshness: "not_applicable",
+        privacyLevel: "room",
       }),
-    ).toEqual({ responseType: "plain_answer", body: "Pack layers." });
+    ).toMatchObject({
+      schemaVersion: "1",
+      intent: "direct_question",
+      message: "Pack layers.",
+    });
   });
 });
