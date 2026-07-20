@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { scheduleItineraryGeneration } from "./scheduler";
 import {
+  cancelItineraryAction,
   generateItineraryAction,
   getTripPlanAction,
   retryItineraryAction,
@@ -74,5 +75,17 @@ describe("itinerary actions", () => {
       error: "unknown_error",
     });
     expect(createServerSupabaseClient).not.toHaveBeenCalled();
+  });
+
+  it("stops active generation without scheduling another worker", async () => {
+    const rpc = client({ id, status: "stopped" });
+    await expect(
+      cancelItineraryAction({ tripPlanId: id, participantId: id }),
+    ).resolves.toEqual({ ok: true, data: { id, status: "stopped" } });
+    expect(rpc).toHaveBeenCalledWith("cancel_itinerary_generation", {
+      target_trip_plan_id: id,
+      target_participant_id: id,
+    });
+    expect(scheduleItineraryGeneration).not.toHaveBeenCalled();
   });
 });

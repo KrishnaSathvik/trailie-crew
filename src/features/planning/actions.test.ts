@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { schedulePlanningSummary } from "./scheduler";
 import {
+  cancelPlanningSummaryAction,
   createPlanningRequestAction,
   reviewPlanningSummaryAction,
 } from "./actions";
@@ -52,5 +53,19 @@ describe("planning actions", () => {
       }),
     ).resolves.toEqual({ ok: false, error: "changes_note_required" });
     expect(createServerSupabaseClient).not.toHaveBeenCalled();
+  });
+  it("stops active summary generation without scheduling another worker", async () => {
+    const rpc = client({ id, status: "cancelled" });
+    await expect(
+      cancelPlanningSummaryAction({
+        planningRequestId: id,
+        participantId: id,
+      }),
+    ).resolves.toEqual({ ok: true, data: { id, status: "cancelled" } });
+    expect(rpc).toHaveBeenCalledWith("cancel_planning_generation", {
+      target_request_id: id,
+      target_participant_id: id,
+    });
+    expect(schedulePlanningSummary).not.toHaveBeenCalled();
   });
 });

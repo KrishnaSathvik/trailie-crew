@@ -124,3 +124,25 @@ export async function getTripPlanAction(
     ? { ok: true, data: plan.data }
     : { ok: false, error: "unknown_error" };
 }
+
+export async function cancelItineraryAction(
+  input: unknown,
+): Promise<Result<{ id: string; status: "stopped" }>> {
+  const parsed = z
+    .object({ tripPlanId: z.uuid(), participantId: z.uuid() })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "unknown_error" };
+  const supabase = await client();
+  if (!supabase) return { ok: false, error: "membership_required" };
+  const { data, error } = await supabase.rpc("cancel_itinerary_generation", {
+    target_trip_plan_id: parsed.data.tripPlanId,
+    target_participant_id: parsed.data.participantId,
+  });
+  if (error) return { ok: false, error: map(error) };
+  const result = z
+    .object({ id: z.uuid(), status: z.literal("stopped") })
+    .strict()
+    .parse(data);
+  return { ok: true, data: result };
+}

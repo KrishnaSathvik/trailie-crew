@@ -6,6 +6,7 @@ import {
   sendMessageAction,
   toggleReactionAction,
 } from "@/features/chat/actions/chat-actions";
+import { invokeTrailieStream } from "@/features/trailie/streaming/invoke-trailie";
 
 import { ChatExperience } from "./chat-experience";
 
@@ -13,6 +14,10 @@ vi.mock("@/features/chat/actions/chat-actions", () => ({
   sendMessageAction: vi.fn(),
   toggleReactionAction: vi.fn(),
   getRoomMessagesAction: vi.fn(),
+}));
+
+vi.mock("@/features/trailie/streaming/invoke-trailie", () => ({
+  invokeTrailieStream: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/browser", () => ({
@@ -66,7 +71,12 @@ const data = {
 };
 
 describe("ChatExperience", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(invokeTrailieStream).mockImplementation(async function* () {
+      return;
+    });
+  });
 
   it("renders an actionable empty conversation without a Trailie response", () => {
     render(<ChatExperience data={data} onPresenceChange={vi.fn()} />);
@@ -161,6 +171,51 @@ describe("ChatExperience", () => {
       "Offline draft",
     );
     expect(screen.getByRole("button", { name: "Retry message" })).toBeVisible();
+  });
+
+  it("shows an immediate honest state and retains Stopped after cancellation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(sendMessageAction).mockImplementation(async (input) => ({
+      ok: true,
+      data: {
+        id: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950b5",
+        roomId: data.room.id,
+        participantId: data.currentParticipant.id,
+        messageType: "user",
+        body: (input as { body: string }).body,
+        clientMessageId: (input as { clientMessageId: string }).clientMessageId,
+        replyToMessageId: null,
+        sender: {
+          participantId: data.currentParticipant.id,
+          displayName: "Maya",
+          role: "host",
+        },
+        reply: null,
+        reactions: [],
+        createdAt: "2026-07-13T18:01:00.000Z",
+        editedAt: null,
+        deletedAt: null,
+      },
+    }));
+    vi.mocked(invokeTrailieStream).mockImplementation(async function* (input) {
+      await new Promise<void>((_resolve, reject) => {
+        input.signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Stopped", "AbortError")),
+          { once: true },
+        );
+      });
+    });
+
+    render(<ChatExperience data={data} onPresenceChange={vi.fn()} />);
+    await user.type(
+      screen.getByLabelText("Message your crew"),
+      "@Trailie help us pack{enter}",
+    );
+    expect(await screen.findByText("Reading the conversation")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Stop Trailie" }));
+    expect(await screen.findByText("Stopped")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 
   it("rolls an optimistic reaction back when the mutation fails", async () => {

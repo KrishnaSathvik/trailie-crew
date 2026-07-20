@@ -129,7 +129,9 @@ export function MapWorkspace({
   // Keep the server render and the browser's first render identical. Node can
   // expose a partial `navigator` without `onLine`, so reading it during state
   // initialization causes the public map to hydrate from two different trees.
-  const [online, setOnline] = useState(true);
+  const [online, setOnline] = useState(() =>
+    typeof window === "undefined" ? true : window.navigator.onLine,
+  );
   const cardRefs = useRef(new Map<string, HTMLElement>());
   const itemDetails = useMemo(
     () =>
@@ -179,7 +181,6 @@ export function MapWorkspace({
     );
 
   useEffect(() => {
-    setOnline(window.navigator.onLine);
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
     window.addEventListener("online", handleOnline);

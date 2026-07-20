@@ -16,6 +16,7 @@ const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 
 describe("ItineraryExperience", () => {
   it("shows persisted semantic progress without model reasoning", () => {
+    const onCancel = vi.fn();
     const plan: TripPlanView = {
       id,
       roomId: id,
@@ -51,10 +52,12 @@ describe("ItineraryExperience", () => {
       publishedAt: null,
       errorCode: null,
     };
-    render(<ItineraryExperience plan={plan} />);
+    render(<ItineraryExperience plan={plan} onCancel={onCancel} />);
     expect(screen.getByText("Checking routes and timing")).toBeVisible();
     expect(screen.getByText("Adjusting a scheduling conflict")).toBeVisible();
     expect(screen.queryByText(/reasoning/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
   it("renders published overview, day, travel, stay, food, evidence, and trip-check views", async () => {

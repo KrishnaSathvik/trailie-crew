@@ -7,6 +7,7 @@ import type {
   ParticipantRole,
 } from "@trailie/schemas";
 import {
+  cancelItineraryAction,
   generateItineraryAction,
   getTripPlanAction,
   retryItineraryAction,
@@ -14,6 +15,7 @@ import {
 import { ItineraryExperience } from "@/features/itinerary/components/itinerary-experience";
 import { RevisionExperience } from "@/features/revisions/components/revision-experience";
 import {
+  cancelPlanningSummaryAction,
   createPlanningRequestAction,
   getPlanningRequestAction,
   regeneratePlanningSummaryAction,
@@ -74,6 +76,7 @@ export function PlanExperience({
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [slowRequestId, setSlowRequestId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
@@ -97,7 +100,13 @@ export function PlanExperience({
       if (timer !== null) window.clearInterval(timer);
     };
   }, [plan?.status, refresh]);
-  async function start() {
+  useEffect(() => {
+    if (!request || !["draft", "generating_summary"].includes(request.status))
+      return;
+    const timer = window.setTimeout(() => setSlowRequestId(request.id), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [request]);
+  async function start(replace = false) {
     setStarting(true);
     setError(null);
     const result = await createPlanningRequestAction({ roomId, participantId });
@@ -106,23 +115,24 @@ export function PlanExperience({
       setError("The planning summary could not be started.");
       return;
     }
-    setRequest(
-      (current) =>
-        current ?? {
-          id: result.data.id,
-          roomId,
-          status: "generating_summary",
-          approvalMode: "all_active",
-          currentSummaryVersion: 0,
-          approvedSummaryVersion: null,
-          readinessStatus: null,
-          summary: null,
-          approvalState: null,
-          generationErrorCode: null,
-          isStale: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
+    setRequest((current) =>
+      !replace && current
+        ? current
+        : {
+            id: result.data.id,
+            roomId,
+            status: "generating_summary",
+            approvalMode: "all_active",
+            currentSummaryVersion: 0,
+            approvedSummaryVersion: null,
+            readinessStatus: null,
+            summary: null,
+            approvalState: null,
+            generationErrorCode: null,
+            isStale: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
     );
     setStarting(false);
     void refresh();
@@ -164,6 +174,22 @@ export function PlanExperience({
     }
     setRequest({ ...request, status: "generating_summary" });
   }
+  async function stopPlanning() {
+    if (!request) return;
+    const result = await cancelPlanningSummaryAction({
+      planningRequestId: request.id,
+      participantId,
+    });
+    if (!result.ok) {
+      setError("This request could not be stopped.");
+      return;
+    }
+    setRequest({
+      ...request,
+      status: "cancelled",
+      generationErrorCode: "workflow_cancelled",
+    });
+  }
   async function generateItinerary() {
     if (!request || generating) return;
     setGenerating(true);
@@ -203,6 +229,18 @@ export function PlanExperience({
     }
     await refresh();
     setGenerating(false);
+  }
+  async function stopItinerary() {
+    if (!plan) return;
+    const result = await cancelItineraryAction({
+      tripPlanId: plan.id,
+      participantId,
+    });
+    if (!result.ok) {
+      setError("This request could not be stopped.");
+      return;
+    }
+    setPlan({ ...plan, status: "failed", errorCode: "workflow_cancelled" });
   }
   if (loading)
     return (
@@ -260,8 +298,14 @@ export function PlanExperience({
               "model_rate_limited",
               "model_unavailable",
               "validation_failed",
+              "workflow_cancelled",
             ].includes(plan.errorCode ?? "")
               ? retryItinerary
+              : undefined
+          }
+          onCancel={
+            ["generating", "validating", "needs_revision"].includes(plan.status)
+              ? stopItinerary
               : undefined
           }
         />
@@ -318,8 +362,35 @@ export function PlanExperience({
           Trailie is checking the trip.
         </h1>
         <p className="text-muted-foreground mt-3">
-          Chat stays available while the crew’s decisions are organized.
+          {request && slowRequestId === request.id
+            ? "Trailie is taking longer than usual."
+            : "Chat stays available while the crew’s decisions are organized."}
         </p>
+        {request ? (
+          <button
+            type="button"
+            onClick={() => void stopPlanning()}
+            className="border-border mx-auto mt-6 min-h-11 rounded-md border px-4 text-sm font-semibold"
+          >
+            Stop
+          </button>
+        ) : null}
+      </div>
+    );
+  if (request?.status === "cancelled")
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12">
+        <h1 className="text-2xl font-semibold">Stopped</h1>
+        <p className="text-muted-foreground mt-3">
+          This request was stopped. No trip brief was published.
+        </p>
+        <button
+          type="button"
+          onClick={() => void start(true)}
+          className="border-border mt-6 min-h-11 self-start rounded-md border px-4 text-sm font-semibold"
+        >
+          Try again
+        </button>
       </div>
     );
   if (request?.status === "failed")

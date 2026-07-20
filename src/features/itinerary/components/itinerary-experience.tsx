@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CostEstimate, TripPlanView } from "@trailie/schemas";
 import { ItineraryMapLoader } from "@/features/maps/components/itinerary-map-loader";
 import { CommentThread } from "@/features/guest-comments/components/comment-thread";
@@ -56,6 +56,8 @@ const quotaCopy: Record<string, string> = {
     "Trailie could not finish after several tries. Chat and published Plans remain available.",
   workflow_deadline_exceeded:
     "Trailie could not complete that right now. No partial Plan was published.",
+  workflow_cancelled:
+    "This request was stopped. No partial Plan was published.",
 };
 
 function costLabel(cost: CostEstimate) {
@@ -81,7 +83,18 @@ function reservationLabel(value: string) {
   return "Reservation status unknown";
 }
 
-function ActivePlan({ plan }: { plan: TripPlanView }) {
+function ActivePlan({
+  plan,
+  onCancel,
+}: {
+  plan: TripPlanView;
+  onCancel?: () => void;
+}) {
+  const [takingLonger, setTakingLonger] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setTakingLonger(true), 10_000);
+    return () => window.clearTimeout(timer);
+  }, []);
   return (
     <div
       className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12 sm:px-8"
@@ -94,9 +107,19 @@ function ActivePlan({ plan }: { plan: TripPlanView }) {
         Trailie is checking the Plan before you see it.
       </h1>
       <p className="text-muted-foreground mt-3 max-w-xl leading-7">
-        Chat stays available. Refreshing this page will resume from the latest
-        completed stage.
+        {takingLonger
+          ? "Trailie is taking longer than usual."
+          : "Chat stays available. Refreshing this page will resume from the latest completed stage."}
       </p>
+      {onCancel ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="border-border mt-6 min-h-11 w-fit rounded-md border px-4 text-sm font-semibold"
+        >
+          Stop
+        </button>
+      ) : null}
       <ol
         className="border-border relative mt-8 space-y-0 border-l"
         aria-label="Plan progress"
@@ -539,6 +562,7 @@ export function ItineraryExperience({
   onChangeItem,
   onHistory,
   onRetry,
+  onCancel,
   readOnly = false,
   initialView = "Overview",
   commenting,
@@ -548,6 +572,7 @@ export function ItineraryExperience({
   onChangeItem?: (itemId: string, title: string) => void;
   onHistory?: () => void;
   onRetry?: () => void;
+  onCancel?: () => void;
   readOnly?: boolean;
   initialView?: ItineraryView;
   commenting?: {
@@ -565,9 +590,11 @@ export function ItineraryExperience({
           Plan · Version {plan.version}
         </p>
         <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em]">
-          {plan.status === "blocked"
-            ? "This Plan cannot be published yet."
-            : "The Plan could not be created."}
+          {plan.errorCode === "workflow_cancelled"
+            ? "Stopped"
+            : plan.status === "blocked"
+              ? "This Plan cannot be published yet."
+              : "The Plan could not be created."}
         </h1>
         <p className="text-muted-foreground mt-3 leading-7">
           {quotaCopy[plan.errorCode ?? ""] ??
@@ -586,7 +613,7 @@ export function ItineraryExperience({
     );
   }
   if (plan.status !== "published" || !plan.itinerary)
-    return <ActivePlan plan={plan} />;
+    return <ActivePlan plan={plan} onCancel={onCancel} />;
   const repaired = plan.validationSummary?.repairedIssues.includes(
     "route_timing_impossible",
   );

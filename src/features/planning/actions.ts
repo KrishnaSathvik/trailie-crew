@@ -133,3 +133,28 @@ export async function regeneratePlanningSummaryAction(
   schedulePlanningSummary(parsed.data.planningRequestId);
   return { ok: true, data: null };
 }
+
+export async function cancelPlanningSummaryAction(
+  input: unknown,
+): Promise<Result<{ id: string; status: "cancelled" }>> {
+  const parsed = z
+    .object({
+      planningRequestId: z.uuid(),
+      participantId: z.uuid(),
+    })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "unknown_error" };
+  const supabase = await client();
+  if (!supabase) return { ok: false, error: "membership_required" };
+  const { data, error } = await supabase.rpc("cancel_planning_generation", {
+    target_request_id: parsed.data.planningRequestId,
+    target_participant_id: parsed.data.participantId,
+  });
+  if (error) return { ok: false, error: map(error) };
+  const result = z
+    .object({ id: z.uuid(), status: z.literal("cancelled") })
+    .strict()
+    .parse(data);
+  return { ok: true, data: result };
+}

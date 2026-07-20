@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cancelPlanningSummaryAction,
   createPlanningRequestAction,
   getPlanningRequestAction,
   reviewPlanningSummaryAction,
@@ -13,12 +14,14 @@ import {
 } from "@/features/itinerary/actions";
 
 vi.mock("../actions", () => ({
+  cancelPlanningSummaryAction: vi.fn(),
   createPlanningRequestAction: vi.fn(),
   getPlanningRequestAction: vi.fn(),
   reviewPlanningSummaryAction: vi.fn(),
   regeneratePlanningSummaryAction: vi.fn(),
 }));
 vi.mock("@/features/itinerary/actions", () => ({
+  cancelItineraryAction: vi.fn(),
   generateItineraryAction: vi.fn(),
   getTripPlanAction: vi.fn(),
   retryItineraryAction: vi.fn(),
@@ -75,6 +78,35 @@ describe("PlanExperience", () => {
     fireEvent.click(screen.getByRole("button", { name: "Prepare trip brief" }));
     expect(
       await screen.findByText("Trailie is checking the trip."),
+    ).toBeVisible();
+  });
+  it("offers Stop during summary generation and keeps a Stopped state", async () => {
+    vi.mocked(getPlanningRequestAction).mockResolvedValue({
+      ok: true,
+      data: {
+        id,
+        roomId: id,
+        status: "generating_summary",
+        approvalMode: "all_active",
+        currentSummaryVersion: 0,
+        approvedSummaryVersion: null,
+        readinessStatus: null,
+        summary: null,
+        approvalState: null,
+        generationErrorCode: null,
+        isStale: false,
+        createdAt: "2026-07-13T00:00:00Z",
+        updatedAt: "2026-07-13T00:00:00Z",
+      },
+    });
+    vi.mocked(cancelPlanningSummaryAction).mockResolvedValue({
+      ok: true,
+      data: { id, status: "cancelled" },
+    });
+    render(<PlanExperience roomId={id} participantId={id} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    expect(
+      await screen.findByRole("heading", { name: "Stopped" }),
     ).toBeVisible();
   });
   it("renders review sections and requires a note for changes", async () => {

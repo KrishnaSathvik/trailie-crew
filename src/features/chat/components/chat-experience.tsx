@@ -33,6 +33,7 @@ import {
 } from "@/features/chat/lib/chat-state";
 import type { TripShellData } from "@/features/crew/queries/trip-crew";
 import { TrailieStreamCard } from "@/features/trailie/components/trailie-stream-card";
+import type { TrailieProgressStage } from "@trailie/schemas";
 import type { TrailieErrorCode } from "@/features/trailie/errors/trailie-errors";
 import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
 import {
@@ -88,7 +89,8 @@ export function ChatExperience({
   const [trailieAnswer, setTrailieAnswer] = useState<{
     source: TrailieInvocationSource;
     body: string;
-    status: "answering" | "retrying" | "recovering" | "failed";
+    status: "answering" | "retrying" | "recovering" | "stopped" | "failed";
+    stage: TrailieProgressStage;
     errorCode: TrailieErrorCode | null;
     retryable: boolean;
   } | null>(null);
@@ -368,9 +370,25 @@ export function ChatExperience({
       source,
       body: "",
       status: "answering",
+      stage: "reading_conversation",
       errorCode: null,
       retryable: false,
     });
+    const slowTimer = window.setTimeout(() => {
+      setTrailieAnswer((current) =>
+        current &&
+        ["answering", "retrying", "recovering"].includes(current.status)
+          ? { ...current, stage: "taking_longer" }
+          : current,
+      );
+    }, 10_000);
+    const checkingTimer = window.setTimeout(() => {
+      setTrailieAnswer((current) =>
+        current?.stage === "reading_conversation"
+          ? { ...current, stage: "checking_trip" }
+          : current,
+      );
+    }, 300);
     try {
       for await (const event of invokeTrailieStream({
         roomId: data.room.id,
@@ -381,6 +399,10 @@ export function ChatExperience({
         if (event.type === "text_delta") {
           setTrailieAnswer((current) =>
             current ? { ...current, body: current.body + event.delta } : null,
+          );
+        } else if (event.type === "progress_state") {
+          setTrailieAnswer((current) =>
+            current ? { ...current, stage: event.stage } : null,
           );
         } else if (event.type === "provider_retrying") {
           setTrailieAnswer((current) =>
@@ -401,10 +423,17 @@ export function ChatExperience({
             current
               ? {
                   ...current,
-                  body: "",
-                  status: "failed",
+                  body:
+                    event.code === "invocation_cancelled" ? current.body : "",
+                  status:
+                    event.code === "invocation_cancelled"
+                      ? "stopped"
+                      : "failed",
                   errorCode: event.code as TrailieErrorCode,
-                  retryable: event.retryable,
+                  retryable:
+                    event.code === "invocation_cancelled"
+                      ? true
+                      : event.retryable,
                 }
               : null,
           );
@@ -412,7 +441,16 @@ export function ChatExperience({
       }
     } catch {
       if (controller.signal.aborted) {
-        setTrailieAnswer(null);
+        setTrailieAnswer((current) =>
+          current
+            ? {
+                ...current,
+                status: "stopped",
+                errorCode: null,
+                retryable: true,
+              }
+            : null,
+        );
       } else {
         setTrailieAnswer((current) =>
           current
@@ -426,6 +464,8 @@ export function ChatExperience({
         );
       }
     } finally {
+      window.clearTimeout(checkingTimer);
+      window.clearTimeout(slowTimer);
       if (trailieAbortRef.current === controller) {
         trailieAbortRef.current = null;
       }
@@ -574,6 +614,7 @@ export function ChatExperience({
           <TrailieStreamCard
             body={trailieAnswer.body}
             status={trailieAnswer.status}
+            stage={trailieAnswer.stage}
             errorCode={trailieAnswer.errorCode}
             retryable={trailieAnswer.retryable}
             onCancel={() => trailieAbortRef.current?.abort()}

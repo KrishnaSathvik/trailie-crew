@@ -51,6 +51,7 @@ const progress: Partial<Record<PlanChangeRequest["status"], string>> = {
   published: "Updated Plan published",
   blocked: "This change needs attention",
   failed: "We could not complete that change",
+  cancelled: "Stopped",
 };
 
 const revisionFailureCopy: Record<string, string> = {
@@ -261,7 +262,7 @@ function ReviewPanel({
       changeRequestId: request.id,
       participantId,
     });
-    if (!result.ok) setError("This request could not be cancelled.");
+    if (!result.ok) setError("This request could not be stopped.");
     else {
       await refresh();
       close();
@@ -461,7 +462,7 @@ function ReviewPanel({
           onClick={() => void cancel()}
           className="text-muted-foreground mt-5 min-h-10 text-xs font-semibold"
         >
-          Cancel request
+          Stop
         </button>
       ) : null}
     </div>
