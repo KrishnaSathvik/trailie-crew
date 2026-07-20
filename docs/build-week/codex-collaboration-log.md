@@ -248,3 +248,116 @@ server/client hydration mismatch was observed during sharing coverage. The
 repository-wide formatting command also still reports three pre-existing,
 unchanged itinerary/sharing files; every file changed here passes formatting.
 No hosted or Production deployment was performed.
+
+## 2026-07-20 — Phase 8 product experience refinement
+
+The route and state audit found eight recurring problems:
+
+1. **Inconsistent:** one-off controls, radii, spacing, status treatments, and
+   mixed Trip/room, Plan/itinerary, and crew/traveler terminology.
+2. **Developer-looking:** internal phase/model/provider language, deterministic
+   adapter labels, technical map terms, and implementation-oriented errors.
+3. **Confusing:** Trailie silence, the planning gate, stale revisions, guest
+   permissions, map behavior before a Plan exists, and share-version context.
+4. **Visually weak:** a generic landing page, flat hierarchy, dense nested
+   itinerary surfaces, and unfinished empty/error states.
+5. **Mobile problems:** cramped navigation, horizontal Plan tabs, composer and
+   safe-area pressure, map-control overlap, and long-content handling.
+6. **Missing states:** first-message/first-Plan/first-map states, unavailable
+   evidence and routes, no stays/food/bookings/comments/suggestions, and
+   expired, revoked, offline, denied, deleted, and retry paths.
+7. **Copy problems:** internal vocabulary, inconsistent capitalization, vague
+   actions, repeated disclaimers, and role descriptions that did not explain
+   guest capability.
+8. **Accessibility problems:** no dependable skip-link treatment, incomplete
+   dialog focus containment/return, ambiguous labels, and insufficient
+   non-visual map/status equivalents.
+
+The polish pass consolidated monochrome-first light/dark tokens, type and
+spacing hierarchy, surface/border/shadow/radius scales, focus rings, status
+styles, five button variants, shared inputs, empty states, reduced motion,
+safe-area behavior, and print rules. Geist and Lucide remain the only product
+type/icon languages. The landing page now presents the real collaboration,
+Trailie, Plan, and map experience; create/join and guest entry explain only the
+necessary choices; the Trip shell uses compact desktop navigation and
+mobile-first bottom navigation; chat, planning, itinerary, evidence, maps,
+history/compare, revisions, guest comments/suggestions, booking handoffs,
+sharing, settings, trust pages, and lifecycle states share one visual and copy
+system. Public booking handoffs now include an intentional empty state.
+
+The itinerary received the strongest hierarchy: clear days and dates, timeline
+rhythm, distinct travel segments, progressive detail, evidence and booking
+states, useful stay/food/free-time treatment, exact-version context, and
+responsive Plan-view selection instead of compressed tabs. Maps preserve a
+complete list equivalent, verified/omitted location states, a calm unavailable
+message, a mobile Plan/Map switch, and privacy-safe public projection. A
+server/client hydration mismatch caused by Node's partial `navigator` object
+was fixed by using a deterministic initial online state and checking real
+connectivity after hydration.
+
+Visible copy was scanned across user-facing TSX and browser chunks. No Build
+Week, hackathon, hosted-acceptance, internal model, provider-recovery, private
+memory, raw error-code, or `sk-proj` language remains in the shipped UI. Product
+terms are standardized around Trip, Crew, Trailie, Plan, Version, Comment,
+Suggestion, Booking option, and Guest. Trailie uses the Phase 8A structured
+response components and safe Markdown renderer, with intentional silence and
+plain thinking/checking/retry states.
+
+### Route and state checklist
+
+- [x] Landing, create, join, valid/invalid invite, guest entry, and inaccessible
+      Trip states.
+- [x] Trip shell, chat, Trailie streaming/failure, planning/approvals,
+      itinerary, evidence, map/list/fallback, history/compare, and revisions.
+- [x] Guest comments/suggestions, member attribution/resolution/conversion,
+      sharing, public share, print/export, booking options, settings, and danger
+      confirmations.
+- [x] Privacy, terms, accuracy, support, expired/revoked/deleted, loading,
+      empty, error, offline, unavailable-provider, denied, and retry states.
+- [x] Desktop, 390×844, 430×932, tablet portrait/landscape, long content,
+      keyboard focus, dark mode, reduced motion, and print.
+- [x] Skip links, landmarks, heading order, live status, named controls, modal
+      focus containment/return, touch targets, and non-visual map access.
+
+Local verification passed formatting, lint, typecheck, `git diff --check`, a
+738-test Vitest suite across 150 files, focused map/share tests, 12 focused
+end-to-end product flows, a final accessibility/revision/sharing trio, and a
+production build of all 17 application pages. Required visual review covered
+desktop, both mobile widths, both tablet orientations, dark mode, create/join,
+Trip chat/Plan/Map/settings, trust pages, long layouts, and keyboard skip-link
+focus. The client bundle contains zero matches for server keys, recovery
+secrets, project keys, or internal model names; the largest shared browser
+chunk remains approximately 1.7 MB and the map implementation stays lazy.
+
+Protected deployment `dpl_2mZMBCr3uo5weqZXcfZNVajDaCVq` is Ready only on the
+custom `hosted-acceptance` target. Vercel Authentication remains enabled,
+Production was not deployed, and the final bypass count is zero. The hosted
+tour passed landing/create/join, two-person presence, chat, reply, reaction,
+explicit Trailie invocation, and the polished recoverable-error state. The
+external provider remained unavailable and bounded recovery timed out twice
+before hosted planning, publication, and downstream guest/share screens could
+be replayed; those surfaces remain covered locally rather than being
+misrepresented as a complete hosted pass. The recovery credential visible in
+the failed transport trace was immediately rotated, the temporary environment
+file and trace were removed, and the harness now catches transport failures
+without printing authorization headers. It also uses the current Supabase CLI
+`--reveal` contract without logging key values.
+
+Remaining polish limitations are operational rather than visual: the full
+live-provider hosted tour must be repeated when provider recovery is healthy;
+support should move from the current issue-form transport to an owned support
+channel before a public launch; live hotel/flight inventory and booking
+execution remain intentionally unavailable; and some structured suggested
+actions still describe the next step instead of navigating directly. Vercel
+CLI 56.4.0 is available while the verified local CLI is 56.3.2; upgrading is
+recommended before the next hosted operations session.
+
+Verdict: the local product experience and Trailie response architecture are
+coherent, polished, responsive, accessible, and production-build clean.
+Protected Preview is suitable for continued product review. A public
+Production release is not claimed until the live-provider hosted tour
+completes and the remaining operational launch items are closed.
+
+Implementation commits: `454b0f8` (product experience refinement),
+`c93b5ef`/`116a60b` (Trailie intelligence and audit), and the hosted harness
+hardening commit recorded with this entry.
