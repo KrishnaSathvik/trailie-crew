@@ -194,3 +194,57 @@ traveler data is excluded from search URLs. Focused contract tests and 8 pgTAP
 assertions pass. Hosted acceptance and Production deployment remain pending;
 checkout, payments, reservations, notifications, and booking confirmation are
 out of scope.
+
+## 2026-07-20 — Phase 8A Trailie intelligence audit
+
+Started from clean `main` baseline `6167045`; the unfinished visual-polish pass
+was preserved separately so this audit could trace the actual intelligence
+path without mixing redesign changes. The implemented pipeline is now:
+authorized explicit invocation → deterministic intent/policy → safe reference
+resolution → intent-bounded Trip context → strict Structured Output → contract,
+scope, evidence, privacy, and booking validation → one safe repair → durable
+staging → persisted Trailie message → purpose-built response blocks with safe
+Markdown fallback. Planning, itinerary generation, revisions, publication,
+exact-version maps, evidence, and booking handoffs remain their existing
+application-owned workflows; chat cannot silently bypass them.
+
+The gap matrix found invocation, memory extraction, planning approval,
+itinerary validation/repair, immutable version publication, map privacy, and
+non-executing booking handoffs implemented correctly. Focused chat was missing
+typed intent, bounded Trip/plan context, versioned response persistence,
+structured rendering, reference safety, and response observability; those gaps
+are fixed. Prompt-dependent facts, unsupported coordinates, live inventory,
+passive booking-completion claims, unsafe Markdown links/HTML, and premature
+planning are now rejected or reduced to explicit unavailable/clarification
+states. Recovery and request orchestration still duplicate some code; recent
+structured-option references are not yet stored as a reusable entity ledger;
+and focused chat defines tool permissions but does not yet dispatch the live
+travel-evidence adapters. Live hotel/flight inventory remains unavailable by
+design. Suggested actions are rendered as a clear next step, but app-shell
+navigation for those actions is not yet connected.
+
+`TrailieResponseV1` now provides discriminated blocks for recommendations,
+comparisons, understanding, itinerary/revision state, approvals, maps/routes,
+hotels, flights, booking/reservation requirements, weather, evidence, warnings,
+and safe states. The database stores only the validated room-private contract
+plus intent, context-section names, validation result, repair count, and
+existing latency/usage/provider metadata; it does not log prompts, private
+memory contents, secrets, or full conversations. The UI renders these as
+semantic components and supports sanitized headings, lists, emphasis, HTTPS
+links, tables, and blockquotes without raw HTML or Markdown-to-itinerary
+parsing.
+
+Verification passed the full 149-file, 734-test Vitest suite, the isolated 12-assertion
+Trailie database contract, focused lint/type/format/diff/security gates, a
+production build, and browser flows for Trailie silence/streaming/persistence,
+private memory, planning approvals/failure, repaired itinerary generation,
+exact current/version context, immutable revision publication, and privacy-safe sharing. One combined browser
+run hit the existing deterministic itinerary provider's transient
+`model_unavailable` path and passed when rerun in isolation. The full pgTAP run
+reached 706 passing assertions but exits nonzero after the pre-existing
+guest-comments fixture attempts to read an ungranted temporary table; the new
+Trailie suite itself passes. A separate existing public deterministic-map
+server/client hydration mismatch was observed during sharing coverage. The
+repository-wide formatting command also still reports three pre-existing,
+unchanged itinerary/sharing files; every file changed here passes formatting.
+No hosted or Production deployment was performed.
