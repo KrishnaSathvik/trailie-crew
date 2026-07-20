@@ -57,6 +57,7 @@ describe("scoped guest plan page", () => {
       expiresAt: "2026-07-20T00:00:00.000Z",
       itinerary,
       comments: [{ ...comment, isOwn: false }],
+      suggestions: [],
     });
 
     render(await GuestPlanPage());
@@ -85,6 +86,7 @@ describe("scoped guest plan page", () => {
       expiresAt: "2026-07-20T00:00:00.000Z",
       itinerary,
       comments: [comment],
+      suggestions: [],
     });
 
     render(await GuestPlanPage());
@@ -92,6 +94,32 @@ describe("scoped guest plan page", () => {
     expect(
       screen.getByLabelText(`Comment on ${firstItem.title}`),
     ).toBeVisible();
+  });
+
+  it("renders a Suggester with a structured item action and no approval controls", async () => {
+    vi.mocked(loadGuestSessionContext).mockResolvedValue({
+      role: "guest_suggester",
+      displayName: "Jordan",
+      planVersionId: planId,
+      planVersion: 1,
+      expiresAt: "2026-07-20T00:00:00.000Z",
+      itinerary,
+      comments: [],
+      suggestions: [],
+    });
+
+    render(await GuestPlanPage());
+    expect(screen.getByText("Suggester · suggestions enabled")).toBeVisible();
+    const itemContainer = screen
+      .getByRole("heading", { name: firstItem.title })
+      .closest("li");
+    expect(itemContainer).toHaveTextContent("Suggest a change");
+    expect(document.body.textContent).toContain(
+      "Suggestions never change the trip directly",
+    );
+    expect(
+      screen.queryByRole("button", { name: /approve|publish/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("fails closed immediately when the session is expired or revoked", async () => {

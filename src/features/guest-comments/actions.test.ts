@@ -40,7 +40,7 @@ const ids = {
   invite: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a4",
   comment: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a5",
 };
-const expiresAt = "2026-07-20T00:00:00.000Z";
+const expiresAt = "2026-07-21T00:00:00.000Z";
 const inviteMetadata = {
   id: ids.invite,
   planVersionId: ids.plan,

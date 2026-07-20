@@ -12,11 +12,79 @@ const safePlainText = z
     "Plain text only.",
   );
 
-export const guestRoleSchema = z.enum(["guest_viewer", "guest_commenter"]);
+export const guestRoleSchema = z.enum([
+  "guest_viewer",
+  "guest_commenter",
+  "guest_suggester",
+]);
 export type GuestRole = z.infer<typeof guestRoleSchema>;
 
 export const plainTextCommentSchema = safePlainText.max(2000);
 export const guestDisplayNameSchema = safePlainText.max(50);
+export const guestSuggestionTargetTypeSchema = z.enum([
+  "plan",
+  "day",
+  "item",
+  "route",
+]);
+export type GuestSuggestionTargetType = z.infer<
+  typeof guestSuggestionTargetTypeSchema
+>;
+export const guestSuggestionTypeSchema = z.enum([
+  "add_item",
+  "remove_item",
+  "replace_item",
+  "reschedule_item",
+  "move_item",
+  "update_note",
+  "change_route",
+  "general",
+]);
+export type GuestSuggestionType = z.infer<typeof guestSuggestionTypeSchema>;
+export const guestSuggestionStatusSchema = z.enum([
+  "open",
+  "dismissed",
+  "converted",
+]);
+export type GuestSuggestionStatus = z.infer<
+  typeof guestSuggestionStatusSchema
+>;
+export const guestSuggestionTitleSchema = safePlainText.max(120);
+export const guestSuggestionDetailsSchema = safePlainText.max(2000);
+
+export const guestSuggestionSchema = z
+  .object({
+    id: z.uuid(),
+    originalPlanVersionId: z.uuid(),
+    originalPlanVersion: z.number().int().positive(),
+    rebasedToPlanVersionId: z.uuid().nullable(),
+    rebasedToPlanVersion: z.number().int().positive().nullable(),
+    targetType: guestSuggestionTargetTypeSchema,
+    targetKey: z.string().trim().min(1).max(200).nullable(),
+    targetLabel: z.string().trim().min(1).max(200).nullable(),
+    suggestionType: guestSuggestionTypeSchema,
+    title: guestSuggestionTitleSchema,
+    details: guestSuggestionDetailsSchema,
+    proposedDate: z.iso.date().nullable(),
+    proposedStartTime: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
+      .nullable(),
+    proposedEndTime: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
+      .nullable(),
+    status: guestSuggestionStatusSchema,
+    guestDisplayName: guestDisplayNameSchema,
+    dismissedAt: timestamp.nullable(),
+    convertedAt: timestamp.nullable(),
+    revisionRequestId: z.uuid().nullable().optional(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    isOwn: z.boolean().optional(),
+  })
+  .strict();
+export type GuestSuggestion = z.infer<typeof guestSuggestionSchema>;
 
 export const guestInviteMetadataSchema = z
   .object({
@@ -83,6 +151,9 @@ export const guestSessionContextSchema = guestSessionMetadataSchema
   .extend({
     itinerary: publicSharedItinerarySchema,
     comments: z.array(guestCommentSchema.extend({ isOwn: z.boolean() })),
+    suggestions: z
+      .array(guestSuggestionSchema.extend({ isOwn: z.literal(true) }))
+      .default([]),
   })
   .strict();
 export type GuestSessionContext = z.infer<typeof guestSessionContextSchema>;

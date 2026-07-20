@@ -11,6 +11,7 @@ import { ItineraryExperience } from "@/features/itinerary/components/itinerary-e
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { ShareControls } from "@/features/sharing/components/share-controls";
 import { GuestInviteControls } from "@/features/guest-comments/components/guest-invite-controls";
+import { GuestSuggestionsPanel } from "@/features/guest-comments/components/guest-suggestions-panel";
 import { listMemberCommentsAction } from "@/features/guest-comments/actions";
 import type { GuestComment } from "@/features/guest-comments/contracts";
 import { SpatialCompare } from "@/features/maps/components/spatial-compare";
@@ -601,6 +602,16 @@ export function RevisionExperience({
           planVersion={historical.version}
           isHost={isHost}
         />
+        <GuestSuggestionsPanel
+          roomId={roomId}
+          participantId={participantId}
+          currentPlanVersion={plan.version}
+          onConverted={async () => {
+            setHistorical(null);
+            setReviewOpen(true);
+            await refresh();
+          }}
+        />
         <ItineraryExperience
           key={preferMap ? "historical-map" : "historical-plan"}
           plan={historical}
@@ -634,6 +645,15 @@ export function RevisionExperience({
         planVersionId={plan.id}
         planVersion={plan.version}
         isHost={isHost}
+      />
+      <GuestSuggestionsPanel
+        roomId={roomId}
+        participantId={participantId}
+        currentPlanVersion={plan.version}
+        onConverted={async () => {
+          setReviewOpen(true);
+          await refresh();
+        }}
       />
       <ItineraryExperience
         key={preferMap ? "current-map" : "current-plan"}

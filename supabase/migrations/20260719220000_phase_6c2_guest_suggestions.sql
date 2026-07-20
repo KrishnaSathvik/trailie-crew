@@ -636,7 +636,9 @@ begin
     -- Re-resolve day targets on the current version during rebase.  The
     -- original day id is immutable attribution only; revision requests must
     -- reference the current version's day identifier.
-    current_target:=current_day->>'id';
+    -- Revision requests accept item targets only. Keep the day anchor in the
+    -- request text while leaving target_item_id null for day-scoped additions.
+    current_target:=case when target.suggestion_type='add_item' then null else current_day->>'id' end;
   elsif target.target_type in ('item','route') then
     select item.value->>'id' into current_target
     from jsonb_array_elements(coalesce(current_plan.itinerary_json->'days','[]'::jsonb)) day(value)

@@ -17,7 +17,9 @@ function defaultExpiry() {
 }
 
 function roleLabel(role: GuestRole) {
-  return role === "guest_commenter" ? "Commenter" : "Viewer";
+  if (role === "guest_commenter") return "Commenter";
+  if (role === "guest_suggester") return "Suggester";
+  return "Viewer";
 }
 
 export function GuestInviteControls({
@@ -147,8 +149,9 @@ export function GuestInviteControls({
               Guest access · Version {planVersion}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Viewer links can only read. Commenter links can add plain-text
-              comments to this exact version.
+              Viewer links can only read. Commenter links add plain-text
+              comments. Suggester links submit structured changes for crew
+              review. Every link stays on this exact version.
             </p>
             {!isHost ? (
               <p className="text-muted-foreground mt-1 text-xs">
@@ -178,6 +181,7 @@ export function GuestInviteControls({
               >
                 <option value="guest_viewer">Viewer</option>
                 <option value="guest_commenter">Commenter</option>
+                <option value="guest_suggester">Suggester</option>
               </select>
             </label>
             <label className="text-xs font-semibold">

@@ -15,6 +15,7 @@ export default async function GuestPlanPage() {
     : null;
   if (!context) return <GuestAccessUnavailable />;
   const commenter = context.role === "guest_commenter";
+  const suggester = context.role === "guest_suggester";
 
   return (
     <>
@@ -27,7 +28,11 @@ export default async function GuestPlanPage() {
             Exact Version {context.planVersion} · {context.displayName}
           </p>
           <p className="text-xs font-semibold">
-            {commenter ? "Commenter · comments enabled" : "Viewer · read only"}
+            {commenter
+              ? "Commenter · comments enabled"
+              : suggester
+                ? "Suggester · suggestions enabled"
+                : "Viewer · read only"}
           </p>
         </div>
       </section>
@@ -35,9 +40,12 @@ export default async function GuestPlanPage() {
         itinerary={context.itinerary}
         generatedAt={context.itinerary.publishedAt}
         commenting={{
-          mode: context.role,
+          mode: commenter ? "guest_commenter" : "guest_viewer",
           comments: context.comments,
         }}
+        suggesting={
+          suggester ? { suggestions: context.suggestions } : undefined
+        }
       />
     </>
   );

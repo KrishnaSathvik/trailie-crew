@@ -7,9 +7,11 @@ import { TrustLinks } from "@/components/shared/trust-links";
 import type { MapConfiguration } from "@/features/maps/config";
 import { PublicItineraryMap } from "@/features/maps/components/public-itinerary-map";
 import { CommentThread } from "@/features/guest-comments/components/comment-thread";
+import { SuggestionThread } from "@/features/guest-comments/components/suggestion-thread";
 import type {
   GuestComment,
   GuestRole,
+  GuestSuggestion,
 } from "@/features/guest-comments/contracts";
 
 function Status({ value }: { value: string }) {
@@ -54,6 +56,7 @@ export function PublicItinerary({
   contentHash,
   map,
   commenting,
+  suggesting,
 }: {
   itinerary: PublicSharedItinerary;
   generatedAt?: string;
@@ -63,8 +66,11 @@ export function PublicItinerary({
     configuration: MapConfiguration;
   } | null;
   commenting?: {
-    mode: GuestRole;
+    mode: Exclude<GuestRole, "guest_suggester">;
     comments: GuestComment[];
+  };
+  suggesting?: {
+    suggestions: GuestSuggestion[];
   };
 }) {
   const travel = itinerary.days.flatMap((day) =>
@@ -128,6 +134,18 @@ export function PublicItinerary({
             }}
             roomId=""
             planVersion={itinerary.version}
+          />
+        ) : null}
+        {suggesting ? (
+          <SuggestionThread
+            target={{
+              type: "plan",
+              key: null,
+              label: `Version ${itinerary.version}`,
+            }}
+            initialSuggestions={suggesting.suggestions.filter(
+              (suggestion) => suggestion.targetType === "plan",
+            )}
           />
         ) : null}
 
@@ -210,6 +228,20 @@ export function PublicItinerary({
                         planVersion={itinerary.version}
                       />
                     ) : null}
+                    {suggesting ? (
+                      <SuggestionThread
+                        target={{
+                          type: "day",
+                          key: day.date,
+                          label: day.title,
+                        }}
+                        initialSuggestions={suggesting.suggestions.filter(
+                          (suggestion) =>
+                            suggestion.targetType === "day" &&
+                            suggestion.targetKey === day.date,
+                        )}
+                      />
+                    ) : null}
                     <ol className="border-border mt-6 border-l">
                       {day.items.map((item) => (
                         <li
@@ -254,6 +286,21 @@ export function PublicItinerary({
                               }}
                               roomId=""
                               planVersion={itinerary.version}
+                            />
+                          ) : null}
+                          {suggesting ? (
+                            <SuggestionThread
+                              target={{
+                                type: "item",
+                                key: item.key,
+                                label: item.title,
+                              }}
+                              initialSuggestions={suggesting.suggestions.filter(
+                                (suggestion) =>
+                                  ["item", "route"].includes(
+                                    suggestion.targetType,
+                                  ) && suggestion.targetKey === item.key,
+                              )}
                             />
                           ) : null}
                         </li>

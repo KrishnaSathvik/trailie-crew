@@ -9,15 +9,24 @@ import {
   guestDisplayNameSchema,
   guestInviteMetadataSchema,
   guestRoleSchema,
+  guestSuggestionDetailsSchema,
+  guestSuggestionSchema,
+  guestSuggestionTargetTypeSchema,
+  guestSuggestionTitleSchema,
+  guestSuggestionTypeSchema,
   plainTextCommentSchema,
 } from "./contracts";
 import {
   createGuestComment,
+  createGuestSuggestion,
   createScopedGuestSession,
   deleteGuestComment,
+  deleteGuestSuggestion,
   updateGuestComment,
+  updateGuestSuggestion,
 } from "./repository";
 import { generateGuestToken, hashGuestToken } from "./token";
+import { schedulePlanChange } from "@/features/revisions/scheduler";
 
 const GUEST_SESSION_COOKIE = "trailie_guest_session";
 const timestamp = z.iso.datetime({ offset: true });
@@ -30,7 +39,11 @@ type GuestActionError =
   | "rate_limited"
   | "guest_unavailable"
   | "invalid_comment"
-  | "comment_unavailable";
+  | "comment_unavailable"
+  | "invalid_suggestion"
+  | "suggestion_unavailable"
+  | "suggestion_immutable"
+  | "suggestion_no_longer_applies";
 type Result<T> = { ok: true; data: T } | { ok: false; error: GuestActionError };
 
 async function authenticatedClient() {
@@ -45,6 +58,9 @@ function mapError(error: { message?: string } | null): GuestActionError {
   if (/rate limited/i.test(message)) return "rate_limited";
   if (/membership|authentication/i.test(message)) return "permission_denied";
   if (/expiration/i.test(message)) return "invalid_expiration";
+  if (/no longer applies/i.test(message))
+    return "suggestion_no_longer_applies";
+  if (/immutable/i.test(message)) return "suggestion_immutable";
   return "guest_unavailable";
 }
 
@@ -355,4 +371,213 @@ export async function resolvePlanCommentAction(
   return result.success
     ? { ok: true, data: result.data }
     : { ok: false, error: "comment_unavailable" };
+}
+
+const optionalTime = z
+  .string()
+  .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
+  .nullable();
+const suggestionDetailsSchema = z
+  .object({
+    title: guestSuggestionTitleSchema,
+    details: guestSuggestionDetailsSchema,
+    proposedDate: z.iso.date().nullable(),
+    proposedStartTime: optionalTime,
+    proposedEndTime: optionalTime,
+  })
+  .refine(
+    ({ proposedStartTime, proposedEndTime }) =>
+      !proposedStartTime ||
+      !proposedEndTime ||
+      proposedEndTime > proposedStartTime,
+    { path: ["proposedEndTime"] },
+  );
+const createSuggestionSchema = suggestionDetailsSchema
+  .extend({
+    targetType: guestSuggestionTargetTypeSchema,
+    targetKey: z.string().trim().min(1).max(200).nullable(),
+    suggestionType: guestSuggestionTypeSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.targetType === "plan" && value.targetKey !== null)
+      context.addIssue({
+        code: "custom",
+        path: ["targetKey"],
+        message: "Plan suggestions do not accept a target key.",
+      });
+    if (value.targetType !== "plan" && value.targetKey === null)
+      context.addIssue({
+        code: "custom",
+        path: ["targetKey"],
+        message: "A scoped target is required.",
+      });
+    if (
+      [
+        "remove_item",
+        "replace_item",
+        "reschedule_item",
+        "move_item",
+        "update_note",
+      ].includes(value.suggestionType) &&
+      value.targetType !== "item"
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["targetType"],
+        message: "This suggestion type requires an item.",
+      });
+    if (
+      value.suggestionType === "add_item" &&
+      !["plan", "day"].includes(value.targetType)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["targetType"],
+        message: "Add-item suggestions target a plan or day.",
+      });
+    if (
+      value.suggestionType === "change_route" &&
+      !["item", "route"].includes(value.targetType)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["targetType"],
+        message: "Route suggestions require a route anchor.",
+      });
+  });
+
+function suggestionMutationError(error: unknown): GuestActionError {
+  if (!(error instanceof Error)) return "suggestion_unavailable";
+  if (/rate_limited/.test(error.message)) return "rate_limited";
+  if (/immutable/.test(error.message)) return "suggestion_immutable";
+  return "suggestion_unavailable";
+}
+
+export async function createGuestSuggestionAction(
+  input: unknown,
+): Promise<Result<z.infer<typeof guestSuggestionSchema>>> {
+  const parsed = createSuggestionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid_suggestion" };
+  const token = await guestSessionToken();
+  if (!token) return { ok: false, error: "guest_unavailable" };
+  try {
+    return {
+      ok: true,
+      data: await createGuestSuggestion(token, parsed.data),
+    };
+  } catch (error) {
+    return { ok: false, error: suggestionMutationError(error) };
+  }
+}
+
+const updateSuggestionSchema = suggestionDetailsSchema
+  .extend({ suggestionId: z.uuid() })
+  .strict();
+
+export async function updateGuestSuggestionAction(
+  input: unknown,
+): Promise<Result<z.infer<typeof guestSuggestionSchema>>> {
+  const parsed = updateSuggestionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid_suggestion" };
+  const token = await guestSessionToken();
+  if (!token) return { ok: false, error: "guest_unavailable" };
+  try {
+    return {
+      ok: true,
+      data: await updateGuestSuggestion(token, parsed.data),
+    };
+  } catch (error) {
+    return { ok: false, error: suggestionMutationError(error) };
+  }
+}
+
+export async function deleteGuestSuggestionAction(
+  input: unknown,
+): Promise<Result<{ id: string; deleted: true }>> {
+  const parsed = z.object({ suggestionId: z.uuid() }).strict().safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid_suggestion" };
+  const token = await guestSessionToken();
+  if (!token) return { ok: false, error: "guest_unavailable" };
+  try {
+    return {
+      ok: true,
+      data: await deleteGuestSuggestion(token, parsed.data.suggestionId),
+    };
+  } catch (error) {
+    return { ok: false, error: suggestionMutationError(error) };
+  }
+}
+
+export async function listMemberGuestSuggestionsAction(
+  roomId: string,
+): Promise<Result<z.infer<typeof guestSuggestionSchema>[]>> {
+  if (!z.uuid().safeParse(roomId).success)
+    return { ok: false, error: "suggestion_unavailable" };
+  const { data, error } = await memberRpc("list_member_guest_suggestions", {
+    target_room_id: roomId,
+  });
+  if (error) return { ok: false, error: mapError(error) };
+  const parsed = guestSuggestionSchema.array().safeParse(data);
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, error: "suggestion_unavailable" };
+}
+
+export async function dismissGuestSuggestionAction(
+  input: unknown,
+): Promise<Result<z.infer<typeof guestSuggestionSchema>>> {
+  const parsed = z
+    .object({ suggestionId: z.uuid(), participantId: z.uuid() })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid_suggestion" };
+  const { data, error } = await memberRpc("dismiss_guest_suggestion", {
+    target_suggestion_id: parsed.data.suggestionId,
+    participant_id: parsed.data.participantId,
+  });
+  if (error) return { ok: false, error: mapError(error) };
+  const result = guestSuggestionSchema.safeParse(data);
+  return result.success
+    ? { ok: true, data: result.data }
+    : { ok: false, error: "suggestion_unavailable" };
+}
+
+const conversionSchema = z
+  .object({
+    suggestion: guestSuggestionSchema,
+    requiresRebaseConfirmation: z.boolean(),
+    originalPlanVersion: z.number().int().positive().optional(),
+    currentPlanVersion: z.number().int().positive().optional(),
+    warning: z.string().max(500).optional(),
+    revisionRequestId: z.uuid().nullable(),
+    created: z.boolean(),
+  })
+  .strict();
+export type GuestSuggestionConversion = z.infer<typeof conversionSchema>;
+
+export async function convertGuestSuggestionAction(
+  input: unknown,
+): Promise<Result<GuestSuggestionConversion>> {
+  const parsed = z
+    .object({
+      suggestionId: z.uuid(),
+      participantId: z.uuid(),
+      confirmRebase: z.boolean(),
+    })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid_suggestion" };
+  const { data, error } = await memberRpc("convert_guest_suggestion", {
+    target_suggestion_id: parsed.data.suggestionId,
+    participant_id: parsed.data.participantId,
+    confirm_rebase: parsed.data.confirmRebase,
+  });
+  if (error) return { ok: false, error: mapError(error) };
+  const result = conversionSchema.safeParse(data);
+  if (!result.success)
+    return { ok: false, error: "suggestion_unavailable" };
+  if (result.data.revisionRequestId && result.data.created)
+    schedulePlanChange(result.data.revisionRequestId);
+  return { ok: true, data: result.data };
 }

@@ -5,7 +5,10 @@ import { projectPublicItinerary } from "@/features/sharing/public-projection";
 import {
   guestCommentSchema,
   guestInviteVerificationSchema,
+  guestRoleSchema,
   guestSessionContextSchema,
+  guestSuggestionSchema,
+  guestSuggestionTypeSchema,
   plainTextCommentSchema,
 } from "./contracts";
 
@@ -43,6 +46,54 @@ function comment() {
 }
 
 describe("guest comment contracts", () => {
+  it("recognizes the suggestion-only guest role", () => {
+    expect(guestRoleSchema.parse("guest_suggester")).toBe("guest_suggester");
+  });
+
+  it("parses safe, version-attributed suggestion state", () => {
+    const parsed = guestSuggestionSchema.parse({
+      id: ids.comment,
+      originalPlanVersionId: ids.plan,
+      originalPlanVersion: 1,
+      rebasedToPlanVersionId: null,
+      rebasedToPlanVersion: null,
+      targetType: "item",
+      targetKey: "item:glacier",
+      targetLabel: "Glacier Point sunset",
+      suggestionType: "remove_item",
+      title: "Skip sunset",
+      details: "Use the evening for an earlier dinner.",
+      proposedDate: null,
+      proposedStartTime: null,
+      proposedEndTime: null,
+      status: "open",
+      guestDisplayName: "Jordan",
+      dismissedAt: null,
+      convertedAt: null,
+      revisionRequestId: null,
+      createdAt: "2026-07-19T00:10:00.000Z",
+      updatedAt: "2026-07-19T00:10:00.000Z",
+      isOwn: true,
+    });
+
+    expect(parsed.originalPlanVersion).toBe(1);
+    expect(parsed).not.toHaveProperty("guestSessionId");
+    expect(parsed).not.toHaveProperty("convertedBy");
+  });
+
+  it("supports only the eight structured suggestion types", () => {
+    expect(guestSuggestionTypeSchema.options).toEqual([
+      "add_item",
+      "remove_item",
+      "replace_item",
+      "reschedule_item",
+      "move_item",
+      "update_note",
+      "change_route",
+      "general",
+    ]);
+  });
+
   it("parses a privacy-safe exact-version invite projection", () => {
     const parsed = guestInviteVerificationSchema.parse({
       inviteId: ids.invite,

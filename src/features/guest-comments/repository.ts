@@ -8,6 +8,7 @@ import {
   guestInviteVerificationSchema,
   guestSessionContextSchema,
   guestSessionMetadataSchema,
+  guestSuggestionSchema,
 } from "./contracts";
 import { hashGuestToken } from "./token";
 
@@ -125,4 +126,99 @@ export async function deleteGuestComment(
     target_session_hash: sessionHash,
     target_comment_id: commentId,
   });
+}
+
+async function executeSuggestion(name: string, args: Record<string, unknown>) {
+  const { data, error } = await serviceRpc(name, args);
+  if (error) {
+    if (/rate limited/i.test(error.message ?? ""))
+      throw new Error("guest_suggestion_rate_limited");
+    if (/immutable/i.test(error.message ?? ""))
+      throw new Error("guest_suggestion_immutable");
+    if (/ownership/i.test(error.message ?? ""))
+      throw new Error("guest_suggestion_ownership");
+    throw new Error("guest_suggestion_unavailable");
+  }
+  const parsed = guestSuggestionSchema.safeParse(data);
+  if (!parsed.success) throw new Error("guest_suggestion_unavailable");
+  return parsed.data;
+}
+
+export async function createGuestSuggestion(
+  sessionToken: string,
+  input: {
+    targetType: string;
+    targetKey: string | null;
+    suggestionType: string;
+    title: string;
+    details: string;
+    proposedDate: string | null;
+    proposedStartTime: string | null;
+    proposedEndTime: string | null;
+  },
+) {
+  const sessionHash = safeHash(sessionToken);
+  if (!sessionHash) throw new Error("guest_suggestion_unavailable");
+  return executeSuggestion("create_guest_suggestion", {
+    target_session_hash: sessionHash,
+    target_type: input.targetType,
+    target_key: input.targetKey,
+    target_suggestion_type: input.suggestionType,
+    target_title: input.title,
+    target_details: input.details,
+    target_proposed_date: input.proposedDate,
+    target_proposed_start_time: input.proposedStartTime,
+    target_proposed_end_time: input.proposedEndTime,
+  });
+}
+
+export async function updateGuestSuggestion(
+  sessionToken: string,
+  input: {
+    suggestionId: string;
+    title: string;
+    details: string;
+    proposedDate: string | null;
+    proposedStartTime: string | null;
+    proposedEndTime: string | null;
+  },
+) {
+  const sessionHash = safeHash(sessionToken);
+  if (!sessionHash || !z.uuid().safeParse(input.suggestionId).success)
+    throw new Error("guest_suggestion_unavailable");
+  return executeSuggestion("update_guest_suggestion", {
+    target_session_hash: sessionHash,
+    target_suggestion_id: input.suggestionId,
+    target_title: input.title,
+    target_details: input.details,
+    target_proposed_date: input.proposedDate,
+    target_proposed_start_time: input.proposedStartTime,
+    target_proposed_end_time: input.proposedEndTime,
+  });
+}
+
+export async function deleteGuestSuggestion(
+  sessionToken: string,
+  suggestionId: string,
+) {
+  const sessionHash = safeHash(sessionToken);
+  if (!sessionHash || !z.uuid().safeParse(suggestionId).success)
+    throw new Error("guest_suggestion_unavailable");
+  const { data, error } = await serviceRpc("delete_guest_suggestion", {
+    target_session_hash: sessionHash,
+    target_suggestion_id: suggestionId,
+  });
+  if (error) {
+    if (/immutable/i.test(error.message ?? ""))
+      throw new Error("guest_suggestion_immutable");
+    if (/ownership/i.test(error.message ?? ""))
+      throw new Error("guest_suggestion_ownership");
+    throw new Error("guest_suggestion_unavailable");
+  }
+  const parsed = z
+    .object({ id: z.uuid(), deleted: z.literal(true) })
+    .passthrough()
+    .safeParse(data);
+  if (!parsed.success) throw new Error("guest_suggestion_unavailable");
+  return { id: parsed.data.id, deleted: true as const };
 }

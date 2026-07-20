@@ -112,7 +112,7 @@ reset role;
 select set_config('request.jwt.claim.sub','c6100000-0000-4000-8000-000000000001',true);
 set local role authenticated;
 select throws_ok(
-  $$select public.create_guest_invite('c6150000-0000-4000-8000-000000000001','c6120000-0000-4000-8000-000000000001','guest_suggester',repeat('3',64),'suggest3',now()+interval '1 day',5)$$,
+  $$select public.create_guest_invite('c6150000-0000-4000-8000-000000000001','c6120000-0000-4000-8000-000000000001','guest_admin',repeat('3',64),'invalid3',now()+interval '1 day',5)$$,
   'P0001','Guest role not allowed.','role escalation is denied'
 );
 create temporary table viewer_invite as
@@ -126,6 +126,12 @@ create temporary table commenter_invite as
     'c6150000-0000-4000-8000-000000000001',
     'c6120000-0000-4000-8000-000000000001',
     'guest_commenter',repeat('5',64),'comment5',now()+interval '1 day',5
+  ) payload;
+create temporary table suggester_invite as
+  select public.create_guest_invite(
+    'c6150000-0000-4000-8000-000000000001',
+    'c6120000-0000-4000-8000-000000000001',
+    'guest_suggester',repeat('8',64),'suggest8',now()+interval '1 day',5
   ) payload;
 reset role;
 
@@ -142,6 +148,10 @@ create temporary table commenter_session as
   select public.create_guest_session(repeat('5',64),repeat('b',64),'Jordan') payload;
 create temporary table second_commenter_session as
   select public.create_guest_session(repeat('5',64),repeat('c',64),'Casey') payload;
+create temporary table suggester_session as
+  select public.create_guest_session(repeat('8',64),repeat('e',64),'Morgan') payload;
+create temporary table second_suggester_session as
+  select public.create_guest_session(repeat('8',64),repeat('f',64),'Drew') payload;
 reset role;
 
 select is((select payload->>'planVersion' from verified_viewer),'1','invite verification remains exact-version bound');
@@ -149,6 +159,7 @@ select is((select payload->'itinerary'->>'version' from verified_viewer),'1','ve
 select ok((select payload::text !~* 'Exact private address|Private pickup|ABC123|latitude|longitude' from verified_viewer),'private lodging and coordinates stay hidden');
 select is((select payload->>'role' from viewer_session),'guest_viewer','viewer session cannot escalate its role');
 select is((select payload->>'role' from commenter_session),'guest_commenter','commenter session retains invite role');
+select is((select payload->>'role' from suggester_session),'guest_suggester','suggester session retains its suggestion-only role');
 select ok((select payload ? 'sessionHash' from commenter_session)=false,'session metadata omits the session credential hash');
 
 set local role service_role;
@@ -255,6 +266,164 @@ select ok(
   (public.get_guest_session_context(repeat('b',64))::text !~* 'memory|messages|participants|approvals|revisions'),
   'guest context excludes private room systems'
 );
+select throws_ok(
+  $$select public.create_guest_suggestion(repeat('a',64),'plan',null,'general','Viewer try','Viewer must not suggest',null,null,null)$$,
+  'P0001','Suggestions not allowed.','viewer cannot create suggestions'
+);
+select throws_ok(
+  $$select public.create_guest_suggestion(repeat('b',64),'plan',null,'general','Commenter try','Commenter must not suggest',null,null,null)$$,
+  'P0001','Suggestions not allowed.','commenter cannot create suggestions'
+);
+create temporary table stale_item_suggestion as
+  select public.create_guest_suggestion(
+    repeat('e',64),'item','item:v1','remove_item',
+    'Skip sunset','Use the evening for dinner.',null,null,null
+  ) payload;
+create temporary table stale_plan_suggestion as
+  select public.create_guest_suggestion(
+    repeat('e',64),'plan',null,'general',
+    'Slow down','Leave the current afternoon less crowded.',null,null,null
+  ) payload;
+create temporary table dismissible_suggestion as
+  select public.create_guest_suggestion(
+    repeat('e',64),'plan',null,'general',
+    'Add snacks','Bring snacks for the drive.',null,null,null
+  ) payload;
+create temporary table deletable_suggestion as
+  select public.create_guest_suggestion(
+    repeat('e',64),'plan',null,'general',
+    'Temporary idea','This one will be deleted.',null,null,null
+  ) payload;
+select throws_ok(
+  format(
+    'select public.update_guest_suggestion(%L,%L,%L,%L,null,null,null)',
+    repeat('f',64),
+    (select payload->>'id' from stale_item_suggestion),
+    'Other guest edit',
+    'A different session cannot edit this.'
+  ),
+  'P0001','Suggestion ownership required.','guest cannot edit another guest suggestion'
+);
+create temporary table edited_suggestion as
+  select public.update_guest_suggestion(
+    repeat('e',64),
+    ((select payload->>'id' from stale_item_suggestion)::uuid),
+    'Skip the sunset stop',
+    'Use the evening for an earlier dinner.',
+    null,null,null
+  ) payload;
+create temporary table deleted_suggestion as
+  select public.delete_guest_suggestion(
+    repeat('e',64),
+    ((select payload->>'id' from deletable_suggestion)::uuid)
+  ) payload;
+reset role;
+
+select is((select payload->>'originalPlanVersion' from edited_suggestion),'1','suggestion attribution remains pinned to Version 1');
+select is((select payload->>'title' from edited_suggestion),'Skip the sunset stop','guest edits their own open suggestion');
+select is((select payload->>'deleted' from deleted_suggestion),'true','guest deletes their own open suggestion');
+select ok(
+  (select payload ? 'guestSessionId' from edited_suggestion)=false,
+  'safe suggestion projection omits the guest session credential'
+);
+select ok(
+  (select public.get_guest_session_context(repeat('e',64))::text !~* 'memory|messages|participants|approvals|revisionRequestId'),
+  'suggester context excludes private crew systems and internal revision state'
+);
+
+select set_config('request.jwt.claim.sub','c6100000-0000-4000-8000-000000000002',true);
+set local role authenticated;
+create temporary table stale_warning as
+  select public.convert_guest_suggestion(
+    ((select payload->>'id' from stale_item_suggestion)::uuid),
+    'c6120000-0000-4000-8000-000000000002',
+    false
+  ) payload;
+select is((select payload->>'requiresRebaseConfirmation' from stale_warning),'true','stale suggestion never auto-converts');
+select like(
+  (select payload->>'warning' from stale_warning),
+  'This suggestion was made on Version 1. The trip is now on Version 2.%',
+  'stale warning identifies original and current versions'
+);
+select throws_ok(
+  format(
+    'select public.convert_guest_suggestion(%L,%L,true)',
+    (select payload->>'id' from stale_item_suggestion),
+    'c6120000-0000-4000-8000-000000000002'
+  ),
+  'P0001','Suggestion no longer applies. Rewrite or dismiss it.',
+  'missing current target blocks rebase conversion safely'
+);
+create temporary table plan_warning as
+  select public.convert_guest_suggestion(
+    ((select payload->>'id' from stale_plan_suggestion)::uuid),
+    'c6120000-0000-4000-8000-000000000002',
+    false
+  ) payload;
+create temporary table converted_suggestion as
+  select public.convert_guest_suggestion(
+    ((select payload->>'id' from stale_plan_suggestion)::uuid),
+    'c6120000-0000-4000-8000-000000000002',
+    true
+  ) payload;
+create temporary table converted_again as
+  select public.convert_guest_suggestion(
+    ((select payload->>'id' from stale_plan_suggestion)::uuid),
+    'c6120000-0000-4000-8000-000000000002',
+    true
+  ) payload;
+create temporary table dismissed_suggestion as
+  select public.dismiss_guest_suggestion(
+    ((select payload->>'id' from dismissible_suggestion)::uuid),
+    'c6120000-0000-4000-8000-000000000002'
+  ) payload;
+reset role;
+
+select is((select payload->>'requiresRebaseConfirmation' from plan_warning),'true','applicable stale suggestion still requires explicit confirmation');
+select is((select payload->'suggestion'->>'status' from converted_suggestion),'converted','confirmed suggestion becomes converted');
+select is((select payload->'suggestion'->>'originalPlanVersion' from converted_suggestion),'1','converted suggestion preserves original Version 1 attribution');
+select is((select payload->'suggestion'->>'rebasedToPlanVersion' from converted_suggestion),'2','converted suggestion records the current rebased Version 2');
+select is((select payload->>'revisionRequestId' from converted_suggestion),(select payload->>'revisionRequestId' from converted_again),'one suggestion converts to at most one revision request');
+select is(
+  (select base_plan_version::text from public.plan_change_requests where id=((select payload->>'revisionRequestId' from converted_suggestion)::uuid)),
+  '2',
+  'converted revision request is based on the current published version'
+);
+select is(
+  (select status::text from public.plan_change_requests where id=((select payload->>'revisionRequestId' from converted_suggestion)::uuid)),
+  'draft',
+  'conversion does not auto-approve the normal revision request'
+);
+select like(
+  (select request_text from public.plan_change_requests where id=((select payload->>'revisionRequestId' from converted_suggestion)::uuid)),
+  'Guest suggestion % from Version 1; rebased to Version 2 by Alex.%',
+  'revision copy records original version, rebased version, confirmer, and guest suggestion attribution'
+);
+select is((select payload->>'status' from dismissed_suggestion),'dismissed','member can dismiss an open suggestion');
+
+set local role service_role;
+select throws_ok(
+  format(
+    'select public.update_guest_suggestion(%L,%L,%L,%L,null,null,null)',
+    repeat('e',64),
+    (select payload->>'id' from dismissible_suggestion),
+    'Try terminal edit',
+    'Dismissed suggestions cannot change.'
+  ),
+  'P0001','Suggestion is immutable.','dismissed suggestion is immutable'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub','c6100000-0000-4000-8000-000000000003',true);
+set local role authenticated;
+select throws_ok(
+  format(
+    'select public.convert_guest_suggestion(%L,%L,true)',
+    (select payload->>'id' from stale_item_suggestion),
+    'c6120000-0000-4000-8000-000000000003'
+  ),
+  'P0001','Membership required.','cross-room conversion is denied'
+);
 reset role;
 
 select set_config('request.jwt.claim.sub','c6100000-0000-4000-8000-000000000001',true);
@@ -263,11 +432,16 @@ select public.revoke_guest_invite(
   ((select payload->>'id' from commenter_invite)::uuid),
   'c6120000-0000-4000-8000-000000000001'
 );
+select public.revoke_guest_invite(
+  ((select payload->>'id' from suggester_invite)::uuid),
+  'c6120000-0000-4000-8000-000000000001'
+);
 reset role;
 
 set local role service_role;
 select is(public.get_guest_session_context(repeat('b',64)),null,'revocation immediately invalidates an existing guest session');
 select is(public.verify_guest_invite_token_hash(repeat('5',64)),null,'revoked invite cannot be verified');
+select is(public.get_guest_session_context(repeat('e',64)),null,'revocation immediately invalidates suggester sessions');
 select throws_ok(
   $$select public.create_guest_plan_comment(repeat('b',64),'2026-09-12','item:v1','After revoke')$$,
   'P0001','Guest session unavailable.','revoked session cannot create comments'
