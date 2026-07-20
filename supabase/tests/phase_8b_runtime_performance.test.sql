@@ -1,5 +1,5 @@
 begin;
-select plan(24);
+select plan(31);
 
 select has_table(
   'private',
@@ -41,6 +41,12 @@ select has_function(
   'record_ai_runtime_telemetry',
   array['jsonb'],
   'service-only telemetry recorder exists'
+);
+select has_function(
+  'public',
+  'get_ai_runtime_benchmark_report',
+  array['text', 'timestamptz'],
+  'service-only aggregate benchmark report exists'
 );
 
 select is(
@@ -89,6 +95,30 @@ select function_privs_are(
   'service_role',
   array['EXECUTE'],
   'service role can record validated runtime telemetry'
+);
+select function_privs_are(
+  'public',
+  'get_ai_runtime_benchmark_report',
+  array['text', 'timestamptz'],
+  'authenticated',
+  array[]::text[],
+  'members cannot read runtime benchmark telemetry'
+);
+select function_privs_are(
+  'public',
+  'get_ai_runtime_benchmark_report',
+  array['text', 'timestamptz'],
+  'anon',
+  array[]::text[],
+  'anonymous clients cannot read runtime benchmark telemetry'
+);
+select function_privs_are(
+  'public',
+  'get_ai_runtime_benchmark_report',
+  array['text', 'timestamptz'],
+  'service_role',
+  array['EXECUTE'],
+  'service role can read aggregate runtime benchmark telemetry'
 );
 select hasnt_column(
   'private',
@@ -152,6 +182,16 @@ select ok(
   ),
   'anonymous callers cannot stop itinerary generation'
 );
+select ok(
+  pg_get_functiondef('public.start_ai_run(uuid,text,text)'::regprocedure)
+    like '%invocation.status in (''failed'', ''cancelled'')%',
+  'a stopped focused answer may be explicitly retried'
+);
+select ok(
+  pg_get_functiondef('public.start_ai_run(uuid,text,text)'::regprocedure)
+    not like '%invocation.status = ''cancelled'' or%',
+  'a stopped focused answer is not rejected as an automatic retry'
+);
 
 select public.record_ai_runtime_telemetry(
   jsonb_build_object(
@@ -186,6 +226,17 @@ select is(
   ),
   'success',
   'the recorder persists one bounded successful observation'
+);
+
+select is(
+  (
+    public.get_ai_runtime_benchmark_report(
+      repeat('a', 64),
+      '2026-07-20T17:59:00.000Z'
+    )->>'requestCount'
+  )::integer,
+  1,
+  'the benchmark report returns only bounded room observations'
 );
 
 select * from finish();
