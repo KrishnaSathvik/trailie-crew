@@ -1,5 +1,30 @@
 # Codex Collaboration Log
 
+## 2026-07-19 — Phase 6C.1 guest comments
+
+Started from clean `main` baseline `29627d6`. Human direction kept the phase to
+scoped Viewer/Commenter links, exact-version plain-text comments, immediate
+expiration/revocation, and privacy-safe guest projection; suggestions, activity,
+email/password invitations, direct editing, Production, and Phase 6C.2 remained
+out of scope. Codex added one focused migration with forced RLS, hashed invite
+and session tokens, narrow empty-`search_path` functions, member/guest ownership
+rules, rate limits, exact-version foreign keys, and host-only link lifecycle.
+The monochrome member and guest surfaces cover link management, display-name
+entry, plan/day/item threads, own-comment editing/deletion, member resolution,
+collapsed resolved comments, and explicit unavailable states without exposing
+chat, memory, participants, approvals, revisions, unpublished plans, or private
+lodging coordinates.
+
+Final evidence is 44 focused unit/component tests, 77 Phase 6C.1 pgTAP
+assertions, one passing local full guest/revision Playwright flow, a passing
+production build and static/security gates, and one passing protected hosted
+guest flow against Ready deployment `dpl_4VT6Qjzf7oiSjVNPx13A3fWjNVyH`.
+Hosted setup used deterministic published-version fixtures through existing
+member and service-only workflows so no broad AI or map suite was rerun.
+Vercel Authentication remained enabled, all temporary bypasses returned to
+zero, the linked non-production migration was applied, and Production was not
+deployed.
+
 ## 2026-07-18 — Phase 6A.1 destination/weather and Phase 6A.2 Mapbox boundary
 
 Started from `e3dcdf8` on `main`. Human direction kept the work narrow:
