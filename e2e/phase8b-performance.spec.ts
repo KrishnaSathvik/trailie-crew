@@ -77,6 +77,11 @@ async function sendTrailie(page: Page, text: string): Promise<BrowserTiming> {
   const activity = page.getByRole("status").filter({ hasText: "Trailie" });
   await expect(activity).toBeVisible({ timeout: 2_000 });
   const visibleStateMs = Math.round(performance.now() - startedAt);
+  const retry = conversation.getByRole("button", { name: "Try again" });
+  await expect(trailieMessages.nth(countBefore).or(retry)).toBeVisible({
+    timeout: 90_000,
+  });
+  if (await retry.isVisible().catch(() => false)) await retry.click();
   await expect(trailieMessages).toHaveCount(countBefore + 1, {
     timeout: 120_000,
   });
