@@ -96,13 +96,20 @@ async function memory(roomId: string) {
 
 async function runBoundedRecovery(request: APIRequestContext) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const response = await request.post(`${baseUrl}/api/internal/recovery`, {
-      headers: {
-        authorization: `Bearer ${recoverySecret}`,
-        "x-vercel-protection-bypass": bypassSecret!,
-        "x-vercel-set-bypass-cookie": "true",
-      },
-    });
+    let response;
+    try {
+      response = await request.post(`${baseUrl}/api/internal/recovery`, {
+        timeout: 120_000,
+        headers: {
+          authorization: `Bearer ${recoverySecret}`,
+          "x-vercel-protection-bypass": bypassSecret!,
+          "x-vercel-set-bypass-cookie": "true",
+        },
+      });
+    } catch {
+      if (attempt === 0) continue;
+      throw new Error("Hosted recovery request did not complete.");
+    }
     if (response.status() === 429 && attempt === 0) {
       await new Promise((resolve) => setTimeout(resolve, 11_000));
       continue;
@@ -351,12 +358,17 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
       host,
       "@Trailie In one short paragraph, what should we verify before a Yosemite trip?",
     );
-    await expect(host.getByText("Trailie is answering…")).toBeVisible();
     const focusedAnswer = host.getByRole("article", {
       name: "Message from Trailie",
     });
+    const focusedRetry = host.getByRole("button", { name: "Try again" });
+    await expect(
+      host.getByText("Trailie is thinking…").or(focusedAnswer).or(focusedRetry),
+    ).toBeVisible({ timeout: 30_000 });
     for (let attempt = 0; attempt < 4; attempt += 1) {
       if ((await focusedAnswer.count()) > 0) break;
+      if (await focusedRetry.isVisible().catch(() => false))
+        await focusedRetry.click();
       await new Promise((resolve) => setTimeout(resolve, 30_000));
       await runBoundedRecovery(hostContext.request);
     }

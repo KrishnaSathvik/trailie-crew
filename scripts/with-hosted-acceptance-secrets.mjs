@@ -28,6 +28,7 @@ const supabaseKeys = JSON.parse(
     "api-keys",
     "--project-ref",
     supabaseProjectRef,
+    "--reveal",
     "-o",
     "json",
   ]).stdout,
