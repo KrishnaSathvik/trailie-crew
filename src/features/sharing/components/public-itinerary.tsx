@@ -8,6 +8,7 @@ import type { MapConfiguration } from "@/features/maps/config";
 import { PublicItineraryMap } from "@/features/maps/components/public-itinerary-map";
 import { CommentThread } from "@/features/guest-comments/components/comment-thread";
 import { SuggestionThread } from "@/features/guest-comments/components/suggestion-thread";
+import { BookingOptions, type BookingHandoff } from "@/features/booking/components/booking-options";
 import type {
   GuestComment,
   GuestRole,
@@ -57,6 +58,7 @@ export function PublicItinerary({
   map,
   commenting,
   suggesting,
+  bookingHandoffs,
 }: {
   itinerary: PublicSharedItinerary;
   generatedAt?: string;
@@ -72,6 +74,7 @@ export function PublicItinerary({
   suggesting?: {
     suggestions: GuestSuggestion[];
   };
+  bookingHandoffs?: BookingHandoff[];
 }) {
   const travel = itinerary.days.flatMap((day) =>
     day.travelSegments.map((segment) => ({ date: day.date, segment })),
@@ -121,6 +124,7 @@ export function PublicItinerary({
             <Status value={`source version ${itinerary.version}`} />
           </div>
         </section>
+        {bookingHandoffs?.length ? <BookingOptions handoffs={bookingHandoffs} /> : null}
         {commenting ? (
           <CommentThread
             mode={commenting.mode}
