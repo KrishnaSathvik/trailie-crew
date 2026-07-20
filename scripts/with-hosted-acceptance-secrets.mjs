@@ -35,8 +35,13 @@ const supabaseKeys = JSON.parse(
 const supabaseKey =
   supabaseKeys.find((item) => item.name === "service_role") ??
   supabaseKeys.find((item) => item.type === "secret");
+const supabasePublicKey =
+  supabaseKeys.find((item) => item.type === "publishable") ??
+  supabaseKeys.find((item) => item.name === "anon");
 if (!supabaseKey?.api_key)
   throw new Error("Linked Supabase secret is unavailable.");
+if (!supabasePublicKey?.api_key)
+  throw new Error("Linked Supabase public key is unavailable.");
 
 let recoverySecret = process.env.RECOVERY_SECRET;
 if (process.env.ROTATE_HOSTED_RECOVERY_SECRET === "1") {
@@ -121,6 +126,8 @@ try {
       CLEANUP_SECRET: recoverySecret,
       HOSTED_ACCEPTANCE: "1",
       HOSTED_BASE_URL: hostedBaseUrl,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabasePublicKey.api_key,
+      NEXT_PUBLIC_SUPABASE_URL: `https://${supabaseProjectRef}.supabase.co`,
       RECOVERY_SECRET: recoverySecret,
       SUPABASE_SECRET_KEY: supabaseKey.api_key,
       VERCEL_AUTOMATION_BYPASS_SECRET: bypassSecret,
