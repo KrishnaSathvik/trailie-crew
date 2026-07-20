@@ -19,8 +19,33 @@ import {
 import { StructuredBodyExtractor } from "@/server/ai/streaming-body";
 import { extractUsage } from "@/server/ai/usage";
 import { normalizeProviderError } from "@/server/ai/reliability-policy";
+import { logOperation } from "@/server/operations/logger";
 
 const focusedAnswerModelSchema = trailieResponseDraftV1Schema;
+
+function omitProviderFormatAnnotations(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map((item) => omitProviderFormatAnnotations(item));
+  if (typeof value !== "object" || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "format")
+      .map(([key, entryValue]) => [
+        key,
+        omitProviderFormatAnnotations(entryValue),
+      ]),
+  );
+}
+
+function createFocusedAnswerTextFormat(
+  schema: ReturnType<typeof createTrailieResponseDraftV1SchemaForBlocks>,
+) {
+  const format = zodTextFormat(schema, "trailie_focused_answer");
+  format.schema = omitProviderFormatAnnotations(
+    format.schema,
+  ) as typeof format.schema;
+  return format;
+}
 
 export function buildFocusedAnswerRequest(input: {
   model: string;
@@ -48,9 +73,8 @@ export function buildFocusedAnswerRequest(input: {
     ].join("\n\n"),
     reasoning: { effort: "low" as const },
     text: {
-      format: zodTextFormat(
+      format: createFocusedAnswerTextFormat(
         createTrailieResponseDraftV1SchemaForBlocks(policy.outputBlocks),
-        "trailie_focused_answer",
       ),
     },
     max_output_tokens: 900,
@@ -61,6 +85,71 @@ export function buildFocusedAnswerRequest(input: {
 
 export function normalizeFocusedAnswerModelOutput(value: unknown) {
   return focusedAnswerModelSchema.parse(value);
+}
+
+function boundedProviderIdentifier(value: unknown) {
+  return typeof value === "string" &&
+    value.length <= 200 &&
+    /^[a-zA-Z0-9_.:-]+$/.test(value)
+    ? value
+    : null;
+}
+
+const schemaHintPatterns = [
+  ["additionalProperties", /\badditionalproperties\b/i],
+  ["allOf", /\ballof\b/i],
+  ["anyOf", /\banyof\b/i],
+  ["dependentRequired", /\bdependentrequired\b/i],
+  ["dependentSchemas", /\bdependentschemas\b/i],
+  ["format", /\bformat\b/i],
+  ["maxItems", /\bmaxitems\b/i],
+  ["maxLength", /\bmaxlength\b/i],
+  ["maximum", /\bmaximum\b/i],
+  ["minItems", /\bminitems\b/i],
+  ["minLength", /\bminlength\b/i],
+  ["minimum", /\bminimum\b/i],
+  ["multipleOf", /\bmultipleof\b/i],
+  ["oneOf", /\boneof\b/i],
+  ["pattern", /\bpattern\b/i],
+  ["patternProperties", /\bpatternproperties\b/i],
+  ["required", /\brequired\b/i],
+  ["root", /\broot\b/i],
+] as const;
+
+function safeSchemaHints(value: unknown) {
+  if (typeof value !== "string") return [];
+  return schemaHintPatterns
+    .filter(([, pattern]) => pattern.test(value))
+    .map(([name]) => name)
+    .slice(0, 8);
+}
+
+export function safeOpenAIContractErrorMetadata(error: unknown) {
+  if (typeof error !== "object" || error === null)
+    return {
+      providerErrorCode: null,
+      providerErrorParam: null,
+      providerRequestId: null,
+      providerSchemaHints: [],
+      providerStatus: null,
+    };
+  const record = error as Record<string, unknown>;
+  const headers = record.headers instanceof Headers ? record.headers : null;
+  return {
+    providerErrorCode: boundedProviderIdentifier(record.code),
+    providerErrorParam: boundedProviderIdentifier(record.param),
+    providerRequestId:
+      boundedProviderIdentifier(record.request_id) ??
+      boundedProviderIdentifier(headers?.get("x-request-id")),
+    providerSchemaHints: safeSchemaHints(record.message),
+    providerStatus:
+      typeof record.status === "number" &&
+      Number.isInteger(record.status) &&
+      record.status >= 100 &&
+      record.status <= 599
+        ? record.status
+        : null,
+  };
 }
 
 export function mapFocusedProviderError(error: unknown, signal?: AbortSignal) {
@@ -83,6 +172,10 @@ export function mapFocusedProviderError(error: unknown, signal?: AbortSignal) {
     error instanceof OpenAI.BadRequestError ||
     error instanceof OpenAI.UnprocessableEntityError
   ) {
+    logOperation(
+      "trailie_ai.provider_contract_rejected",
+      safeOpenAIContractErrorMetadata(error),
+    );
     code = "invalid_model_response";
     retryable = false;
   } else if (

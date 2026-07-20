@@ -633,7 +633,7 @@ describe("deterministic itinerary validation", () => {
     );
   });
 
-  it("blocks hard constraints and missing confirmed decisions", () => {
+  it("keeps hard constraints blocked while routing missing decisions to bounded repair", () => {
     const plan = itinerary();
     plan.days[0].items[0].startTime = "09:00";
     plan.days[0].items[1].title = "Mountain overlook";
@@ -644,6 +644,17 @@ describe("deterministic itinerary validation", () => {
         "hard_constraint_violation",
         "confirmed_decision_missing",
       ]),
+    );
+
+    const missingDecisionOnly = itinerary();
+    missingDecisionOnly.days[0].items[1].title = "Mountain overlook";
+    const repairableReport = validate(missingDecisionOnly);
+    expect(repairableReport.status).toBe("needs_revision");
+    expect(repairableReport.issues).toContainEqual(
+      expect.objectContaining({
+        code: "confirmed_decision_missing",
+        repairable: true,
+      }),
     );
   });
 

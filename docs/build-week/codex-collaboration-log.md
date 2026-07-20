@@ -416,25 +416,59 @@ current Trip facts and current versions prioritized. Provider calls use the
 existing cache, per-room/global limits, bounded concurrency, typed failure
 classes, and independent-call parallelism.
 
-Protected hosted acceptance found and fixed two real defects: fresh rooms
-initially rejected simple chat before the first memory extraction, and a
-stopped focused request advertised a retry that durable state rejected. It also
-showed the full response-block union was too broad for a focused request, so
-the model schema is now narrowed to the detected intent's permitted blocks.
-The final protected deployment `dpl_5qB8ZRVzUX9TDMffjrbMgXwxuJhU` is Ready on
-the `hosted-acceptance` target only. Vercel Authentication remains enabled,
-Production was not deployed, and bypass count is zero.
+Protected hosted acceptance found and fixed four real defects. Fresh rooms
+initially rejected simple chat before the first memory extraction; stopped
+focused requests advertised a retry that durable state rejected; the focused
+response-block union was broader than the detected intent allowed; and the
+configured fast route rejected provider-facing `format` annotations inside the
+strict JSON schema. The provider schema now omits only those incompatible
+annotations while retaining the complete Zod application validation contract
+and the SDK's non-enumerable parser hooks. Safe contract diagnostics record
+only bounded error identifiers and schema-key hints, never provider bodies or
+private request content.
 
-Hosted acceptance is nevertheless a **miss**. The configured fast route still
-receives an HTTP 400 `invalid_model_output` before a first token, even after
-intent narrowing; the memory route succeeds. Two aggregate failed fast-route
-samples measured visible-output p50/p95 at 456/465 ms, total p50/p95 at
-790/1,361 ms, and database/context-tool p50/p95 at 241/253 ms, with zero input
-or output tokens and unavailable cost. There is no successful first-token or
-completion sample. Tool-backed answers, planning, itinerary generation, small
-and large revisions, cancellation/retry, concurrency, and mobile streaming
-were not reached in the live benchmark, so no hosted p50/p95 is claimed for
-them. The remaining blocker is the exact fast-model request-contract
-incompatibility; its safe provider body is intentionally not logged. Phase 8B
-therefore improves and verifies the local runtime architecture but does not
-pass hosted performance acceptance or authorize Production hardening.
+The final successful fast/context sample set on protected acceptance contained
+three normal-chat and two context-backed requests. Normal chat completed at
+p50/p95/max 2.508/4.455/4.671 seconds (**pass**) with first-token
+p50/p95 1.705/3.809 seconds (**close/miss**) and visible-state p50/p95
+593/722 ms (**miss**). Context-backed responses completed at p50/p95/max
+2.136/2.294/2.312 seconds (**pass**), with first-token p50/p95
+1.067/1.163 seconds and visible-state p50/p95 311/385 ms. Normal-chat
+database/context tool time was p50/p95 369/610 ms; context-backed tool time was
+185/228 ms. Route usage was fast-only for these requests, with 7,422 input and
+632 output tokens in aggregate. Cost remained unavailable from the configured
+provider response.
+
+Planning-summary wall time was 42.633 seconds (**miss** against 12/20 seconds).
+Full itinerary generation entered the reasoning/planning route, generated a
+candidate in 161.260 seconds, validated in under one second, ran one bounded
+93.110-second repair, and still required revision. Aggregate itinerary
+telemetry, which includes the recovery claim, reported p50/p95/max
+128.129/243.350/256.152 seconds; browser wall time exceeded the 300-second
+bound (**miss** against 45/75 seconds). No partial itinerary was published.
+The hosted run exposed two itinerary state defects: an omitted approved
+decision was incorrectly considered non-repairable, and exhausted repair left
+the plan indefinitely active. Missing decisions now enter the single existing
+repair path, while a still-invalid repaired draft terminates as blocked. Both
+changes have deterministic worker/validation regressions; the terminal-state
+fix was made after the bounded hosted run and was not redeployed or presented
+as a hosted pass.
+
+The bounded hosted benchmark stopped at the full-itinerary miss, so no hosted
+p50/p95 is claimed for tool-backed chat, small or large revisions,
+cancellation/retry, two-user concurrency, or mobile streaming. Their routing,
+state, cancellation, concurrency, slow-network, and accessibility behavior
+remains covered by deterministic focused suites. The dominant hosted
+bottleneck is reasoning-provider generation and repair, not local validation;
+structured provider token/cost timing is also still incomplete. The final
+candidate `dpl_23EZkQZG9XAJgi9v7UEJjNLhEwQZ` is Ready on the protected
+`hosted-acceptance` target only. Vercel Authentication remains enabled,
+temporary bypass count is zero, and Production was not deployed.
+
+Phase 8B verdict: **local architecture and focused verification pass; protected
+hosted performance acceptance misses**. Fast and context-backed responses are
+functional, but immediate-state/TTFT targets need improvement and the
+reasoning/planning route is far outside the itinerary target. Production
+hardening is not authorized; the next optimization is reducing
+reasoning-provider generation/repair latency and completing a fresh bounded
+hosted matrix after the terminal-state fix.

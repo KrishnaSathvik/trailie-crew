@@ -138,7 +138,10 @@ async function waitForVisibleWithRecovery(
 }
 
 async function runtimeReport(roomId: string, windowStartedAt: string) {
-  const roomHash = createHash("sha256").update(roomId).digest("hex");
+  const roomHash = createHash("sha256")
+    .update("trailie-runtime-room-v1:")
+    .update(roomId)
+    .digest("hex");
   const { data, error } = await admin!.rpc("get_ai_runtime_benchmark_report", {
     target_room_id_hash: roomHash,
     window_started_at: windowStartedAt,
@@ -243,9 +246,7 @@ test("protected hosted Phase 8B runtime benchmark and acceptance", async ({
   const planningStartedAt = performance.now();
   await page.getByRole("button", { name: "Prepare trip brief" }).click();
   await expect(
-    page
-      .getByText("Understanding your trip")
-      .or(page.getByText("Checking dates and preferences")),
+    page.getByRole("heading", { name: "Trailie is checking the trip." }),
   ).toBeVisible({ timeout: 2_000 });
   await waitForVisibleWithRecovery(
     page.getByRole("heading", { name: "Before I build the trip" }),
@@ -261,16 +262,20 @@ test("protected hosted Phase 8B runtime benchmark and acceptance", async ({
   const itineraryStartedAt = performance.now();
   await page.getByRole("button", { name: "Create the Plan" }).click();
   await expect(
-    page
-      .getByText("Building the day-by-day plan")
-      .or(page.getByText("Checking timing and routes"))
-      .or(page.getByText("Preparing the itinerary")),
+    page.getByRole("heading", {
+      name: "Trailie is checking the Plan before you see it.",
+    }),
   ).toBeVisible({ timeout: 2_000 });
+  const publishedPlan = page.getByText("Current plan · Version 1");
+  const terminalPlanFailure = page
+    .getByRole("heading", { name: "This Plan cannot be published yet." })
+    .or(page.getByRole("heading", { name: "The Plan could not be created." }));
   await waitForVisibleWithRecovery(
-    page.getByText("Current plan · Version 1"),
+    publishedPlan.or(terminalPlanFailure),
     context.request,
     300_000,
   );
+  await expect(publishedPlan).toBeVisible();
   const fullItineraryMs = Math.round(performance.now() - itineraryStartedAt);
 
   await page.getByRole("button", { name: "Chat" }).first().click();

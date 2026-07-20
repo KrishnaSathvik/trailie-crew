@@ -777,7 +777,7 @@ export function validateItinerary(input: Input): ValidationReport {
           "critical",
           `The approved decision “${decision.label}” is missing.`,
           [],
-          false,
+          true,
         ),
       );
     }

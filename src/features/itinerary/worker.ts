@@ -548,6 +548,7 @@ async function validateAndRecord(
     resolution: CanonicalDestinationResolutionV1;
   } | null,
   dependencies: Dependencies,
+  terminalIfInvalid = false,
 ) {
   if (destinationResolution)
     traceDestinationResolution({
@@ -648,7 +649,7 @@ async function validateAndRecord(
     id,
     "constraint_validation_started",
   );
-  const report = validateItinerary({
+  const validationReport = validateItinerary({
     itinerary: normalizedItinerary,
     approvedSummary: context.approvedSummary,
     evidence: enriched.evidence,
@@ -658,6 +659,10 @@ async function validateAndRecord(
     minimumTravelBufferMinutes: 15,
     maximumDailyDriveMinutes: 360,
   });
+  const report =
+    terminalIfInvalid && validationReport.status === "needs_revision"
+      ? ({ ...validationReport, status: "blocked" } as const)
+      : validationReport;
   if (destinationResolution)
     traceDestinationResolution({
       stage: "final_validation",
@@ -844,6 +849,7 @@ export async function processItineraryGeneration(
       live.evidence,
       live.destinationResolution,
       dependencies,
+      firstClaim.stage === "repair",
     );
     if (result.report.status === "pass") {
       if (dependencies.travelIntelligence) {
@@ -919,6 +925,7 @@ export async function processItineraryGeneration(
       live.evidence,
       live.destinationResolution,
       dependencies,
+      true,
     );
     if (result.report.status === "pass") {
       if (dependencies.travelIntelligence) {

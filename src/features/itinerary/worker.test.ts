@@ -263,7 +263,7 @@ describe("itinerary worker", () => {
     expect(calls.published).toBe(0);
   });
 
-  it("does not loop when the single repair remains invalid", async () => {
+  it("ends in a blocked state when the single repair remains invalid", async () => {
     const { repo, calls } = repository();
     const provider = createFakeItineraryProvider();
     provider.repair = provider.generate;
@@ -274,7 +274,7 @@ describe("itinerary worker", () => {
       safetyIdentifier: "safe",
       now: "2026-07-13T19:00:00.000Z",
     });
-    expect(calls.reports).toEqual(["needs_revision", "needs_revision"]);
+    expect(calls.reports).toEqual(["needs_revision", "blocked"]);
     expect(calls.claims).toBe(2);
     expect(calls.published).toBe(0);
   });
