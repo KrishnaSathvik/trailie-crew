@@ -361,3 +361,80 @@ completes and the remaining operational launch items are closed.
 Implementation commits: `454b0f8` (product experience refinement),
 `c93b5ef`/`116a60b` (Trailie intelligence and audit), and the hosted harness
 hardening commit recorded with this entry.
+
+## 2026-07-20 — Phase 8B runtime performance
+
+Started from accepted Phase 8A commit `ff4a8b3` on `main`. The traced runtime is:
+authorized source receipt → deterministic invocation detection → intent and
+complexity classification → bounded Trip/context reads → server-only route and
+tool selection → provider/model call → sentence-buffered safe text streaming
+or atomic structured buffering → schema/feasibility validation and bounded
+repair → evidence/map/booking binding → validated persistence → final UI
+reconciliation. Stop, timeout, retry, recovery, and fallback now terminate or
+resume at durable boundaries without publishing cancelled itinerary/revision
+state.
+
+Routing has one server-side source of truth. Instant and unsupported work is
+local/deterministic. Simple and context-backed answers use the configured fast
+route; small targeted revisions use that route or a deterministic constrained
+patch. Destination comparison, planning summaries, full itineraries, group
+conflicts, and large revisions use the configured reasoning/planning route.
+Weather, NPS/RIDB, geocoding/directions, map, hotel/flight, and booking guidance
+use the tool pipeline before an approved model route. Repository/acceptance
+configuration maps these to Terra for fast answers, Luna for memory, and Sol
+for reasoning/planning/itinerary work; the hosted run directly observed Terra
+and Luna, while Sol routes were not reached.
+
+Safe private telemetry records salted room references, route/complexity, stage
+timings, tool classes, cache/retry/failure observations, usage/cost when
+available, and terminal reasons. Prompts, conversations, memory bodies,
+credentials, invite/session tokens, private lodging, and generated private
+URLs are excluded. A service-only aggregate report returns percentiles and
+counts without raw rows. The deterministic benchmark defines exactly 39
+non-sensitive fixtures (10 simple, 10 context-backed, 5 tool-backed, 3 planning
+summaries, 3 itineraries, 5 small revisions, and 3 large revisions) and proves
+the expected routes and aggregation. It does not substitute synthetic fixture
+timings for live performance.
+
+Normal chat now shows an immediate real stage, streams sanitized sentence-safe
+text without duplicate reconciliation, preserves only understandable partial
+text after Stop, and exposes retryable stopped/failed states. Structured
+planning, itinerary, map, booking, and revision payloads remain buffered,
+validated, atomically revealed, and persisted only after validation. Planning,
+itinerary, and revision UI uses stage-specific, accessible progress and
+longer-than-usual copy. Cancellation is idempotent; focused retries receive
+fresh quota/provider identities; cancelled plans cannot publish; and small
+revisions retain their affected-item/day path instead of rebuilding the full
+Plan.
+
+Local focused verification passed the routing, telemetry, streaming,
+cancellation, concurrency, timeout, itinerary, revision, provider, mobile, and
+accessibility suites, the 31-case Phase 8B pgTAP contract, formatting, lint,
+typecheck, production build, bundle/secret scans, and `git diff --check`.
+Context is capped at 12 relevant recent messages and 12,000 characters, with
+current Trip facts and current versions prioritized. Provider calls use the
+existing cache, per-room/global limits, bounded concurrency, typed failure
+classes, and independent-call parallelism.
+
+Protected hosted acceptance found and fixed two real defects: fresh rooms
+initially rejected simple chat before the first memory extraction, and a
+stopped focused request advertised a retry that durable state rejected. It also
+showed the full response-block union was too broad for a focused request, so
+the model schema is now narrowed to the detected intent's permitted blocks.
+The final protected deployment `dpl_5qB8ZRVzUX9TDMffjrbMgXwxuJhU` is Ready on
+the `hosted-acceptance` target only. Vercel Authentication remains enabled,
+Production was not deployed, and bypass count is zero.
+
+Hosted acceptance is nevertheless a **miss**. The configured fast route still
+receives an HTTP 400 `invalid_model_output` before a first token, even after
+intent narrowing; the memory route succeeds. Two aggregate failed fast-route
+samples measured visible-output p50/p95 at 456/465 ms, total p50/p95 at
+790/1,361 ms, and database/context-tool p50/p95 at 241/253 ms, with zero input
+or output tokens and unavailable cost. There is no successful first-token or
+completion sample. Tool-backed answers, planning, itinerary generation, small
+and large revisions, cancellation/retry, concurrency, and mobile streaming
+were not reached in the live benchmark, so no hosted p50/p95 is claimed for
+them. The remaining blocker is the exact fast-model request-contract
+incompatibility; its safe provider body is intentionally not logged. Phase 8B
+therefore improves and verifies the local runtime architecture but does not
+pass hosted performance acceptance or authorize Production hardening.
