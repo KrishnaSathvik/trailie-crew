@@ -233,9 +233,40 @@ export const trailieInvocationDecisionSchema = z.discriminatedUnion("invoked", [
     .strict(),
 ]);
 
+export const trailieProgressStageSchema = z.enum([
+  "reading_conversation",
+  "checking_trip",
+  "looking_up_current_information",
+  "preparing_answer",
+  "understanding_trip",
+  "checking_dates_preferences",
+  "building_day_by_day_plan",
+  "checking_timing_routes",
+  "preparing_itinerary",
+  "reviewing_requested_change",
+  "checking_current_plan",
+  "measuring_impact",
+  "updating_affected_parts",
+  "checking_proposed_changes",
+  "preparing_crew_review",
+  "finding_verified_locations",
+  "checking_route_information",
+  "preparing_map",
+  "checking_reservation_requirements",
+  "finding_official_booking_options",
+  "preparing_provider_links",
+  "taking_longer",
+]);
+
 export const trailieStreamEventSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("invocation_started"), invocationId: z.uuid() })
+    .strict(),
+  z
+    .object({
+      type: z.literal("progress_state"),
+      stage: trailieProgressStageSchema,
+    })
     .strict(),
   z
     .object({
@@ -1571,6 +1602,7 @@ export type TrailieInvocationType = z.infer<typeof trailieInvocationTypeSchema>;
 export type TrailieInvocationDecision = z.infer<
   typeof trailieInvocationDecisionSchema
 >;
+export type TrailieProgressStage = z.infer<typeof trailieProgressStageSchema>;
 export type TrailieStreamEvent = z.infer<typeof trailieStreamEventSchema>;
 export type AiInvocationStatus = z.infer<typeof aiInvocationStatusSchema>;
 export type AiRunStatus = z.infer<typeof aiRunStatusSchema>;

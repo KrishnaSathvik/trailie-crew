@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { consumeFocusedStream } from "./focused-stream";
 
@@ -35,7 +35,7 @@ describe("focused stream completion contract", () => {
     ).rejects.toBe(providerError);
   });
 
-  it("returns visible text only after a validated completion exists", async () => {
+  it("observes model deltas before completion while retaining the full buffer", async () => {
     const result = {
       answer: {
         schemaVersion: "1" as const,
@@ -62,14 +62,19 @@ describe("focused stream completion contract", () => {
         totalTokens: 15,
       },
     };
+    const onTextDelta = vi.fn();
     await expect(
-      consumeFocusedStream({
-        textDeltas: (async function* () {
-          yield "Com";
-          yield "plete.";
-        })(),
-        completed: Promise.resolve(result),
-      }),
+      consumeFocusedStream(
+        {
+          textDeltas: (async function* () {
+            yield "Com";
+            yield "plete.";
+          })(),
+          completed: Promise.resolve(result),
+        },
+        { onTextDelta },
+      ),
     ).resolves.toEqual({ bufferedDeltas: ["Com", "plete."], result });
+    expect(onTextDelta.mock.calls).toEqual([["Com"], ["plete."]]);
   });
 });

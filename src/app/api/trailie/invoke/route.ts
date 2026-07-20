@@ -3,8 +3,10 @@ import {
   itinerarySchema,
   planVersionSummarySchema,
   roomMemorySnapshotSchema,
+  trailieResponseDraftV1Schema,
   trailieResponseV1Schema,
   trailieStreamEventSchema,
+  type TrailieProgressStage,
   tripPlanViewSchema,
   type TrailieResponseV1,
 } from "@trailie/schemas";
@@ -24,11 +26,14 @@ import {
 } from "@/features/trailie/intelligence/reference-resolution";
 import { authorizeTrailieSource } from "@/features/trailie/invocation/authorize-source";
 import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
-import { parseOpenAIEnv } from "@/server/env";
+import { parseOpenAIEnv, parseTravelProviderEnv } from "@/server/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assembleFocusedContext } from "@/server/ai/context";
 import { logAiEvent } from "@/server/ai/logger";
-import { createModelRouter } from "@/server/ai/model-router";
+import {
+  createTrailieRuntimeRouter,
+  type TrailieRequestComplexity,
+} from "@/server/ai/model-router";
 import { createOpenAIFocusedAnswerProvider } from "@/server/ai/openai-provider";
 import {
   createFakeFocusedAnswerProvider,
@@ -51,6 +56,20 @@ import type { ProviderAttemptExecutionResult } from "@/server/ai/provider-attemp
 import { ProviderFailure } from "@/server/ai/reliability-policy";
 import { consumeFocusedStream } from "@/server/ai/focused-stream";
 import { withHostedFocusedFault } from "@/server/ai/hosted-acceptance-faults";
+import { createSafeTrailieTextStream } from "@/server/ai/safe-streaming";
+import {
+  createRuntimeTrace,
+  type TrailieResponseType,
+  type TrailieToolClass,
+} from "@/server/ai/runtime-telemetry";
+import { createRuntimeTelemetryRepository } from "@/server/ai/runtime-telemetry-repository";
+import {
+  createTravelProviderRegistry,
+  withTravelProviderCache,
+} from "@/server/travel/provider-registry";
+import { createTravelProviderCacheRepository } from "@/server/travel/cache-repository";
+import { createTravelProviderOperationController } from "@/server/travel/operation-repository";
+import { collectDestinationTravelEvidence } from "@/server/travel/intelligence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -173,11 +192,90 @@ function providerFor(
   );
 }
 
+function responseTypeFor(
+  complexity: TrailieRequestComplexity,
+): TrailieResponseType {
+  if (complexity === "context_backed") return "context_backed";
+  if (complexity === "tool_backed" || complexity === "evidence_refresh")
+    return "tool_backed";
+  if (complexity === "planning_summary") return "planning_summary";
+  if (complexity === "full_itinerary") return "full_itinerary";
+  if (complexity === "small_revision") return "small_revision";
+  if (complexity === "large_revision") return "large_revision";
+  if (complexity === "map_resolution") return "map";
+  if (complexity === "booking_guidance") return "booking";
+  if (complexity === "unsupported") return "unsupported";
+  return "normal_chat";
+}
+
+function selectedToolClasses(intent: string): TrailieToolClass[] {
+  if (intent === "weather_question") return ["weather", "database_read"];
+  if (intent === "permit_question") return ["nps", "ridb", "database_read"];
+  if (intent === "route_question")
+    return ["maps_geocoding", "directions", "database_read"];
+  if (intent === "map_question") return ["maps_geocoding", "database_read"];
+  if (intent === "evidence_question") return ["nps", "ridb", "database_read"];
+  if (
+    [
+      "reservation_question",
+      "lodging_recommendation",
+      "lodging_search",
+      "flight_guidance",
+      "flight_search",
+      "booking_handoff",
+    ].includes(intent)
+  )
+    return [
+      "booking_normalization",
+      "approved_search_handoff",
+      "database_read",
+    ];
+  return ["database_read"];
+}
+
+function progressStageFor(
+  complexity: TrailieRequestComplexity,
+): TrailieProgressStage {
+  if (complexity === "planning_summary") return "understanding_trip";
+  if (complexity === "small_revision" || complexity === "large_revision")
+    return "reviewing_requested_change";
+  if (complexity === "map_resolution") return "preparing_map";
+  if (complexity === "booking_guidance") return "preparing_provider_links";
+  return "preparing_answer";
+}
+
+function localUnsupportedDraft() {
+  return trailieResponseDraftV1Schema.parse({
+    schemaVersion: "1",
+    intent: "unsupported_action",
+    message: "I cannot complete that action.",
+    blocks: [
+      {
+        type: "error_state",
+        title: "That action is not available",
+        detail: "I can help you prepare the next step instead.",
+        actionLabel: null,
+      },
+    ],
+    warnings: [],
+    sources: [],
+    assumptions: [],
+    unresolvedQuestions: [],
+    suggestedActions: [],
+    persistenceDirective: "none",
+    approvalDirective: "not_required",
+    freshness: "not_applicable",
+    privacyLevel: "room",
+  });
+}
+
 export async function POST(request: Request) {
+  const requestReceivedAt = Date.now();
   const correlationId = createCorrelationId();
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError("source_message_invalid", 400);
 
+  const permissionStartedAt = Date.now();
   const client = await createServerSupabaseClient();
   const { data: authData, error: authError } = await client.auth.getUser();
   if (authError || !authData.user) return jsonError("membership_required", 401);
@@ -226,7 +324,9 @@ export async function POST(request: Request) {
     })
   )
     return jsonError("permission_denied", 403);
+  const permissionEndedAt = Date.now();
 
+  const contextStartedAt = Date.now();
   let replyTargetType: "user" | "system" | "trailie" | null = null;
   let replyTarget: typeof source | null = null;
   if (source.reply_to_message_id) {
@@ -244,10 +344,12 @@ export async function POST(request: Request) {
       replyTarget = reply;
     }
   }
+  const invocationDetectionStartedAt = Date.now();
   const decision = detectTrailieInvocation({
     body: source.body,
     replyTargetType,
   });
+  const invocationDetectionEndedAt = Date.now();
   if (!decision.invoked) return jsonError("trailie_not_invoked", 422);
 
   let environment: ReturnType<typeof parseOpenAIEnv>;
@@ -333,7 +435,18 @@ export async function POST(request: Request) {
       requiredMessageIds: [source.id, ...(replyTarget ? [replyTarget.id] : [])],
     },
   );
+  const intentClassificationStartedAt = Date.now();
   const intent = classifyTrailieIntent({ request: decision.normalizedRequest });
+  const intentClassificationEndedAt = Date.now();
+  const route = createTrailieRuntimeRouter({
+    fast: environment.conversationModel,
+    reasoning: environment.flagshipModel,
+    planning: environment.planningModel,
+    itinerary: environment.itineraryModel,
+  }).route({
+    intent,
+    request: decision.normalizedRequest,
+  });
   const [
     roomResult,
     memoryResult,
@@ -454,6 +567,119 @@ export async function POST(request: Request) {
     currentPlan.success && currentPlan.data?.itinerary
       ? itinerarySchema.safeParse(currentPlan.data.itinerary)
       : null;
+  let currentEvidence: readonly Record<string, unknown>[] = [];
+  let toolPipelineDurationMs: number | null = null;
+  let toolPipelineState: "success" | "failure" = "failure";
+  let toolDurationsByCapability: Readonly<Record<string, number>> = {};
+  if (route.route === "tool_pipeline") {
+    const destination =
+      factValues(shared.destinationsUnderConsideration)[0] ??
+      currentItinerary?.data?.destinationSummary ??
+      null;
+    if (destination) {
+      const toolStartedAt = Date.now();
+      try {
+        const travelEnvironment = parseTravelProviderEnv(process.env);
+        const operationController = createTravelProviderOperationController({
+          roomId: parsed.data.roomId,
+          workflowKey: `focused:${invocationId}`,
+          environment:
+            process.env.VERCEL_ENV === "production"
+              ? "production"
+              : process.env.VERCEL_ENV === "preview"
+                ? "hosted-acceptance"
+                : process.env.NODE_ENV === "test"
+                  ? "test"
+                  : "local",
+          roomDailyLimit: travelEnvironment.roomDailyLimit,
+          globalDailyLimit: travelEnvironment.globalDailyLimit,
+        });
+        const registry = withTravelProviderCache(
+          createTravelProviderRegistry(
+            environment.provider === "fake"
+              ? {
+                  mode: "fake",
+                  environment: travelEnvironment,
+                  scenario: "baseline",
+                }
+              : { mode: "live", environment: travelEnvironment },
+          ),
+          {
+            cache: createTravelProviderCacheRepository(),
+            environment:
+              process.env.VERCEL_ENV === "production"
+                ? "production"
+                : process.env.VERCEL_ENV === "preview"
+                  ? "hosted-acceptance"
+                  : process.env.NODE_ENV === "test"
+                    ? "test"
+                    : "local",
+            bypass: process.env.TRAVEL_CACHE_BYPASS === "true",
+            authorizeRequest: operationController.authorize,
+            recordRequest: operationController.record,
+          },
+        );
+        const evidenceResult = await collectDestinationTravelEvidence({
+          destination,
+          dates: factValues(shared.dateWindows),
+          locale: "en-US",
+          providers: registry,
+          maximumCallsPerProvider: environment.provider === "fake" ? 8 : 12,
+          signal: request.signal,
+        });
+        const evidence = [...evidenceResult.evidence];
+        const capabilityDurations = {
+          ...evidenceResult.durationMsByCapability,
+        };
+        if (intent === "route_question" && currentItinerary?.success) {
+          const segment = currentItinerary.data.days
+            .flatMap((day) => day.travelSegments)
+            .find(
+              (candidate) =>
+                candidate.origin.latitude !== null &&
+                candidate.origin.longitude !== null &&
+                candidate.destination.latitude !== null &&
+                candidate.destination.longitude !== null,
+            );
+          if (segment) {
+            const routeStartedAt = performance.now();
+            const routeResult = await registry.geocoding.getRoute(
+              {
+                origin: {
+                  latitude: segment.origin.latitude!,
+                  longitude: segment.origin.longitude!,
+                },
+                destination: {
+                  latitude: segment.destination.latitude!,
+                  longitude: segment.destination.longitude!,
+                },
+                mode:
+                  segment.mode === "train"
+                    ? "transit"
+                    : segment.mode === "flight"
+                      ? "unknown"
+                      : segment.mode,
+                locale: "en-US",
+              },
+              request.signal,
+            );
+            capabilityDurations.route = Math.max(
+              Math.round(performance.now() - routeStartedAt),
+              0,
+            );
+            evidence.push(...routeResult.evidence);
+          }
+        }
+        currentEvidence = evidence;
+        toolDurationsByCapability = capabilityDurations;
+        toolPipelineState = evidence.length > 0 ? "success" : "failure";
+      } catch (error) {
+        if (request.signal.aborted) throw error;
+      } finally {
+        toolPipelineDurationMs = Date.now() - toolStartedAt;
+      }
+    }
+  }
   const referenceResolution = resolveTrailieReference({
     request: decision.normalizedRequest,
     explicitEntityId: parsed.data.entityId,
@@ -582,20 +808,80 @@ export async function POST(request: Request) {
           })),
         ]
       : [],
-    evidence: [],
+    evidence: currentEvidence,
     requestedSections: [...requestedSections],
   });
-  const route = createModelRouter({
-    conversation: environment.conversationModel,
-    flagship: environment.flagshipModel,
-  }).route({
-    request: decision.normalizedRequest,
-    contextCharacters: trailieContext.text.length,
+  const runtimeTrace = createRuntimeTrace({
+    requestId: correlationId,
+    roomId: parsed.data.roomId,
+    responseType: responseTypeFor(route.complexity),
+    startedAt: new Date(requestReceivedAt),
+    monotonicStartedAt: requestReceivedAt,
   });
+  runtimeTrace.recordDuration(
+    "permissionCheck",
+    permissionEndedAt - permissionStartedAt,
+  );
+  runtimeTrace.recordDuration(
+    "invocationDetection",
+    invocationDetectionEndedAt - invocationDetectionStartedAt,
+  );
+  runtimeTrace.recordDuration(
+    "intentClassification",
+    intentClassificationEndedAt - intentClassificationStartedAt,
+  );
+  runtimeTrace.recordDuration("contextAssembly", Date.now() - contextStartedAt);
+  const toolClasses = selectedToolClasses(intent);
+  runtimeTrace.setRouting({
+    intent,
+    complexity: route.complexity,
+    selectedModelRoute: route.route,
+    toolClasses,
+  });
+  runtimeTrace.recordToolCall("database_read", Date.now() - contextStartedAt, {
+    cache: "not_applicable",
+    retries: 0,
+    state: "success",
+  });
+  const telemetryClassByCapability: Record<string, TrailieToolClass> = {
+    geocode: "maps_geocoding",
+    park: "nps",
+    park_alerts: "nps",
+    recreation: "ridb",
+    reservation_links: "ridb",
+    route: "directions",
+    weather: "weather",
+    daylight: "weather",
+  };
+  for (const [capability, durationMs] of Object.entries(
+    toolDurationsByCapability,
+  )) {
+    const toolClass = telemetryClassByCapability[capability];
+    if (!toolClass) continue;
+    runtimeTrace.recordToolCall(toolClass, durationMs, {
+      cache: "not_applicable",
+      retries: 0,
+      state: toolPipelineState,
+    });
+  }
+  const primaryToolClass = toolClasses.find(
+    (toolClass) => toolClass !== "database_read",
+  );
+  if (
+    toolPipelineDurationMs !== null &&
+    Object.keys(toolDurationsByCapability).length === 0 &&
+    primaryToolClass
+  )
+    runtimeTrace.recordToolCall(primaryToolClass, toolPipelineDurationMs, {
+      cache: "not_applicable",
+      retries: 0,
+      state: toolPipelineState,
+    });
+  const selectedModel = route.model ?? "trailie-deterministic";
 
   const { data: runData, error: runError } = await admin.rpc("start_ai_run", {
     target_invocation_id: invocationId,
-    target_model: route.model,
+    target_model: selectedModel,
     target_prompt_version: environment.promptVersion,
   });
   if (runError) return jsonError("retry_not_allowed", 409);
@@ -613,6 +899,12 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       let clientConnected = true;
+      let runtimeState:
+        "success" | "failure" | "cancelled" | "timeout" | "fallback" =
+        "failure";
+      let cancellationReason: string | null = null;
+      let timeoutReason: string | null = null;
+      let fallbackReason: string | null = null;
       let quota: ReturnType<typeof createDurableAiQuotaReservation> | null =
         null;
       let providerResultStaged = false;
@@ -626,7 +918,66 @@ export async function POST(request: Request) {
         }
       };
       emit({ type: "invocation_started", invocationId });
+      emit({
+        type: "progress_state",
+        stage: progressStageFor(route.complexity),
+      });
+      runtimeTrace.markFirstVisibleOutput();
       try {
+        if (route.route === "deterministic") {
+          const validationStartedAt = Date.now();
+          const envelope = finalizeTrailieResponse({
+            draft: localUnsupportedDraft(),
+            expectedIntent: intent,
+            responseId: invocationId,
+            sourceMessageId: parsed.data.sourceMessageId,
+            now: new Date().toISOString(),
+            referenceResolutionStatus: referenceResolution.status,
+          });
+          runtimeTrace.recordDuration(
+            "validation",
+            Date.now() - validationStartedAt,
+          );
+          emit({ type: "text_delta", delta: envelope.message });
+          const persistenceStartedAt = Date.now();
+          const { error: stageError } = await admin.rpc(
+            "stage_ai_response_contract",
+            {
+              target_invocation_id: invocationId,
+              target_run_id: runId,
+              validated_response_contract: envelope,
+              target_detected_intent: intent,
+              target_context_sections: trailieContext.usedSections,
+              target_validation_result: "pass",
+              target_repair_count: 0,
+            },
+          );
+          if (stageError)
+            throw new TrailieProviderError("invalid_model_response", false);
+          const { error: completeError } = await admin.rpc("complete_ai_run", {
+            target_invocation_id: invocationId,
+            target_run_id: runId,
+            response_body: envelope.message,
+            provider_response_id: null,
+            provider_request_id: null,
+            used_input_tokens: null,
+            used_output_tokens: null,
+            used_reasoning_tokens: null,
+            used_cached_input_tokens: null,
+            used_total_tokens: null,
+            measured_latency_ms: Date.now() - startedAt,
+          });
+          if (completeError)
+            throw new TrailieProviderError("openai_unavailable", true);
+          runtimeTrace.recordDuration(
+            "persistence",
+            Date.now() - persistenceStartedAt,
+          );
+          runtimeTrace.recordDuration("finalRenderReady", 0);
+          emit({ type: "response_completed", response: envelope });
+          runtimeState = "success";
+          return;
+        }
         type Envelope = TrailieResponseV1;
         const attempts = createDurableProviderAttemptController<Envelope>(
           createProviderAttemptRepository<Envelope>(),
@@ -635,7 +986,7 @@ export async function POST(request: Request) {
           userId: authData.user.id,
           roomId: parsed.data.roomId,
           workflow: "focused_answer",
-          model: route.model,
+          model: selectedModel,
           estimatedTokens: 4_000,
           reservationId: invocationId,
         });
@@ -656,20 +1007,23 @@ export async function POST(request: Request) {
           controller: attempts,
           workflow: "focused_answer",
           operationKey: `focused:${invocationId}`,
-          model: route.model,
+          model: selectedModel,
           stage: "focusedProvider",
           policy: routePolicy,
           quotaReservationId: invocationId,
           correlationId,
+          signal: request.signal,
           execute: async ({ signal, retryCount }) => {
             if (retryCount > 0) emit({ type: "provider_retrying" });
             const providerStartedAt = Date.now();
+            const safeText = createSafeTrailieTextStream();
+            runtimeTrace.markModelRequestStarted();
             const consumed = await consumeFocusedStream(
               await providerFor(environment).stream({
                 operationKey: invocationId,
                 request: decision.normalizedRequest,
                 context: trailieContext.text,
-                model: route.model,
+                model: selectedModel,
                 intent,
                 safetyIdentifier: createSafetyIdentifier(
                   authData.user.id,
@@ -677,8 +1031,16 @@ export async function POST(request: Request) {
                 ),
                 signal,
               }),
+              {
+                onFirstToken: () => runtimeTrace.markFirstModelToken(),
+                onTextDelta: (delta) => {
+                  for (const visible of safeText.push(delta))
+                    emit({ type: "text_delta", delta: visible });
+                },
+              },
             );
             const result = consumed.result;
+            const validationStartedAt = Date.now();
             const envelope = finalizeTrailieResponse({
               draft: result.answer,
               expectedIntent: intent,
@@ -687,6 +1049,10 @@ export async function POST(request: Request) {
               now: new Date().toISOString(),
               referenceResolutionStatus: referenceResolution.status,
             });
+            runtimeTrace.recordDuration(
+              "validation",
+              Date.now() - validationStartedAt,
+            );
             const responseRepairCount =
               result.answer.message !== envelope.message ||
               JSON.stringify(result.answer.blocks) !==
@@ -696,8 +1062,15 @@ export async function POST(request: Request) {
                 JSON.stringify(envelope.unresolvedQuestions)
                 ? 1
                 : 0;
-            for (const delta of consumed.bufferedDeltas)
-              emit({ type: "text_delta", delta });
+            if (responseRepairCount > 0) runtimeTrace.recordRepair(0);
+            const remainingVisible = safeText.flushValidated();
+            if (remainingVisible)
+              emit({ type: "text_delta", delta: remainingVisible });
+            runtimeTrace.setUsage({
+              inputTokens: result.usage.inputTokens,
+              outputTokens: result.usage.outputTokens,
+              estimatedCost: null,
+            });
             return {
               value: envelope,
               responseId: result.responseId,
@@ -715,6 +1088,7 @@ export async function POST(request: Request) {
             await durableQuota.reconcile(result.usage.totalTokens ?? 4_000);
           },
           apply: async (envelope, result) => {
+            const persistenceStartedAt = Date.now();
             const { error: stageError } = await admin.rpc(
               "stage_ai_response_contract",
               {
@@ -747,15 +1121,29 @@ export async function POST(request: Request) {
             );
             if (completeError)
               throw new TrailieProviderError("openai_unavailable", true);
+            runtimeTrace.recordDuration(
+              "persistence",
+              Date.now() - persistenceStartedAt,
+            );
           },
         });
         if (outcome.status !== "applied")
           throw new TrailieProviderError("openai_unavailable", true);
+        runtimeTrace.recordDuration("finalRenderReady", 0);
         emit({ type: "response_completed", response: outcome.result.value });
+        if (
+          route.route === "tool_pipeline" &&
+          !trailieContext.usedSections.includes("evidence")
+        ) {
+          runtimeState = "fallback";
+          fallbackReason = "current_evidence_not_bound";
+        } else {
+          runtimeState = "success";
+        }
         logAiEvent("completed", {
           invocationId,
           runId,
-          model: route.model,
+          model: selectedModel,
           promptVersion: environment.promptVersion,
           latencyMs: outcome.result.totalDurationMs,
           providerLatencyMs: outcome.result.providerDurationMs,
@@ -766,7 +1154,7 @@ export async function POST(request: Request) {
           recoveryCount: outcome.recovered ? 1 : 0,
           quotaStatus: "reconciled",
           detectedIntent: intent,
-          selectedTools: [],
+          selectedTools: toolClasses,
           contextSections: trailieContext.usedSections,
           responseContractVersion: "1",
           validationResult: "pass",
@@ -781,16 +1169,27 @@ export async function POST(request: Request) {
             : error instanceof TrailieProviderError
               ? error
               : error instanceof ProviderFailure
-                ? new TrailieProviderError(
-                    error.code as never,
-                    error.retryable,
-                    {
-                      statusCode: error.statusCode,
-                      requestId: error.requestId,
-                      retryAfterMs: error.retryAfterMs,
-                    },
-                  )
+                ? error.code === "workflow_cancelled"
+                  ? new TrailieProviderError("invocation_cancelled", false)
+                  : new TrailieProviderError(
+                      error.code as never,
+                      error.retryable,
+                      {
+                        statusCode: error.statusCode,
+                        requestId: error.requestId,
+                        retryAfterMs: error.retryAfterMs,
+                      },
+                    )
                 : new TrailieProviderError("openai_unavailable", true);
+        if (failure.code === "invocation_cancelled") {
+          runtimeState = "cancelled";
+          cancellationReason = "user_stop";
+        } else if (failure.code === "openai_timeout") {
+          runtimeState = "timeout";
+          timeoutReason = "normal_model_response";
+        } else {
+          runtimeState = "failure";
+        }
         await admin.rpc("fail_ai_run", {
           target_invocation_id: invocationId,
           target_run_id: runId,
@@ -805,13 +1204,30 @@ export async function POST(request: Request) {
         logAiEvent("failed", {
           invocationId,
           runId,
-          model: route.model,
+          model: selectedModel,
           promptVersion: environment.promptVersion,
           errorCode: failure.code,
           totalWorkflowLatencyMs: Date.now() - startedAt,
           providerStatus: failure.statusCode,
         });
       } finally {
+        await createRuntimeTelemetryRepository()
+          .record(
+            runtimeTrace.complete({
+              state: runtimeState,
+              cancellationReason,
+              timeoutReason,
+              fallbackReason,
+            }),
+          )
+          .catch(() =>
+            logOperation("trailie_ai.runtime_telemetry_failed", {
+              correlationId,
+              workflow: "focused_answer",
+              status: "failed",
+              errorCode: "runtime_telemetry_unavailable",
+            }),
+          );
         if (clientConnected) controller.close();
       }
     },

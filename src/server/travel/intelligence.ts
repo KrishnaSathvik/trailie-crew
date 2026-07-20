@@ -341,6 +341,7 @@ export async function collectDestinationTravelEvidence(input: Input) {
   const evidence: TravelEvidenceV1[] = [];
   const callsByProvider: Record<string, number> = {};
   const callsByCapability: Record<string, number> = {};
+  const durationMsByCapability: Record<string, number> = {};
   const requestCache = new Map<string, Promise<TravelProviderResponse>>();
   const destinationQuery = providerPlaceQuery(input.destination);
   const parkQuery = officialParkSourceQuery(destinationQuery);
@@ -363,7 +364,16 @@ export async function collectDestinationTravelEvidence(input: Input) {
       });
     callsByProvider[provider.providerId] = count + 1;
     callsByCapability[capability] = (callsByCapability[capability] ?? 0) + 1;
-    const request = execute();
+    const request = (async () => {
+      const startedAt = performance.now();
+      try {
+        return await execute();
+      } finally {
+        durationMsByCapability[capability] =
+          (durationMsByCapability[capability] ?? 0) +
+          Math.max(Math.round(performance.now() - startedAt), 0);
+      }
+    })();
     requestCache.set(key, request);
     return request;
   }
@@ -513,5 +523,6 @@ export async function collectDestinationTravelEvidence(input: Input) {
     evidence: uniqueEvidence(evidence),
     callsByProvider,
     callsByCapability,
+    durationMsByCapability,
   } as const;
 }

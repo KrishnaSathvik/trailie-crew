@@ -15,7 +15,6 @@ import {
 } from "@trailie/schemas";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import type { Json } from "@/types/database";
-import { routeChangeAnalysisModel } from "./routing";
 import type { ProviderMeta } from "./provider";
 import type { RevisionContext, RevisionRepository } from "./worker";
 import type { NormalizedToolEvidence } from "@/features/itinerary/validation/validate-itinerary";
@@ -122,15 +121,7 @@ export function createRevisionRepository(): RevisionRepository {
       ensure(error, "change_analysis_failed");
       return claimSchema.parse(data);
     },
-    async completeAnalysis(id, analysis) {
-      const model = routeChangeAnalysisModel({
-        requestType: analysis.requestedChange.type,
-        affectedItemCount: analysis.affectedItems.length,
-        affectedDayCount: analysis.affectedDays.length,
-        materiality: analysis.materiality,
-        touchesConfirmedDecision:
-          analysis.impacts.confirmedDecisions.length > 0,
-      });
+    async completeAnalysis(id, analysis, _output, model) {
       const { error } = await admin.rpc("complete_change_analysis", {
         target_change_request_id: id,
         validated_analysis: analysis as unknown as Json,

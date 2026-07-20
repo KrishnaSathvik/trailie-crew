@@ -12,6 +12,7 @@ export type ItineraryErrorCode =
   | "workflow_deadline_exceeded"
   | "retry_exhausted"
   | "recovery_required"
+  | "workflow_cancelled"
   | "unknown_error";
 
 export class ItineraryProviderError extends Error {

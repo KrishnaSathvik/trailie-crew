@@ -14,6 +14,10 @@ import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { resolveAiQuotaSubject } from "@/server/ai/quota";
 import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
+import { createTrailieRuntimeRouter } from "@/server/ai/model-router";
+import { runStructuredRuntime } from "@/server/ai/structured-runtime";
+import { createCorrelationId } from "@/server/operations/logger";
+import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import type { Itinerary } from "@trailie/schemas";
 import { createOpenAIItineraryProvider } from "./openai-provider";
 import { createFakeItineraryProvider } from "./provider";
@@ -44,6 +48,18 @@ async function withSlot(task: () => Promise<void>) {
 
 export async function drainItineraryGeneration(id: string) {
   const env = requireAiGeneration(parseOpenAIEnv(process.env));
+  const route = createTrailieRuntimeRouter({
+    fast: env.conversationModel,
+    reasoning: env.flagshipModel,
+    planning: env.planningModel,
+    itinerary: env.itineraryModel,
+  }).route({
+    intent: "create_itinerary",
+    request: "full itinerary",
+    complexity: "full_itinerary",
+  });
+  const selectedModel = route.model;
+  if (!selectedModel) throw new Error("itinerary_model_route_unavailable");
   const travelEnvironment = parseTravelProviderEnv(process.env);
   const quotaSubject = await resolveAiQuotaSubject("itinerary", id);
   const provider =
@@ -119,22 +135,53 @@ export async function drainItineraryGeneration(id: string) {
     evidenceRepository: createTravelEvidenceRepository(),
     maximumCallsPerProvider: env.provider === "fake" ? 8 : 20,
   };
-  await processItineraryGeneration(id, {
-    repository: createItineraryRepository(),
-    provider,
-    travelProvider,
-    travelIntelligence,
-    safetyIdentifier: createSafetyIdentifier(
-      `itinerary:${id}`,
-      env.safetyHmacSecret,
-    ),
-    model: env.itineraryModel,
-    quotaSubject,
-    reliabilityPolicy: env.reliabilityPolicy,
-    providerAttempts: createDurableProviderAttemptController(
-      createProviderAttemptRepository<Itinerary>(),
-    ),
-  });
+  await runStructuredRuntime(
+    {
+      requestId: createCorrelationId(),
+      roomId: quotaSubject.roomId,
+      responseType: "full_itinerary",
+      intent: "create_itinerary",
+      complexity: route.complexity,
+      selectedModelRoute: route.route,
+      toolClasses: [
+        "nps",
+        "ridb",
+        "weather",
+        "maps_geocoding",
+        "directions",
+        "booking_normalization",
+        "database_read",
+        "database_write",
+      ],
+    },
+    async () => {
+      await processItineraryGeneration(id, {
+        repository: createItineraryRepository(),
+        provider,
+        travelProvider,
+        travelIntelligence,
+        safetyIdentifier: createSafetyIdentifier(
+          `itinerary:${id}`,
+          env.safetyHmacSecret,
+        ),
+        model: selectedModel,
+        quotaSubject,
+        reliabilityPolicy: env.reliabilityPolicy,
+        providerAttempts: createDurableProviderAttemptController(
+          createProviderAttemptRepository<Itinerary>(),
+        ),
+      });
+      const { data } = await createAdminSupabaseClient()
+        .from("trip_plans")
+        .select("status,error_code")
+        .eq("id", id)
+        .maybeSingle();
+      if (data?.status === "failed" && data.error_code === "workflow_cancelled")
+        throw new Error("workflow_cancelled");
+      if (data?.status === "failed")
+        throw new Error(data.error_code ?? "itinerary_failed");
+    },
+  );
 }
 
 export function scheduleItineraryGeneration(id: string) {

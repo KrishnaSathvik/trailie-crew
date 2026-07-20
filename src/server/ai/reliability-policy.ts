@@ -12,6 +12,7 @@ export const providerFailureCodes = [
   "workflow_deadline_exceeded",
   "retry_exhausted",
   "recovery_required",
+  "workflow_cancelled",
 ] as const;
 
 export type ProviderFailureCode = (typeof providerFailureCodes)[number];
@@ -369,7 +370,7 @@ export async function runProviderOperation<T>(
 
   while (attempt < input.policy.maximumAttempts) {
     if (input.signal?.aborted)
-      throw new ProviderFailure("recovery_required", {
+      throw new ProviderFailure("workflow_cancelled", {
         cause: input.signal.reason,
       });
 
@@ -401,7 +402,7 @@ export async function runProviderOperation<T>(
       };
     } catch (error) {
       if (input.signal?.aborted)
-        throw new ProviderFailure("recovery_required", {
+        throw new ProviderFailure("workflow_cancelled", {
           cause: input.signal.reason,
         });
       if (isQuotaRejection(error)) throw error;

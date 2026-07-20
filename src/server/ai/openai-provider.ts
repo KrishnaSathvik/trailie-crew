@@ -59,7 +59,9 @@ export function normalizeFocusedAnswerModelOutput(value: unknown) {
   return focusedAnswerModelSchema.parse(value);
 }
 
-export function mapFocusedProviderError(error: unknown) {
+export function mapFocusedProviderError(error: unknown, signal?: AbortSignal) {
+  if (signal?.aborted)
+    return new TrailieProviderError("invocation_cancelled", false);
   if (error instanceof TrailieProviderError) return error;
   let code: SafeAiErrorCode | null = null;
   let retryable = true;
@@ -132,7 +134,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
           { signal: input.signal },
         );
       } catch (error) {
-        throw mapFocusedProviderError(error);
+        throw mapFocusedProviderError(error, input.signal);
       }
 
       const completed = stream
@@ -154,7 +156,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
           };
         })
         .catch((error) => {
-          throw mapFocusedProviderError(error);
+          throw mapFocusedProviderError(error, input.signal);
         });
 
       return {
@@ -167,7 +169,7 @@ export function createOpenAIFocusedAnswerProvider(configuration: {
               if (safeDelta) yield safeDelta;
             }
           } catch (error) {
-            throw mapFocusedProviderError(error);
+            throw mapFocusedProviderError(error, input.signal);
           }
         })(),
         completed,

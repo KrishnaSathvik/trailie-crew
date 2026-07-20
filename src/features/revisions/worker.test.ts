@@ -17,6 +17,11 @@ import {
 } from "./manifest";
 import { applyRevisionPatch, deriveDeterministicRevisionPatch } from "./patch";
 
+const models = {
+  fast: "gpt-5.6-terra",
+  reasoning: "gpt-5.6-sol",
+};
+
 function analysisContext(): RevisionContext {
   return {
     request: {
@@ -138,6 +143,7 @@ describe("revision worker", () => {
       provider,
       travelProvider: noTravelProvider() as never,
       safetyIdentifier: "safe",
+      models,
       now: "2026-07-16T20:00:00.000Z",
     });
     expect(repository.persistManifest).toHaveBeenCalledWith(
@@ -213,6 +219,7 @@ describe("revision worker", () => {
       provider,
       travelProvider: noTravelProvider() as never,
       safetyIdentifier: "safe",
+      models,
       now: "2026-07-16T20:00:00.000Z",
     });
 
@@ -269,6 +276,7 @@ describe("revision worker", () => {
       provider,
       travelProvider: noTravelProvider() as never,
       safetyIdentifier: "safe",
+      models,
       now: "2026-07-16T20:00:00.000Z",
     });
 
@@ -345,6 +353,7 @@ describe("revision worker", () => {
       provider,
       travelProvider: noTravelProvider() as never,
       safetyIdentifier: "safe",
+      models,
       now: "2026-07-16T20:00:00.000Z",
     });
     expect(repository.startScopeRepair).toHaveBeenCalledWith(
@@ -426,6 +435,7 @@ describe("revision worker", () => {
       provider,
       travelProvider: noTravelProvider() as never,
       safetyIdentifier: "safe",
+      models,
       now: "2026-07-16T20:00:00.000Z",
     });
     expect(provider.repairScope).toHaveBeenCalledOnce();
@@ -475,6 +485,7 @@ describe("revision worker", () => {
       },
       travelProvider: {} as never,
       safetyIdentifier: "safe",
+      models,
       now: "2026-07-13T19:00:00.000Z",
     });
     expect(repository.claimAnalysis).toHaveBeenCalledWith(
@@ -485,6 +496,7 @@ describe("revision worker", () => {
       "request",
       expect.objectContaining({ materiality: "material" }),
       expect.any(Object),
+      "gpt-5.6-terra",
     );
   });
 
@@ -642,6 +654,7 @@ describe("revision worker", () => {
       },
       travelProvider: travelProvider as never,
       safetyIdentifier: "safe",
+      models,
       candidateAttempts: { run } as never,
       reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
       now: "2026-07-13T19:00:00.000Z",
@@ -697,6 +710,7 @@ describe("revision worker", () => {
       },
       travelProvider: {} as never,
       safetyIdentifier: "safe",
+      models,
       reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
       now: "2026-07-13T19:00:00.000Z",
     });
@@ -747,6 +761,7 @@ describe("revision worker", () => {
       },
       travelProvider: {} as never,
       safetyIdentifier: "safe",
+      models,
       analysisAttempts: { run } as never,
       reliabilityPolicy: parseWorkflowReliabilityPolicy({}),
       now: "2026-07-13T19:00:00.000Z",

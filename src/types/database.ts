@@ -582,6 +582,13 @@ export type Database = {
         };
         Returns: Json;
       };
+      cancel_planning_generation: {
+        Args: {
+          target_request_id: string;
+          target_participant_id: string;
+        };
+        Returns: Json;
+      };
       claim_planning_summary_generation: {
         Args: {
           target_request_id: string;
@@ -650,6 +657,13 @@ export type Database = {
         Args: {
           target_trip_plan_id: string;
           participant_id: string;
+        };
+        Returns: Json;
+      };
+      cancel_itinerary_generation: {
+        Args: {
+          target_trip_plan_id: string;
+          target_participant_id: string;
         };
         Returns: Json;
       };

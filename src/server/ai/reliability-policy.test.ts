@@ -116,6 +116,7 @@ describe("workflow reliability policy", () => {
     ["workflow_deadline_exceeded", false],
     ["retry_exhausted", false],
     ["recovery_required", false],
+    ["workflow_cancelled", false],
   ] as const)("classifies %s retryability safely", (code, retryable) => {
     expect(classifyProviderFailure(new ProviderFailure(code))).toMatchObject({
       code,
@@ -360,7 +361,7 @@ describe("workflow reliability policy", () => {
         signal: controller.signal,
         operation,
       }),
-    ).rejects.toMatchObject({ code: "recovery_required" });
+    ).rejects.toMatchObject({ code: "workflow_cancelled" });
     expect(operation).not.toHaveBeenCalled();
   });
 

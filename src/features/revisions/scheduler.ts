@@ -31,6 +31,9 @@ import {
 import { createTravelEvidenceRepository } from "@/server/travel/repository";
 import { createTravelProviderCacheRepository } from "@/server/travel/cache-repository";
 import { createTravelProviderOperationController } from "@/server/travel/operation-repository";
+import { createTrailieRuntimeRouter } from "@/server/ai/model-router";
+import { runStructuredRuntime } from "@/server/ai/structured-runtime";
+import { createCorrelationId } from "@/server/operations/logger";
 
 const MAX_CONCURRENCY = 2;
 let active = 0;
@@ -116,27 +119,84 @@ export async function drainPlanChange(id: string) {
     evidenceRepository: createTravelEvidenceRepository(),
     maximumCallsPerProvider: env.provider === "fake" ? 8 : 20,
   };
-  await processPlanChange(id, {
-    repository: createRevisionRepository(),
-    provider,
-    travelProvider,
-    travelIntelligence,
-    safetyIdentifier: createSafetyIdentifier(
-      `revision:${id}`,
-      env.safetyHmacSecret,
-    ),
-    quotaSubject,
-    reliabilityPolicy: env.reliabilityPolicy,
-    analysisAttempts: createDurableProviderAttemptController(
-      createProviderAttemptRepository<PlanChangeAnalysis>(),
-    ),
-    candidateAttempts: createDurableProviderAttemptController(
-      createProviderAttemptRepository<Itinerary>(),
-    ),
-    patchAttempts: createDurableProviderAttemptController(
-      createProviderAttemptRepository<RevisionPatchV1>(),
-    ),
+  const repository = createRevisionRepository();
+  const context = await repository.loadContext(id);
+  const smallTypes = new Set([
+    "remove_item",
+    "move_item",
+    "reschedule_item",
+    "shorten_item",
+    "extend_item",
+    "update_note",
+  ]);
+  const complexity =
+    context.request.targetItemId && smallTypes.has(context.request.requestType)
+      ? "small_revision"
+      : "large_revision";
+  const route = createTrailieRuntimeRouter({
+    fast: env.conversationModel,
+    reasoning: env.flagshipModel,
+    planning: env.planningModel,
+    itinerary: env.itineraryModel,
+  }).route({
+    intent: "itinerary_revision",
+    request: context.request.requestType,
+    complexity,
   });
+  await runStructuredRuntime(
+    {
+      requestId: createCorrelationId(),
+      roomId: quotaSubject.roomId,
+      responseType: complexity,
+      intent: "itinerary_revision",
+      complexity,
+      selectedModelRoute: route.route,
+      toolClasses: [
+        "nps",
+        "ridb",
+        "weather",
+        "maps_geocoding",
+        "directions",
+        "database_read",
+        "database_write",
+      ],
+    },
+    async () => {
+      await processPlanChange(id, {
+        repository,
+        provider,
+        travelProvider,
+        travelIntelligence,
+        safetyIdentifier: createSafetyIdentifier(
+          `revision:${id}`,
+          env.safetyHmacSecret,
+        ),
+        quotaSubject,
+        reliabilityPolicy: env.reliabilityPolicy,
+        models: {
+          fast: env.conversationModel,
+          reasoning: env.flagshipModel,
+        },
+        analysisAttempts: createDurableProviderAttemptController(
+          createProviderAttemptRepository<PlanChangeAnalysis>(),
+        ),
+        candidateAttempts: createDurableProviderAttemptController(
+          createProviderAttemptRepository<Itinerary>(),
+        ),
+        patchAttempts: createDurableProviderAttemptController(
+          createProviderAttemptRepository<RevisionPatchV1>(),
+        ),
+      });
+      const terminal = await repository.loadContext(id);
+      if (terminal.request.status === "cancelled")
+        throw new Error("workflow_cancelled");
+      if (
+        terminal.request.status === "failed" ||
+        terminal.request.status === "blocked"
+      )
+        throw new Error(`revision_${terminal.request.status}`);
+    },
+  );
 }
 
 export async function publishPlanChange(id: string) {

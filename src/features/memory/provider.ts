@@ -20,6 +20,7 @@ export type MemoryErrorCode =
   | "workflow_deadline_exceeded"
   | "recovery_required"
   | "retry_exhausted"
+  | "workflow_cancelled"
   | "unknown_error";
 
 export class MemoryProviderError extends Error {

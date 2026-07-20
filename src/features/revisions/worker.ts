@@ -64,6 +64,7 @@ import {
 import type { TravelProviderRegistry } from "@/server/travel/intelligence";
 import type { TravelEvidenceRepository } from "@/server/travel/repository";
 import { refreshRevisionTravelEvidence } from "@/server/travel/revision-refresh";
+import { createTrailieRuntimeRouter } from "@/server/ai/model-router";
 
 export type RevisionContext = {
   request: {
@@ -102,6 +103,7 @@ export interface RevisionRepository {
     id: string,
     analysis: PlanChangeAnalysis,
     output: ProviderMeta,
+    model: string,
   ): Promise<void>;
   claimCandidate(
     id: string,
@@ -117,7 +119,7 @@ export interface RevisionRepository {
     itinerary: Itinerary,
     output: ProviderMeta,
     provenance: {
-      model: "trailie-deterministic" | "gpt-5.6-terra" | "gpt-5.6-sol";
+      model: string;
       promptVersion:
         "trailie-revision-patch-v1" | "trailie-itinerary-revision-v2";
     },
@@ -169,6 +171,7 @@ type Dependencies = {
   analysisAttempts?: DurableProviderAttemptController<PlanChangeAnalysis>;
   candidateAttempts?: DurableProviderAttemptController<Itinerary>;
   patchAttempts?: DurableProviderAttemptController<RevisionPatchV1>;
+  models: { fast: string; reasoning: string };
   travelIntelligence?: {
     providers: TravelProviderRegistry;
     evidenceRepository: TravelEvidenceRepository;
@@ -288,6 +291,7 @@ export async function processPlanChange(
 ) {
   const policy =
     dependencies.reliabilityPolicy ?? parseWorkflowReliabilityPolicy({});
+  const environmentModels = dependencies.models;
   const workflowStartedAt = Date.now();
   try {
     const context = await dependencies.repository.loadContext(id);
@@ -304,13 +308,16 @@ export async function processPlanChange(
         requestType: context.request.requestType,
         requestText: context.request.requestText,
       });
-      const model = routeChangeAnalysisModel({
-        requestType: context.request.requestType,
-        affectedItemCount: context.request.targetItemId ? 1 : 0,
-        affectedDayCount: day ? 1 : 0,
-        materiality: preliminary,
-        touchesConfirmedDecision: false,
-      });
+      const model = routeChangeAnalysisModel(
+        {
+          requestType: context.request.requestType,
+          affectedItemCount: context.request.targetItemId ? 1 : 0,
+          affectedDayCount: day ? 1 : 0,
+          materiality: preliminary,
+          touchesConfirmedDecision: false,
+        },
+        environmentModels,
+      );
       const claim = await dependencies.repository.claimAnalysis(id, model);
       if (!claim.claimed) return;
       const operationKey = `${id}:analysis:${context.request.currentAnalysisVersion + 1}`;
@@ -365,6 +372,7 @@ export async function processPlanChange(
           id,
           analysis,
           meta(output),
+          model,
         );
         await dependencies.repository.recordRunUsage(
           id,
@@ -444,16 +452,26 @@ export async function processPlanChange(
       affectedItemCount: manifest.maximumAffectedItems,
       affectedDayCount: manifest.maximumAffectedDays,
     });
-    const model = route === "constrained_sol" ? "gpt-5.6-sol" : "gpt-5.6-terra";
+    const runtimeRoute = createTrailieRuntimeRouter({
+      ...environmentModels,
+      planning: environmentModels.reasoning,
+      itinerary: environmentModels.reasoning,
+    }).route({
+      intent: "itinerary_revision",
+      request: manifest.requestType,
+      complexity:
+        route === "constrained_sol" ? "large_revision" : "small_revision",
+    });
+    const model = runtimeRoute.model ?? "trailie-deterministic";
     const candidateProvenance =
       route === "constrained_sol"
         ? {
-            model: "gpt-5.6-sol" as const,
+            model: environmentModels.reasoning,
             promptVersion: "trailie-itinerary-revision-v2" as const,
           }
         : route === "constrained_terra"
           ? {
-              model: "gpt-5.6-terra" as const,
+              model: environmentModels.fast,
               promptVersion: "trailie-revision-patch-v1" as const,
             }
           : {

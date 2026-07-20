@@ -301,7 +301,7 @@ export async function runDurableProviderOperation<T>(
     attempt += 1
   ) {
     if (input.signal?.aborted)
-      throw new ProviderFailure("recovery_required", {
+      throw new ProviderFailure("workflow_cancelled", {
         cause: input.signal.reason,
       });
     const timeoutMs = remainingProviderTimeout(
@@ -347,7 +347,7 @@ export async function runDurableProviderOperation<T>(
       return outcome;
     } catch (error) {
       if (input.signal?.aborted)
-        throw new ProviderFailure("recovery_required", {
+        throw new ProviderFailure("workflow_cancelled", {
           cause: input.signal.reason,
         });
       const failure = timeoutSignal.aborted

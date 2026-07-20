@@ -221,6 +221,34 @@ describe("durable provider attempt controller", () => {
 });
 
 describe("durable provider retry orchestration", () => {
+  it("treats caller cancellation as terminal and never starts an attempt", async () => {
+    const controller = { run: vi.fn() };
+    const abortController = new AbortController();
+    abortController.abort("user_stopped");
+    const sleep = vi.fn();
+
+    await expect(
+      runDurableProviderOperation({
+        controller: controller as never,
+        workflow: "focused_answer",
+        operationKey: "focused:invocation-cancelled",
+        model: "gpt-5.6-terra",
+        stage: "focusedProvider",
+        policy: parseWorkflowReliabilityPolicy({}),
+        signal: abortController.signal,
+        execute: vi.fn(),
+        parse: vi.fn(),
+        apply: vi.fn(),
+        sleep,
+      }),
+    ).rejects.toMatchObject({
+      code: "workflow_cancelled",
+      retryable: false,
+    });
+    expect(controller.run).not.toHaveBeenCalled();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
   it("uses distinct attempt rows for one transient retry", async () => {
     const calls: number[] = [];
     const controller = {

@@ -40,6 +40,14 @@ describe("collectDestinationTravelEvidence", () => {
       ]),
     );
     expect(result.callsByProvider["trailie-fake-v1"]).toBeLessThanOrEqual(8);
+    expect(result.durationMsByCapability).toEqual(
+      expect.objectContaining({
+        geocode: expect.any(Number),
+        park: expect.any(Number),
+        recreation: expect.any(Number),
+        weather: expect.any(Number),
+      }),
+    );
     expect(result.evidence.some((entry) => entry.errorState)).toBe(false);
   });
 

@@ -16,6 +16,21 @@ describe("focused-answer OpenAI boundary", () => {
     ).toMatchObject({ code: "openai_timeout", retryable: true });
   });
 
+  it("classifies a caller-aborted request as cancellation instead of timeout", async () => {
+    const { mapFocusedProviderError } = await import("./openai-provider");
+    const abortController = new AbortController();
+    abortController.abort("user_stopped");
+    expect(
+      mapFocusedProviderError(
+        new DOMException("The operation was aborted", "AbortError"),
+        abortController.signal,
+      ),
+    ).toMatchObject({
+      code: "invocation_cancelled",
+      retryable: false,
+    });
+  });
+
   it("classifies HTTP 503 as model unavailable with safe metadata", async () => {
     const { mapFocusedProviderError } = await import("./openai-provider");
     const failure = mapFocusedProviderError(
