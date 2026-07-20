@@ -3,22 +3,22 @@ import { LegalPage, LegalSection } from "@/components/shared/legal-page";
 export default function TermsPage() {
   return (
     <LegalPage
-      title="Terms of Preview use"
+      title="Terms of use"
       summary="Conditions for using Trailie Crew as a planning assistant."
     >
-      <LegalSection title="Preview service">
+      <LegalSection title="Using Trailie Crew">
         <p>
           Trailie Crew may change, pause, or be unavailable. Use it lawfully and
-          do not automate account creation, evade limits, probe other rooms,
-          publish harmful content, or interfere with service operation.
+          do not evade usage limits, try to access another Trip, publish harmful
+          content, or interfere with the service.
         </p>
       </LegalSection>
       <LegalSection title="Planning only">
         <p>
           Trailie does not book or purchase travel, take payment, guarantee
-          reservations, or act as a travel agent. Provider names or links are
-          informational handoffs. Prices, schedules, inventory, routes, and
-          availability can change.
+          reservations, or act as a travel agent. Booking links are
+          informational. Prices, schedules, inventory, routes, and availability
+          can change.
         </p>
       </LegalSection>
       <LegalSection title="Your responsibilities">
@@ -29,20 +29,19 @@ export default function TermsPage() {
           timing, and reservation terms with authoritative sources.
         </p>
       </LegalSection>
-      <LegalSection title="AI limitations">
+      <LegalSection title="Trailie’s limits">
         <p>
-          AI output may be incomplete, stale, biased, or wrong. Validation
-          checks structure and internal consistency; it does not establish
-          real-world truth. Do not rely on Trailie for emergency, medical,
-          legal, immigration, or safety decisions.
+          Trailie’s suggestions may be incomplete, out of date, biased, or
+          wrong. Plan checks can catch conflicts but cannot establish every
+          real-world fact. Do not rely on Trailie for emergency, medical, legal,
+          immigration, or safety decisions.
         </p>
       </LegalSection>
       <LegalSection title="Changes and termination">
         <p>
-          You may stop using the service and request deletion subject to
-          shared-room ownership rules. We may restrict abusive use or disable
-          generation to protect reliability and cost. This draft requires
-          professional review before public Production launch.
+          You may stop using the service and request deletion, subject to shared
+          Trip ownership. We may restrict abusive use or temporarily pause
+          Trailie to protect the service for everyone.
         </p>
       </LegalSection>
     </LegalPage>

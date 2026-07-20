@@ -20,7 +20,7 @@ async function createCrew(browser: Browser) {
   const roomUrl = host.url();
   const roomId = roomUrl.split("/").at(-1)!;
   const inviteUrl = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();

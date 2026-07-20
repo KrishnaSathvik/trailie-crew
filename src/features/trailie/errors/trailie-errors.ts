@@ -15,32 +15,31 @@ export const trailieErrorMessages = {
   global_ai_limit_reached:
     "Trailie’s daily capacity has been reached. Crew chat is still available.",
   provider_budget_unavailable:
-    "Trailie generation is temporarily unavailable. Crew chat is still available.",
+    "Trailie is temporarily unavailable. Crew chat is still available.",
   openai_authentication_failed:
-    "Trailie is temporarily unavailable because its service is not configured.",
+    "Trailie is temporarily unavailable. Crew chat is still available.",
   openai_rate_limited:
     "Trailie is receiving too many requests. Please try again shortly.",
   openai_timeout: "Trailie took too long to answer. Please try again.",
   openai_unavailable: "Trailie is temporarily unavailable. Please try again.",
   invalid_model_response:
-    "Trailie could not produce a safe answer. Please try again.",
-  model_timeout:
-    "Trailie took longer than the safe deadline. You can retry this request.",
+    "Trailie could not complete that answer. Please try again.",
+  model_timeout: "Trailie took too long to answer. You can try again.",
   model_rate_limited:
-    "Trailie’s provider is temporarily rate limited. You can retry shortly.",
+    "Trailie is receiving too many requests. You can try again shortly.",
   model_unavailable:
-    "Trailie’s provider is temporarily unavailable. You can retry shortly.",
+    "Trailie is temporarily unavailable. You can try again shortly.",
   invalid_model_output:
-    "Trailie did not produce a response that passed validation.",
+    "Trailie could not complete that answer. Please try again.",
   workflow_deadline_exceeded:
-    "Trailie reached the workflow deadline without publishing partial work.",
+    "Trailie could not complete that right now. The current Plan is unchanged.",
   retry_exhausted: "Trailie could not answer right now. Try again.",
   recovery_required:
-    "Trailie saved this request for recovery. Chat remains available while recovery continues.",
-  context_unavailable: "Trailie could not load the conversation context.",
-  permission_denied: "You do not have access to invoke Trailie here.",
-  membership_required: "Active Trip membership is required.",
-  source_message_invalid: "That source message cannot invoke Trailie.",
+    "Trailie is still checking this request. Chat remains available.",
+  context_unavailable: "Trailie could not load the Trip conversation.",
+  permission_denied: "You do not have permission to ask Trailie here.",
+  membership_required: "Join this Trip to ask Trailie.",
+  source_message_invalid: "Trailie cannot answer from that message.",
   retry_not_allowed: "This Trailie request cannot be retried.",
   unknown_error: "Trailie could not answer just now. Please try again.",
 } as const;

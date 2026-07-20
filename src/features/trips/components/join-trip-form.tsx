@@ -60,7 +60,7 @@ export function JoinTripForm({
       );
     } catch {
       setFieldErrors({
-        inviteValue: "Enter a valid invite code or join link.",
+        inviteValue: "Enter a valid Trip code or invitation link.",
       });
       setError("invalid_input");
       return;
@@ -77,7 +77,7 @@ export function JoinTripForm({
         nextErrors[field] =
           field === "displayName"
             ? "Enter your display name."
-            : "Enter a valid invite code or join link.";
+            : "Enter a valid Trip code or invitation link.";
       }
       setFieldErrors(nextErrors);
       setError("invalid_input");
@@ -125,19 +125,19 @@ export function JoinTripForm({
       ) : null}
       {initialInviteValue ? (
         <div className="bg-subtle rounded-md px-4 py-3 text-sm">
-          <p className="font-semibold">Invitation ready</p>
+          <p className="font-semibold">Ready to join</p>
           <p className="text-muted-foreground mt-1">
-            Choose the name your crew will see.
+            This link opens the shared Trip. Choose the name your crew will see.
           </p>
         </div>
       ) : (
         <Field
           id="inviteValue"
           name="inviteValue"
-          label="Invite code or link"
+          label="Trip code or invitation link"
           autoComplete="off"
           spellCheck={false}
-          placeholder="ABCD2345 or a join link"
+          placeholder="ABCD2345 or an invitation link"
           error={fieldErrors.inviteValue}
         />
       )}

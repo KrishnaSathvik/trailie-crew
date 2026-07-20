@@ -406,7 +406,7 @@ async function createVersionOne(browser: Browser) {
   const roomId = new URL(roomUrl).pathname.split("/").at(-1);
   if (!roomId) throw new Error("hosted_fixture_room_id_missing");
   const inviteUrl = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
 
   await member.goto(appUrl(inviteUrl));
@@ -422,7 +422,7 @@ async function createVersionOne(browser: Browser) {
     "I confirm Yosemite and Glacier Point sunset. I need accessible low-strain alternatives and peanut-free restaurant options.",
   );
   await openPlan(host);
-  await host.getByRole("button", { name: "Build Our Itinerary" }).click();
+  await host.getByRole("button", { name: "Prepare trip brief" }).click();
   await expect(
     host.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: workflowTimeout(30_000, 120_000) });
@@ -431,22 +431,20 @@ async function createVersionOne(browser: Browser) {
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 20_000 });
   await expect(
-    host.getByRole("button", { name: "Approve summary" }),
+    host.getByRole("button", { name: "Approve trip brief" }),
   ).toBeEnabled({ timeout: 30_000 });
   await expect(
-    member.getByRole("button", { name: "Approve summary" }),
+    member.getByRole("button", { name: "Approve trip brief" }),
   ).toBeEnabled({ timeout: 30_000 });
-  await host.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Approve summary" }).click();
+  await host.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Approve trip brief" }).click();
   await expect(
-    member.getByRole("button", { name: "Generate Itinerary" }),
+    member.getByRole("button", { name: "Create the Plan" }),
   ).toBeVisible({ timeout: 30_000 });
   const planId = hosted
     ? await publishHostedFixture(roomId, hostContext)
     : await (async () => {
-        await member
-          .getByRole("button", { name: "Generate Itinerary" })
-          .click();
+        await member.getByRole("button", { name: "Create the Plan" }).click();
         return null;
       })();
   if (hosted) {
@@ -455,7 +453,7 @@ async function createVersionOne(browser: Browser) {
     await openPlan(host);
     await openPlan(member);
   }
-  await expect(host.getByText("Published itinerary · Version 1")).toBeVisible({
+  await expect(host.getByText("Current plan · Version 1")).toBeVisible({
     timeout: workflowTimeout(90_000, 300_000),
   });
 
@@ -491,15 +489,15 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
     const viewerLink = await createGuestLink(host, "guest_viewer");
     await viewer.goto(appUrl(viewerLink));
     await expect(
-      viewer.getByRole("heading", { name: "Join as a guest viewer" }),
+      viewer.getByRole("heading", { name: "Join as a Viewer" }),
     ).toBeVisible();
-    await viewer.getByLabel("Guest display name").fill("Riley");
-    await viewer.getByRole("button", { name: "Open Version 1" }).click();
+    await viewer.getByLabel("Your display name").fill("Riley");
+    await viewer.getByRole("button", { name: "View Plan Version 1" }).click();
     await expect(viewer).toHaveURL(/\/guest\/plan$/);
     await expect(viewer.getByLabel("Guest permission")).toContainText(
-      "Viewer · read only",
+      "View only",
     );
-    await expect(viewer.getByLabel("Pinned Version 1")).toBeVisible();
+    await expect(viewer.getByLabel("Shared Plan Version 1")).toBeVisible();
     await expect(
       viewer.getByRole("button", { name: "Add comment" }),
     ).toHaveCount(0);
@@ -508,15 +506,16 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
     );
 
     const commenterLink = await createGuestLink(host, "guest_commenter");
-    const commenterPrefix = commenterLink.split("/").at(-1)!.slice(0, 8);
     await commenter.goto(appUrl(commenterLink));
     await expect(
-      commenter.getByRole("heading", { name: "Join as a guest commenter" }),
+      commenter.getByRole("heading", { name: "Join as a Commenter" }),
     ).toBeVisible();
-    await commenter.getByLabel("Guest display name").fill("Jordan");
-    await commenter.getByRole("button", { name: "Open Version 1" }).click();
+    await commenter.getByLabel("Your display name").fill("Jordan");
+    await commenter
+      .getByRole("button", { name: "View Plan Version 1" })
+      .click();
     await expect(commenter.getByLabel("Guest permission")).toContainText(
-      "Commenter · comments enabled",
+      "You can comment",
     );
 
     const guestItem = commenter
@@ -565,34 +564,34 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
       await host
         .getByLabel("Request details")
         .fill("Move Glacier Point sunset later without changing another day");
-      await host.getByRole("button", { name: "Submit change request" }).click();
+      await host.getByRole("button", { name: "Check this change" }).click();
       await expect(
         host.getByRole("heading", { name: "Move an itinerary item later" }),
       ).toBeVisible({ timeout: workflowTimeout(30_000, 120_000) });
-      await host.getByRole("button", { name: "Approve analysis" }).click();
+      await host.getByRole("button", { name: "Approve change" }).click();
       await expect(
         member.getByRole("heading", { name: "Move an itinerary item later" }),
       ).toBeVisible({ timeout: 20_000 });
-      await member.getByRole("button", { name: "Approve analysis" }).click();
+      await member.getByRole("button", { name: "Approve change" }).click();
       await expect(
         host.getByRole("heading", { name: "Ready to publish Version 2" }),
       ).toBeVisible({ timeout: workflowTimeout(90_000, 300_000) });
-      await host.getByRole("button", { name: "Confirm Version 2" }).click();
+      await host.getByRole("button", { name: "Publish Version 2" }).click();
       await expect(
         member.getByRole("heading", { name: "Ready to publish Version 2" }),
       ).toBeVisible({ timeout: 20_000 });
-      await member.getByRole("button", { name: "Confirm Version 2" }).click();
+      await member.getByRole("button", { name: "Publish Version 2" }).click();
     }
-    await expect(host.getByText("Published itinerary · Version 2")).toBeVisible(
-      { timeout: workflowTimeout(30_000, 60_000) },
-    );
+    await expect(host.getByText("Current plan · Version 2")).toBeVisible({
+      timeout: workflowTimeout(30_000, 60_000),
+    });
 
     await commenter.reload();
-    await expect(commenter.getByLabel("Pinned Version 1")).toBeVisible();
+    await expect(commenter.getByLabel("Shared Plan Version 1")).toBeVisible();
     await expect(
       commenter.getByText("Resolved comment by Jordan"),
     ).toBeVisible();
-    await expect(commenter.getByLabel("Pinned Version 2")).toHaveCount(0);
+    await expect(commenter.getByLabel("Shared Plan Version 2")).toHaveCount(0);
     await expect(
       commenter.getByText(/latitude|longitude|exact address/i),
     ).toHaveCount(0);
@@ -607,10 +606,11 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
     await commenter.goto(appUrl("/guest/plan"));
 
     await host.getByRole("button", { name: "Version history" }).click();
-    await host.getByRole("button", { name: "View version" }).last().click();
+    await host.getByRole("button", { name: "View Plan" }).last().click();
     const commenterInvite = host
+      .getByLabel("Guest access for Version 1")
       .getByRole("listitem")
-      .filter({ hasText: `Commenter · ${commenterPrefix}…` });
+      .filter({ hasText: "Commenter" });
     await commenterInvite
       .getByRole("button", { name: "Revoke guest link" })
       .click();
@@ -619,7 +619,9 @@ test("Viewer and Commenter stay pinned to one safe plan version and revoke immed
     );
     await commenter.reload();
     await expect(
-      commenter.getByRole("heading", { name: "Guest access unavailable" }),
+      commenter.getByRole("heading", {
+        name: "This guest link is no longer available",
+      }),
     ).toBeVisible();
   } finally {
     await Promise.all([

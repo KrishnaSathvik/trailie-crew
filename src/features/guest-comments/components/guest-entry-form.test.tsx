@@ -22,10 +22,12 @@ describe("guest display-name entry", () => {
     });
     render(<GuestEntryForm inviteToken={"A".repeat(43)} planVersion={1} />);
 
-    fireEvent.change(screen.getByLabelText("Guest display name"), {
+    fireEvent.change(screen.getByLabelText("Your display name"), {
       target: { value: "Jordan" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Open Version 1" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "View Plan Version 1" }),
+    );
     await waitFor(() =>
       expect(beginGuestSessionAction).toHaveBeenCalledWith({
         inviteToken: "A".repeat(43),
@@ -41,10 +43,12 @@ describe("guest display-name entry", () => {
       error: "guest_unavailable",
     });
     render(<GuestEntryForm inviteToken={"A".repeat(43)} planVersion={1} />);
-    fireEvent.change(screen.getByLabelText("Guest display name"), {
+    fireEvent.change(screen.getByLabelText("Your display name"), {
       target: { value: "Jordan" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Open Version 1" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "View Plan Version 1" }),
+    );
     expect(
       await screen.findByText(/expired, revoked, or reached its use limit/i),
     ).toBeVisible();

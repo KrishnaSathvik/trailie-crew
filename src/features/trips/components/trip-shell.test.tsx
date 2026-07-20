@@ -86,29 +86,36 @@ describe("TripShell", () => {
 
   it("shows host invitation controls", () => {
     renderShell(<TripShell data={shell} />);
-    expect(screen.getByText("Invite Your Crew")).toBeInTheDocument();
+    expect(screen.getByText("Invite your crew")).toBeInTheDocument();
     expect(screen.getAllByText("ABCD2345").length).toBeGreaterThan(0);
+    expect(screen.getByText("Trip code")).toBeInTheDocument();
   });
 
   it("opens Plan from navigation and returns to Chat", async () => {
     renderShell(<TripShell data={shell} />);
     fireEvent.click(screen.getAllByRole("button", { name: "Plan" })[0]);
     expect(
-      await screen.findByRole("button", { name: "Build Our Itinerary" }),
+      await screen.findByRole("button", { name: "Prepare trip brief" }),
     ).toBeVisible();
     fireEvent.click(screen.getAllByRole("button", { name: "Chat" })[0]);
     expect(screen.getByText("Start the conversation")).toBeVisible();
   });
 
-  it("opens the map entry point without replacing the planning workflow", async () => {
+  it("explains the empty map and returns to the planning workflow", async () => {
     renderShell(<TripShell data={shell} />);
     const mapButton = screen.getAllByRole("button", { name: "Map" })[0];
     expect(mapButton).toBeEnabled();
     fireEvent.click(mapButton);
     expect(
-      await screen.findByRole("button", { name: "Build Our Itinerary" }),
+      await screen.findByRole("heading", {
+        name: "Your map will follow the Plan.",
+      }),
     ).toBeVisible();
-    expect(screen.getByText("Spatial itinerary")).toBeVisible();
+    expect(screen.getByText("Trip map")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Open Plan" }));
+    expect(
+      await screen.findByRole("button", { name: "Prepare trip brief" }),
+    ).toBeVisible();
   });
 
   it("limits members to safe room-code information", () => {
@@ -121,7 +128,7 @@ describe("TripShell", () => {
         }}
       />,
     );
-    expect(screen.queryByText("Invite Your Crew")).not.toBeInTheDocument();
-    expect(screen.getByText("Room code")).toBeInTheDocument();
+    expect(screen.queryByText("Invite your crew")).not.toBeInTheDocument();
+    expect(screen.getByText("Trip code")).toBeInTheDocument();
   });
 });

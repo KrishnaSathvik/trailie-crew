@@ -9,15 +9,17 @@ import TermsPage from "./terms/page";
 describe("public trust pages", () => {
   it.each([
     ["Privacy notice", PrivacyPage],
-    ["Terms of Preview use", TermsPage],
+    ["Terms of use", TermsPage],
     ["Accuracy and availability", AccuracyPage],
-    ["Support and abuse reports", SupportPage],
-  ])("renders %s and marks it for professional review", (title, Page) => {
+    ["Support", SupportPage],
+  ])("renders %s as customer-facing product copy", (title, Page) => {
     render(<Page />);
     expect(screen.getByRole("heading", { name: title })).toBeVisible();
-    expect(screen.getByText(/professional review required/i)).toBeVisible();
     expect(
       screen.getByRole("navigation", { name: /trust, legal/i }),
     ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(
+      /preview|production|draft|professional review|github issue|room|model|provider|error code|workflow|token counts/i,
+    );
   });
 });

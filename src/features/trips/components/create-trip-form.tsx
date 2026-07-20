@@ -68,7 +68,7 @@ export function CreateTripForm({
             ? "Enter a Trip name."
             : field === "displayName"
               ? "Enter your display name."
-              : "Expected travelers must be between 1 and 50.";
+              : "Expected crew size must be between 1 and 50.";
       }
       setFieldErrors(nextErrors);
       setError("invalid_input");
@@ -142,7 +142,7 @@ export function CreateTripForm({
       <Field
         id="expectedTravelers"
         name="expectedTravelers"
-        label="Expected travelers (optional)"
+        label="Expected crew size (optional)"
         hint="A rough headcount is enough. You can leave this blank."
         type="number"
         inputMode="numeric"

@@ -12,7 +12,7 @@ async function createCrew(browser: Browser) {
   await expect(host).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomUrl = host.url();
   const inviteUrl = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -58,10 +58,8 @@ test("crew reviews, approves, stales, and regenerates an immutable planning summ
   await send(host, "We all decided on Yosemite");
   await send(member, "Where should we stay? This is an open question");
   await openPlan(host);
-  await host.getByRole("button", { name: "Build Our Itinerary" }).click();
-  await expect(
-    host.getByText("Trailie is organizing what the crew has decided."),
-  ).toBeVisible();
+  await host.getByRole("button", { name: "Prepare trip brief" }).click();
+  await expect(host.getByText("Trailie is checking the trip.")).toBeVisible();
   await expect(
     host.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 20_000 });
@@ -70,7 +68,7 @@ test("crew reviews, approves, stales, and regenerates an immutable planning summ
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 10_000 });
   await expect(member.getByText("Confirmed decisions")).toBeVisible();
-  await expect(member.getByText("Traveler preferences")).toBeVisible();
+  await expect(member.getByText("Crew preferences")).toBeVisible();
   await expect(member.getByText("Open questions")).toBeVisible();
   await expect(
     member.getByText(/itinerary generation is the next step/i),
@@ -80,25 +78,25 @@ test("crew reviews, approves, stales, and regenerates an immutable planning summ
     member.getByText("Add a note before requesting changes."),
   ).toBeVisible();
   await member
-    .getByLabel("Revision note (required for changes)")
+    .getByLabel("What should change?")
     .fill("Please preserve the open lodging question.");
   await member.getByRole("button", { name: "Request changes" }).click();
   await expect(member.getByText("The crew requested changes")).toBeVisible();
-  await member.getByRole("button", { name: "Regenerate Summary" }).click();
+  await member.getByRole("button", { name: "Regenerate summary" }).click();
   await expect(member.getByText("Version 2", { exact: false })).toBeVisible({
     timeout: 20_000,
   });
   await expect(host.getByText("Version 2", { exact: false })).toBeVisible({
     timeout: 10_000,
   });
-  await host.getByRole("button", { name: "Approve summary" }).click();
+  await host.getByRole("button", { name: "Approve trip brief" }).click();
   await expect(host.getByText("Summary approved")).toHaveCount(0);
-  await member.getByRole("button", { name: "Approve summary" }).click();
+  await member.getByRole("button", { name: "Approve trip brief" }).click();
   await expect(member.getByText("Summary approved")).toBeVisible({
     timeout: 10_000,
   });
   await expect(
-    member.getByRole("button", { name: "Generate Itinerary" }),
+    member.getByRole("button", { name: "Create the Plan" }),
   ).toBeVisible();
   await member.getByRole("button", { name: "Chat" }).first().click();
   await send(member, "Actually, I prefer kayaking");
@@ -106,10 +104,8 @@ test("crew reviews, approves, stales, and regenerates an immutable planning summ
   await expect(
     member.getByText("Trip details changed after this summary was created"),
   ).toBeVisible({ timeout: 15_000 });
-  await member.getByRole("button", { name: "Regenerate Summary" }).click();
-  await expect(
-    member.getByText("Trailie is organizing what the crew has decided."),
-  ).toBeVisible();
+  await member.getByRole("button", { name: "Regenerate summary" }).click();
+  await expect(member.getByText("Trailie is checking the trip.")).toBeVisible();
   await expect(member.getByText("Version 3", { exact: false })).toBeVisible({
     timeout: 20_000,
   });
@@ -140,7 +136,7 @@ test("summary generation failure stops safely at the retry cap without affecting
   const { hostContext, host, memberContext } = await createCrew(browser);
   await send(host, "simulate planning failure while keeping Yosemite in chat");
   await openPlan(host);
-  await host.getByRole("button", { name: "Build Our Itinerary" }).click();
+  await host.getByRole("button", { name: "Prepare trip brief" }).click();
   await expect(
     host.getByRole("heading", { name: "The summary could not be prepared." }),
   ).toBeVisible({ timeout: 20_000 });
@@ -153,7 +149,7 @@ test("summary generation failure stops safely at the retry cap without affecting
   await openPlan(host);
   await expect(
     host.getByText(
-      "The summary reached its safe retry limit. Chat and prior plans remain available.",
+      "Trailie could not finish after several tries. Chat and earlier Plans remain available.",
     ),
   ).toBeVisible();
   await expect(host.getByRole("button", { name: "Retry summary" })).toHaveCount(

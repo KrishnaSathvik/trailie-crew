@@ -3,21 +3,47 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --background: #f7f7f5;
-  --foreground: #171717;
-  --muted-foreground: #686866;
-  --border: #d6d6d1;
-  --subtle: #ecece8;
-  --ring: #171717;
+  --background: #f7f8f6;
+  --foreground: #171a18;
+  --muted-foreground: #626863;
+  --border: #d6dad5;
+  --subtle: #ecefeb;
+  --surface: #fafbf9;
+  --surface-raised: #ffffff;
+  --ring: #34584a;
+  --accent: #34584a;
+  --accent-soft: #e4ede8;
+  --positive: #276246;
+  --positive-soft: #e3f0e8;
+  --warning: #785a1d;
+  --warning-soft: #f5edda;
+  --destructive: #9f3535;
+  --destructive-soft: #f7e7e5;
+  --destructive-foreground: #ffffff;
+  --radius-card-value: 0.75rem;
+  --radius-control-value: 0.5rem;
+  --shadow-soft-value: 0 12px 32px rgb(23 26 24 / 7%);
 }
 
 :root[data-theme="dark"] {
-  --background: #111110;
-  --foreground: #f1f1ed;
-  --muted-foreground: #a3a39d;
-  --border: #353532;
-  --subtle: #20201e;
-  --ring: #f1f1ed;
+  --background: #121512;
+  --foreground: #f1f3ef;
+  --muted-foreground: #a6ada7;
+  --border: #333a34;
+  --subtle: #1d231f;
+  --surface: #161a17;
+  --surface-raised: #1b211d;
+  --ring: #a8c7b8;
+  --accent: #a8c7b8;
+  --accent-soft: #21372d;
+  --positive: #9bd2b3;
+  --positive-soft: #1c3829;
+  --warning: #dfc27e;
+  --warning-soft: #392f1f;
+  --destructive: #f0a3a0;
+  --destructive-soft: #3f2525;
+  --destructive-foreground: #211212;
+  --shadow-soft-value: 0 14px 40px rgb(0 0 0 / 24%);
 }
 
 @theme inline {
@@ -26,9 +52,23 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-subtle: var(--subtle);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-foreground: var(--destructive-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-card: var(--radius-card-value);
+  --radius-control: var(--radius-control-value);
+  --shadow-soft: var(--shadow-soft-value);
 }
 
 * {
@@ -45,15 +85,91 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, sans-serif;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 button {
   font: inherit;
 }
 
+a,
+button,
+input,
+textarea,
+select,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: none;
+}
+
 ::selection {
   color: var(--background);
   background: var(--foreground);
+}
+
+.eyebrow {
+  color: var(--muted-foreground);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.page-title {
+  font-size: clamp(2.25rem, 5vw, 4.75rem);
+  font-weight: 650;
+  letter-spacing: -0.06em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.section-title {
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-radius: var(--radius-control-value);
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.skip-link:focus-visible {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
 }
 
 .route-line {
@@ -150,6 +266,12 @@ button {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 30rem) {
+  .page-title {
+    font-size: clamp(2.5rem, 14vw, 4rem);
   }
 }
 

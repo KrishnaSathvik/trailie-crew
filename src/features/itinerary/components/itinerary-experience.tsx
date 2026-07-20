@@ -9,11 +9,11 @@ const progressCopy = {
   generation_started: "Preparing the approved trip details",
   structure_created: "Building the day-by-day plan",
   route_validation_started: "Checking routes and timing",
-  constraint_validation_started: "Validating crew constraints",
+  constraint_validation_started: "Checking crew needs",
   repair_started: "Adjusting a scheduling conflict",
-  validation_completed: "Finalizing the itinerary",
-  published: "Itinerary published",
-  failed: "Itinerary generation stopped",
+  validation_completed: "Finalizing the Plan",
+  published: "Plan published",
+  failed: "Trailie couldn’t finish the Plan",
 } as const;
 export type ItineraryView =
   | "Overview"
@@ -23,7 +23,7 @@ export type ItineraryView =
   | "Stay"
   | "Food"
   | "Evidence"
-  | "Validation";
+  | "Trip checks";
 const views: ItineraryView[] = [
   "Overview",
   "Map",
@@ -32,31 +32,30 @@ const views: ItineraryView[] = [
   "Stay",
   "Food",
   "Evidence",
-  "Validation",
+  "Trip checks",
 ];
 const quotaCopy: Record<string, string> = {
   ai_disabled:
-    "New AI generation is temporarily paused. Chat and existing plans remain available.",
+    "Trailie is temporarily paused. Chat and existing Plans remain available.",
   user_ai_limit_reached:
-    "Your daily generation allowance has been reached. Existing trip data remains available.",
+    "Your daily Trailie allowance has been reached. Your existing Trip remains available.",
   room_ai_limit_reached:
-    "This trip’s daily generation allowance has been reached.",
-  global_ai_limit_reached:
-    "Trailie’s daily generation capacity has been reached.",
+    "This Trip’s daily Trailie allowance has been reached.",
+  global_ai_limit_reached: "Trailie’s daily capacity has been reached.",
   provider_budget_unavailable:
-    "Generation is temporarily unavailable because the provider budget cannot be reserved.",
+    "Trailie is temporarily unavailable. Your current Plan is unchanged.",
   model_timeout:
-    "The provider exceeded the safe deadline. No partial itinerary was published; a retry is safe.",
+    "Trailie took too long to finish. No partial Plan was published, and you can try again.",
   model_rate_limited:
-    "The provider is temporarily rate limited. No partial itinerary was published; retry shortly.",
+    "Trailie is receiving too many requests. No partial Plan was published; try again shortly.",
   model_unavailable:
-    "The provider is temporarily unavailable. No partial itinerary was published; a retry is safe.",
+    "Trailie is temporarily unavailable. No partial Plan was published, and you can try again.",
   recovery_required:
-    "The validated work was saved for automatic recovery. Chat and published plans remain available while recovery continues.",
+    "Trailie is still checking this request. Chat and published Plans remain available.",
   retry_exhausted:
-    "The itinerary reached its safe retry limit. Chat and published plans remain available.",
+    "Trailie could not finish after several tries. Chat and published Plans remain available.",
   workflow_deadline_exceeded:
-    "The workflow reached its total deadline and stopped without publishing partial work.",
+    "Trailie could not complete that right now. No partial Plan was published.",
 };
 
 function costLabel(cost: CostEstimate) {
@@ -68,6 +67,20 @@ function costLabel(cost: CostEstimate) {
   return "Cost estimate unavailable";
 }
 
+function locationLabel(value: string | null | undefined) {
+  if (value === "verified") return "Verified location";
+  if (value === "estimated") return "Location estimated";
+  if (value === "unavailable") return "Location unavailable";
+  return "Location not verified";
+}
+
+function reservationLabel(value: string) {
+  if (value === "required") return "Reservation required";
+  if (value === "recommended") return "Reservation recommended";
+  if (value === "not_required") return "No reservation required";
+  return "Reservation status unknown";
+}
+
 function ActivePlan({ plan }: { plan: TripPlanView }) {
   return (
     <div
@@ -75,10 +88,10 @@ function ActivePlan({ plan }: { plan: TripPlanView }) {
       aria-live="polite"
     >
       <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-        Itinerary · Version {plan.version}
+        Plan · Version {plan.version}
       </p>
       <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em]">
-        Trailie is validating the plan before you see it.
+        Trailie is checking the Plan before you see it.
       </h1>
       <p className="text-muted-foreground mt-3 max-w-xl leading-7">
         Chat stays available. Refreshing this page will resume from the latest
@@ -86,7 +99,7 @@ function ActivePlan({ plan }: { plan: TripPlanView }) {
       </p>
       <ol
         className="border-border relative mt-8 space-y-0 border-l"
-        aria-label="Itinerary progress"
+        aria-label="Plan progress"
       >
         {plan.progressEvents.map((event) => (
           <li key={event.id} className="relative pb-6 pl-6 last:pb-0">
@@ -122,8 +135,8 @@ function Overview({ plan }: { plan: TripPlanView }) {
         <div className="border-border bg-border grid grid-cols-2 gap-px overflow-hidden rounded-md border sm:grid-cols-4">
           {[
             ["Dates", `${itinerary.startDate} — ${itinerary.endDate}`],
-            ["Travelers", String(itinerary.travelers.length)],
-            ["Summary basis", `Version ${plan.basisSummaryVersion}`],
+            ["Crew", String(itinerary.travelers.length)],
+            ["Trip brief", `Version ${plan.basisSummaryVersion}`],
             ["Cost", costStatus],
           ].map(([label, value]) => (
             <div key={label} className="bg-background p-4">
@@ -145,28 +158,26 @@ function Overview({ plan }: { plan: TripPlanView }) {
           <p className="mt-3">
             {lodging
               ? `${lodging.name} · ${lodging.area}`
-              : "Lodging remains unresolved."}
+              : "No lodging has been selected yet."}
           </p>
           <p className="text-muted-foreground mt-1 text-sm">
             Recommendation only. No reservation has been made.
           </p>
         </section>
         <section className="border-border mt-6 border-t pt-6">
-          <h2 className="text-sm font-semibold">Unresolved items</h2>
+          <h2 className="text-sm font-semibold">Open details</h2>
           <p className="text-muted-foreground mt-2 text-sm">
             {unresolved
-              ? `${unresolved} item${unresolved === 1 ? "" : "s"} remain explicit.`
-              : "No unresolved items in this version."}
+              ? `${unresolved} detail${unresolved === 1 ? "" : "s"} still need a crew decision.`
+              : "Every material detail is settled in this version."}
           </p>
         </section>
       </div>
       <aside className="border-border h-fit rounded-md border p-5">
         <p className="text-muted-foreground font-mono text-[0.5625rem] tracking-wider uppercase">
-          Validation
+          Trip checks
         </p>
-        <p className="mt-3 text-sm font-semibold">
-          Validated before publishing
-        </p>
+        <p className="mt-3 text-sm font-semibold">Checked before publishing</p>
         <p className="text-muted-foreground mt-2 text-sm leading-6">
           Critical timing, route, decision, and crew-constraint checks passed.
         </p>
@@ -235,10 +246,10 @@ function Days({
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-[0.6875rem]">
                   <span className="border-border rounded-full border px-2 py-1">
-                    {item.location?.verificationStatus ?? "unknown"} location
+                    {locationLabel(item.location?.verificationStatus)}
                   </span>
                   <span className="border-border rounded-full border px-2 py-1">
-                    Reservation {item.reservation.status.replaceAll("_", " ")}
+                    {reservationLabel(item.reservation.status)}
                   </span>
                   <span className="border-border rounded-full border px-2 py-1">
                     {costLabel(item.cost)}
@@ -302,7 +313,10 @@ function Travel({ plan }: { plan: TripPlanView }) {
                   {segment.origin.name} → {segment.destination.name}
                 </p>
                 <p className="text-muted-foreground mt-1 text-sm capitalize">
-                  {segment.mode} · {segment.verificationStatus}
+                  {segment.mode} ·{" "}
+                  {segment.durationMinutes === null
+                    ? "Route unavailable"
+                    : "Route checked"}
                 </p>
               </div>
               <p className="text-sm font-semibold">
@@ -329,20 +343,27 @@ function Stay({ plan }: { plan: TripPlanView }) {
       <p className="text-muted-foreground mt-2 text-sm">
         No reservation has been made
       </p>
-      <div className="mt-6 space-y-4">
-        {plan.itinerary!.lodging.map((stay) => (
-          <article
-            key={stay.id}
-            className="border-border rounded-md border p-5"
-          >
-            <h3 className="font-semibold">{stay.name}</h3>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {stay.area} · {stay.checkInDate} to {stay.checkOutDate}
-            </p>
-            <p className="mt-3 text-sm">{costLabel(stay.cost)}</p>
-          </article>
-        ))}
-      </div>
+      {plan.itinerary!.lodging.length ? (
+        <div className="mt-6 space-y-4">
+          {plan.itinerary!.lodging.map((stay) => (
+            <article
+              key={stay.id}
+              className="border-border rounded-md border p-5"
+            >
+              <h3 className="font-semibold">{stay.name}</h3>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {stay.area} · {stay.checkInDate} to {stay.checkOutDate}
+              </p>
+              <p className="mt-3 text-sm">{costLabel(stay.cost)}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="text-muted-foreground mt-6">
+          No stay has been selected yet. Ask Trailie to compare areas or lodging
+          options when the crew is ready.
+        </p>
+      )}
     </div>
   );
 }
@@ -354,7 +375,7 @@ function Food({ plan }: { plan: TripPlanView }) {
       <h2 className="text-xl font-semibold">Food</h2>
       {!restaurants.length ? (
         <p className="text-muted-foreground mt-4">
-          No verified restaurant details yet
+          No verified restaurant details yet.
         </p>
       ) : (
         <ul className="mt-5 space-y-4">
@@ -373,11 +394,11 @@ function Food({ plan }: { plan: TripPlanView }) {
   );
 }
 
-function Validation({ plan }: { plan: TripPlanView }) {
+function TripChecks({ plan }: { plan: TripPlanView }) {
   const report = plan.validationSummary;
   return (
     <div>
-      <h2 className="text-xl font-semibold">Validation summary</h2>
+      <h2 className="text-xl font-semibold">Trip checks</h2>
       <p className="mt-4 text-lg font-semibold">
         {report?.passedChecks.length ?? 0} checks passed
       </p>
@@ -392,7 +413,7 @@ function Validation({ plan }: { plan: TripPlanView }) {
         </p>
       ) : (
         <p className="text-muted-foreground mt-6 text-sm">
-          Some provider details remain unknown.
+          Some travel details could not be verified.
         </p>
       )}
     </div>
@@ -450,8 +471,8 @@ function Evidence({ plan }: { plan: TripPlanView }) {
     <div>
       <h2 className="text-xl font-semibold">Travel evidence</h2>
       <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
-        Sources are pinned to Version {plan.version}. Conditions may have
-        changed since this version was published.
+        Sources are saved with Version {plan.version}. Conditions may have
+        changed since this Version was published.
       </p>
       {evidence.length ? (
         <ul className="border-border mt-6 divide-y border-y">
@@ -505,7 +526,7 @@ function Evidence({ plan }: { plan: TripPlanView }) {
         </ul>
       ) : (
         <p className="text-muted-foreground mt-6">
-          Live travel evidence is unavailable for this published version.
+          This information could not be verified for this Plan version.
         </p>
       )}
     </div>
@@ -541,16 +562,16 @@ export function ItineraryExperience({
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12">
         <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-          Itinerary · Version {plan.version}
+          Plan · Version {plan.version}
         </p>
         <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em]">
           {plan.status === "blocked"
-            ? "This itinerary cannot be published yet."
-            : "The itinerary could not be generated."}
+            ? "This Plan cannot be published yet."
+            : "The Plan could not be created."}
         </h1>
         <p className="text-muted-foreground mt-3 leading-7">
           {quotaCopy[plan.errorCode ?? ""] ??
-            "The approved summary and crew conversation are unchanged. Trailie did not present an unvalidated plan as ready."}
+            "The approved trip brief and Crew conversation are unchanged. No incomplete Plan was published."}
         </p>
         {plan.status === "failed" && onRetry ? (
           <button
@@ -558,7 +579,7 @@ export function ItineraryExperience({
             onClick={onRetry}
             className="bg-foreground text-background mt-6 w-fit rounded-full px-5 py-2.5 text-sm font-semibold"
           >
-            Retry itinerary
+            Try again
           </button>
         ) : null}
       </div>
@@ -573,7 +594,8 @@ export function ItineraryExperience({
     <div className="min-h-0 flex-1 overflow-y-auto">
       <header className="border-border px-5 pt-7 sm:px-8">
         <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-          Published itinerary · Version {plan.version}
+          {readOnly ? "Earlier version" : "Current plan"} · Version{" "}
+          {plan.version}
         </p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -587,11 +609,11 @@ export function ItineraryExperience({
           <div className="flex flex-wrap items-center gap-2">
             {readOnly ? (
               <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
-                Historical · read only
+                Viewing an earlier version
               </span>
             ) : null}
             <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
-              Validated before publishing
+              Checked before publishing
             </span>
             {onHistory ? (
               <button
@@ -608,7 +630,7 @@ export function ItineraryExperience({
                 onClick={onRequestChange}
                 className="bg-foreground text-background min-h-10 rounded-md px-3 text-xs font-semibold"
               >
-                Request a Change
+                Request a change
               </button>
             ) : null}
           </div>
@@ -634,10 +656,26 @@ export function ItineraryExperience({
             participantId={commenting.participantId}
           />
         ) : null}
+        <label className="mt-7 block sm:hidden">
+          <span className="text-muted-foreground mb-2 block text-xs font-semibold">
+            Plan view
+          </span>
+          <select
+            value={view}
+            onChange={(event) => setView(event.target.value as ItineraryView)}
+            className="border-border bg-background focus-visible:ring-ring min-h-11 w-full rounded-md border px-3 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {views.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
         <div
-          className="mt-7 overflow-x-auto"
+          className="mt-7 hidden overflow-x-auto sm:block"
           role="tablist"
-          aria-label="Itinerary views"
+          aria-label="Plan views"
         >
           <div className="border-border flex min-w-max gap-6 border-b">
             {views.map((item) => (
@@ -675,7 +713,7 @@ export function ItineraryExperience({
           {view === "Stay" ? <Stay plan={plan} /> : null}
           {view === "Food" ? <Food plan={plan} /> : null}
           {view === "Evidence" ? <Evidence plan={plan} /> : null}
-          {view === "Validation" ? <Validation plan={plan} /> : null}
+          {view === "Trip checks" ? <TripChecks plan={plan} /> : null}
         </div>
       )}
     </div>

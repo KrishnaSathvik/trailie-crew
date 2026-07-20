@@ -45,7 +45,7 @@ describe("public share page", () => {
     const token = "A".repeat(43);
     render(await SharePage({ params: Promise.resolve({ token }) }));
     expect(verifyPlanShareToken).toHaveBeenCalledWith(token);
-    expect(screen.getByLabelText("Pinned Version 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Shared Plan Version 1")).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(token);
   });
 
@@ -55,7 +55,7 @@ describe("public share page", () => {
       await SharePage({ params: Promise.resolve({ token: "bad-token" }) }),
     );
     expect(
-      screen.getByRole("heading", { name: "Shared itinerary unavailable" }),
+      screen.getByRole("heading", { name: "Shared Plan unavailable" }),
     ).toBeInTheDocument();
   });
 

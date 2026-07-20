@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { beginGuestSessionAction } from "../actions";
+import {
+  buttonClassName,
+  inputClassName,
+} from "@/components/ui/product-controls";
 
 export function GuestEntryForm({
   inviteToken,
@@ -36,18 +40,18 @@ export function GuestEntryForm({
   return (
     <form onSubmit={(event) => void begin(event)} className="mt-8">
       <label className="text-sm font-semibold" htmlFor="guest-display-name">
-        Guest display name
+        Your display name
       </label>
       <input
         id="guest-display-name"
-        aria-label="Guest display name"
+        aria-label="Your display name"
         autoComplete="name"
         required
         maxLength={50}
         value={displayName}
         onChange={(event) => setDisplayName(event.target.value)}
-        className="border-border mt-2 min-h-11 w-full rounded-md border bg-transparent px-3"
-        placeholder="How your comments will appear"
+        className={`${inputClassName} mt-2`}
+        placeholder="How the Crew will see your name"
       />
       {message ? (
         <p role="alert" className="mt-3 text-sm font-semibold">
@@ -57,9 +61,9 @@ export function GuestEntryForm({
       <button
         type="submit"
         disabled={busy || !displayName.trim()}
-        className="bg-foreground text-background mt-4 min-h-11 rounded-md px-4 text-sm font-semibold disabled:opacity-50"
+        className={`${buttonClassName({ variant: "primary" })} mt-4`}
       >
-        Open Version {planVersion}
+        View Plan Version {planVersion}
       </button>
     </form>
   );

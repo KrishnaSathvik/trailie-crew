@@ -91,7 +91,7 @@ describe("MapWorkspace", () => {
     ).toBeVisible();
     expect(screen.getByRole("region", { name: "Itinerary map" })).toBeVisible();
     expect(
-      screen.getByRole("region", { name: "Spatial itinerary" }),
+      screen.getByRole("region", { name: "Plan locations" }),
     ).toBeVisible();
 
     fireEvent.click(
@@ -124,7 +124,7 @@ describe("MapWorkspace", () => {
 
   it("offers mobile Map/Plan modes and three sheet positions", () => {
     render(<MapWorkspace {...common} />);
-    fireEvent.click(screen.getByRole("button", { name: "Map mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
     expect(
       screen.getByRole("button", { name: "Expand place sheet" }),
     ).toBeVisible();
@@ -138,7 +138,7 @@ describe("MapWorkspace", () => {
       "data-position",
       "expanded",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Plan mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Plan" }));
     expect(screen.getByTestId("map-workspace")).toHaveAttribute(
       "data-mobile-mode",
       "plan",
@@ -159,7 +159,7 @@ describe("MapWorkspace", () => {
     );
     expect(
       screen.getByText(
-        "Map view is unavailable. Your itinerary and route details are still available.",
+        "Map view is unavailable. Your itinerary is still fully accessible.",
       ),
     ).toBeVisible();
     expect(screen.getByText("Glacier Point sunset")).toBeVisible();
@@ -174,7 +174,7 @@ describe("MapWorkspace", () => {
       value: true,
     });
     render(<MapWorkspace {...common} />);
-    fireEvent.click(screen.getByRole("button", { name: "Map mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
     fireEvent.click(screen.getByRole("button", { name: "Expand place sheet" }));
     expect(screen.getByTestId("place-sheet")).toHaveAttribute(
       "data-position",
@@ -193,7 +193,7 @@ describe("MapWorkspace", () => {
     fireEvent(window, new Event("offline"));
     expect(
       screen.getByText(
-        "Map view is unavailable while offline. Your itinerary and route details are still available.",
+        "Map view is unavailable. Your itinerary is still fully accessible.",
       ),
     ).toBeVisible();
     expect(screen.getByText("Glacier Point sunset")).toBeVisible();

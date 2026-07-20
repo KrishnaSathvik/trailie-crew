@@ -36,12 +36,12 @@ describe("guest invite entry page", () => {
 
     render(await GuestInvitePage({ params: Promise.resolve({ token }) }));
     expect(
-      screen.getByRole("heading", { name: "Join as a guest commenter" }),
+      screen.getByRole("heading", { name: "Join as a Commenter" }),
     ).toBeVisible();
     expect(screen.getByLabelText("Exact plan version")).toHaveTextContent(
       "Version 1",
     );
-    expect(screen.getByLabelText("Guest display name")).toBeVisible();
+    expect(screen.getByLabelText("Your display name")).toBeVisible();
     expect(document.body.textContent).not.toContain(token);
   });
 
@@ -51,7 +51,9 @@ describe("guest invite entry page", () => {
       await GuestInvitePage({ params: Promise.resolve({ token: "bad" }) }),
     );
     expect(
-      screen.getByRole("heading", { name: "Guest access unavailable" }),
+      screen.getByRole("heading", {
+        name: "This guest link is no longer available",
+      }),
     ).toBeVisible();
     expect(screen.getByText(/expired, revoked, or replaced/i)).toBeVisible();
   });

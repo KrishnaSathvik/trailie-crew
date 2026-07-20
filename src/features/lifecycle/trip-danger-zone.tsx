@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { deleteRoomAction, transferRoomHostAction } from "./actions";
@@ -16,17 +17,21 @@ const messages: Record<string, string> = {
   host_required: "Only the current host can make this change.",
   confirmation_required: "Enter the trip name exactly to confirm deletion.",
   active_member_required: "Choose an active crew member.",
-  lifecycle_unavailable: "This change is temporarily unavailable. Try again.",
+  lifecycle_unavailable: "We couldn’t complete that right now. Try again.",
 };
 
 export function TripDangerZone({
   roomId,
   roomName,
+  roomCode,
   participants,
+  onOpenPlan,
 }: {
   roomId: string;
   roomName: string;
+  roomCode?: string;
   participants: Participant[];
+  onOpenPlan?: () => void;
 }) {
   const router = useRouter();
   const [confirmation, setConfirmation] = useState("");
@@ -47,7 +52,7 @@ export function TripDangerZone({
       });
       if (!result.ok)
         return setNotice(
-          messages[result.error] ?? "Host transfer failed safely.",
+          messages[result.error] ?? "We couldn’t transfer the host role.",
         );
       setNotice("Host role transferred. Refreshing trip access…");
       router.refresh();
@@ -60,7 +65,7 @@ export function TripDangerZone({
       const result = await deleteRoomAction({ roomId, confirmation });
       if (!result.ok)
         return setNotice(
-          messages[result.error] ?? "Trip deletion failed safely.",
+          messages[result.error] ?? "We couldn’t delete this Trip.",
         );
       window.location.assign("/");
     });
@@ -75,16 +80,47 @@ export function TripDangerZone({
         Trip settings
       </p>
       <h2 id="danger-zone-heading" className="mt-3 text-2xl font-semibold">
-        Host and deletion
+        Manage this Trip
       </h2>
       <p className="text-muted-foreground mt-3 text-sm leading-6">
-        Export anything you need before deleting. Deletion immediately revokes
-        invitations and public shares and cannot be undone.
+        Update access, hand over the host role, or manage your data.
       </p>
 
+      <div className="border-border bg-surface-raised rounded-card mt-8 border p-5">
+        <p className="eyebrow">Trip</p>
+        <h3 className="mt-2 font-semibold">{roomName}</h3>
+        {roomCode ? (
+          <p className="text-muted-foreground mt-2 text-sm">
+            Trip code{" "}
+            <strong className="text-foreground font-mono tracking-[0.12em]">
+              {roomCode}
+            </strong>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
+        <p className="eyebrow">Guest access &amp; sharing</p>
+        <h3 className="mt-2 font-semibold">Share a published Plan</h3>
+        <p className="text-muted-foreground mt-2 text-sm leading-6">
+          Create guest links, choose permissions, and manage public sharing from
+          the published Plan.
+        </p>
+        {onOpenPlan ? (
+          <button
+            type="button"
+            onClick={onOpenPlan}
+            className="border-border rounded-control mt-4 min-h-11 border px-4 text-sm font-semibold"
+          >
+            Open Plan sharing
+          </button>
+        ) : null}
+      </div>
+
       {members.length ? (
-        <div className="border-border mt-8 rounded-lg border p-5">
-          <h3 className="font-semibold">Transfer host</h3>
+        <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
+          <p className="eyebrow">People</p>
+          <h3 className="mt-2 font-semibold">Transfer host</h3>
           <p className="text-muted-foreground mt-2 text-sm">
             The new host gains deletion and invitation controls. Your role
             becomes member.
@@ -117,13 +153,38 @@ export function TripDangerZone({
             Transfer host role
           </button>
         </div>
-      ) : null}
+      ) : (
+        <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
+          <p className="eyebrow">People</p>
+          <h3 className="mt-2 font-semibold">Host role</h3>
+          <p className="text-muted-foreground mt-2 text-sm">
+            Invite another crew member before transferring the host role.
+          </p>
+        </div>
+      )}
 
-      <div className="border-destructive/50 mt-8 rounded-lg border p-5">
-        <h3 className="text-destructive font-semibold">Delete this trip</h3>
+      <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
+        <p className="eyebrow">Data</p>
+        <h3 className="mt-2 font-semibold">Account data</h3>
+        <p className="text-muted-foreground mt-2 text-sm">
+          Download your data or manage your Trailie Crew account.
+        </p>
+        <Link
+          href="/settings"
+          className="border-border rounded-control mt-4 inline-flex min-h-11 items-center border px-4 text-sm font-semibold"
+        >
+          Open account settings
+        </Link>
+      </div>
+
+      <div className="border-destructive/50 rounded-card mt-10 border p-5">
+        <p className="eyebrow text-destructive">Danger zone</p>
+        <h3 className="text-destructive mt-2 font-semibold">
+          Delete this trip
+        </h3>
         <p className="text-muted-foreground mt-2 text-sm">
           Type <strong className="text-foreground">{roomName}</strong> to
-          permanently delete the trip and its room-owned data.
+          permanently delete the Trip and everything saved in it.
         </p>
         <label
           htmlFor="delete-room-confirmation"

@@ -64,7 +64,7 @@ export function GuestSuggestionsPanel({
         suggestion,
         warning:
           result.data.warning ??
-          `This suggestion was made on Version ${suggestion.originalPlanVersion}. The trip is now on Version ${currentPlanVersion}. Convert it into a new revision request based on the current version?`,
+          `This suggestion was made on Version ${suggestion.originalPlanVersion}. The Trip is now on Version ${currentPlanVersion}. Review it against the current Plan before converting.`,
       });
     } else {
       setConfirming(null);
@@ -75,7 +75,7 @@ export function GuestSuggestionsPanel({
             : value,
         ),
       );
-      setMessage("Converted into the normal crew revision workflow.");
+      setMessage("Converted into a Plan change for Crew review.");
       await onConverted();
     }
     setBusy(false);
@@ -114,8 +114,7 @@ export function GuestSuggestionsPanel({
           <div>
             <p className="text-sm font-semibold">Guest suggestions</p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Review exact-version suggestions before converting one into the
-              existing crew revision workflow.
+              Review suggestions before turning one into a Plan change.
             </p>
           </div>
           <div className="flex gap-1" aria-label="Suggestion filters">
@@ -142,8 +141,8 @@ export function GuestSuggestionsPanel({
               {confirming.warning}
             </p>
             <p className="text-muted-foreground mt-2 text-xs">
-              Trailie will re-resolve the target and stop safely if it no longer
-              applies.
+              Trailie will check the suggestion against the current Plan before
+              creating the change.
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -152,7 +151,7 @@ export function GuestSuggestionsPanel({
                 onClick={() => void convert(confirming.suggestion, true)}
                 className="bg-foreground text-background min-h-10 rounded-md px-3 text-xs font-semibold disabled:opacity-50"
               >
-                Confirm and create revision
+                Review against current Plan
               </button>
               <button
                 type="button"
@@ -185,15 +184,15 @@ export function GuestSuggestionsPanel({
                       <p className="mt-2 text-sm">{suggestion.details}</p>
                       {stale && suggestion.status === "open" ? (
                         <p className="border-foreground mt-3 border-l-2 pl-3 text-xs font-semibold">
-                          Stale-version warning: current trip is Version{" "}
-                          {currentPlanVersion}. Explicit rebase confirmation is
-                          required.
+                          This suggestion was made on an earlier version. Review
+                          it against Version {currentPlanVersion} before
+                          converting.
                         </p>
                       ) : null}
                       {suggestion.status === "converted" ? (
                         <p className="mt-3 text-xs font-semibold">
                           Converted from Version{" "}
-                          {suggestion.originalPlanVersion} to revision base
+                          {suggestion.originalPlanVersion} into a change for
                           Version {suggestion.rebasedToPlanVersion}.
                         </p>
                       ) : null}
@@ -206,7 +205,7 @@ export function GuestSuggestionsPanel({
                           onClick={() => void convert(suggestion, false)}
                           className="bg-foreground text-background min-h-9 rounded-md px-3 text-xs font-semibold disabled:opacity-50"
                         >
-                          Convert to revision
+                          Convert to Plan change
                         </button>
                         <button
                           type="button"
@@ -223,7 +222,7 @@ export function GuestSuggestionsPanel({
                         onClick={() => void onConverted()}
                         className="border-border min-h-9 rounded-md border px-3 text-xs font-semibold"
                       >
-                        Open revision request
+                        Open Plan change
                       </button>
                     ) : null}
                   </div>

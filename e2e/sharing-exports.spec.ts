@@ -28,7 +28,7 @@ async function createPublishedVersions(browser: Browser) {
   const roomId = new URL(roomUrl).pathname.match(/^\/trips\/([^/]+)/)?.[1];
   if (!roomId) throw new Error("room_id_missing_from_trip_url");
   const inviteUrl = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
 
   const memberContext = await browser.newContext();
@@ -42,7 +42,7 @@ async function createPublishedVersions(browser: Browser) {
     "We all decided on Yosemite and must see Glacier Point sunset",
   );
   await openPlan(host);
-  await host.getByRole("button", { name: "Build Our Itinerary" }).click();
+  await host.getByRole("button", { name: "Prepare trip brief" }).click();
   await expect(
     host.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 20_000 });
@@ -50,9 +50,9 @@ async function createPublishedVersions(browser: Browser) {
   await expect(
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 15_000 });
-  await host.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Generate Itinerary" }).click();
+  await host.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Create the Plan" }).click();
   await expect(
     member.getByRole("heading", { name: "Yosemite crew escape" }),
   ).toBeVisible({ timeout: 30_000 });
@@ -66,24 +66,24 @@ async function createPublishedVersions(browser: Browser) {
   await member
     .getByLabel("Request details")
     .fill("Move Glacier Point sunset later without changing another day");
-  await member.getByRole("button", { name: "Submit change request" }).click();
+  await member.getByRole("button", { name: "Check this change" }).click();
   await expect(
     member.getByRole("heading", { name: "Move an itinerary item later" }),
   ).toBeVisible({ timeout: 20_000 });
-  await member.getByRole("button", { name: "Approve analysis" }).click();
+  await member.getByRole("button", { name: "Approve change" }).click();
   await expect(
     host.getByRole("heading", { name: "Move an itinerary item later" }),
   ).toBeVisible({ timeout: 15_000 });
-  await host.getByRole("button", { name: "Approve analysis" }).click();
+  await host.getByRole("button", { name: "Approve change" }).click();
   await expect(
     member.getByRole("heading", { name: "Ready to publish Version 2" }),
   ).toBeVisible({ timeout: 30_000 });
-  await member.getByRole("button", { name: "Confirm Version 2" }).click();
+  await member.getByRole("button", { name: "Publish Version 2" }).click();
   await expect(
     host.getByRole("heading", { name: "Ready to publish Version 2" }),
   ).toBeVisible({ timeout: 15_000 });
-  await host.getByRole("button", { name: "Confirm Version 2" }).click();
-  await expect(host.getByText("Published itinerary · Version 2")).toBeVisible({
+  await host.getByRole("button", { name: "Publish Version 2" }).click();
+  await expect(host.getByText("Current plan · Version 2")).toBeVisible({
     timeout: 20_000,
   });
   return { hostContext, host, memberContext, member, roomId, roomUrl };
@@ -91,8 +91,8 @@ async function createPublishedVersions(browser: Browser) {
 
 async function openHistoricalVersionOne(page: Page) {
   await page.getByRole("button", { name: "Version history" }).click();
-  await page.getByRole("button", { name: "View version" }).last().click();
-  await expect(page.getByText("Published itinerary · Version 1")).toBeVisible();
+  await page.getByRole("button", { name: "View Plan" }).last().click();
+  await expect(page.getByText("Earlier version · Version 1")).toBeVisible();
 }
 
 test("a shared historical version stays pinned, exports safely, and revokes immediately", async ({
@@ -128,9 +128,9 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
 
   await openHistoricalVersionOne(member);
   await expect(member.getByText(/Active public link/)).toBeVisible();
-  await expect(member.getByRole("button", { name: "Rotate link" })).toHaveCount(
-    0,
-  );
+  await expect(
+    member.getByRole("button", { name: "Replace link" }),
+  ).toHaveCount(0);
   await expect(member.getByRole("button", { name: "Revoke link" })).toHaveCount(
     0,
   );
@@ -141,11 +141,11 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
   await expect(visitor.locator("#shared-title")).toHaveText(
     "Yosemite crew escape",
   );
-  await expect(visitor.getByLabel("Pinned Version 1")).toBeVisible();
+  await expect(visitor.getByLabel("Shared Plan Version 1")).toBeVisible();
   await expect(
     visitor.getByRole("heading", { name: "Privacy-safe map" }),
   ).toBeVisible();
-  await expect(visitor.getByText("Deterministic local adapter")).toBeVisible();
+  await expect(visitor.getByText("Map preview")).toBeVisible();
   await expect(
     visitor.getByText(/Private locations are hidden/i),
   ).toBeVisible();
@@ -184,19 +184,19 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
 
   const print = await hostContext.newPage();
   await print.goto(`/trips/${roomId}/plans/1/print`);
-  await expect(print.getByLabel("Pinned Version 1")).toBeVisible();
+  await expect(print.getByLabel("Shared Plan Version 1")).toBeVisible();
   await expect(
     print.getByText("No bookings were made by Trailie"),
   ).toBeVisible();
   await print.close();
 
   await host.getByRole("button", { name: "Back to current" }).click();
-  await expect(host.getByText("Published itinerary · Version 2")).toBeVisible();
+  await expect(host.getByText("Current plan · Version 2")).toBeVisible();
   await host.getByRole("button", { name: "Create share link" }).click();
   const oldVersionTwoUrl = await host
     .getByLabel("New link · shown once")
     .inputValue();
-  await host.getByRole("button", { name: "Rotate link" }).click();
+  await host.getByRole("button", { name: "Replace link" }).click();
   await expect(host.getByLabel("New link · shown once")).not.toHaveValue(
     oldVersionTwoUrl,
   );
@@ -206,10 +206,10 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
   expect(newVersionTwoUrl).not.toBe(oldVersionTwoUrl);
   await visitor.goto(oldVersionTwoUrl);
   await expect(
-    visitor.getByRole("heading", { name: "Shared itinerary unavailable" }),
+    visitor.getByRole("heading", { name: "Shared Plan unavailable" }),
   ).toBeVisible();
   await visitor.goto(newVersionTwoUrl);
-  await expect(visitor.getByLabel("Pinned Version 2")).toBeVisible();
+  await expect(visitor.getByLabel("Shared Plan Version 2")).toBeVisible();
 
   await openHistoricalVersionOne(host);
   await host.getByRole("button", { name: "Revoke link" }).click();
@@ -218,10 +218,12 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
   );
   await visitor.goto(versionOneUrl);
   await expect(
-    visitor.getByRole("heading", { name: "Shared itinerary unavailable" }),
+    visitor.getByRole("heading", { name: "Shared Plan unavailable" }),
   ).toBeVisible();
 
-  await host.getByLabel("Link mode").selectOption("expiring_link");
+  await host
+    .getByRole("combobox", { name: "Access", exact: true })
+    .selectOption("expiring_link");
   const future = new Date(Date.now() + 60 * 60 * 1000);
   future.setSeconds(0, 0);
   await host.getByLabel("Expires").fill(future.toISOString().slice(0, 16));
@@ -230,7 +232,7 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
     .getByLabel("New link · shown once")
     .inputValue();
   await visitor.goto(expiringUrl);
-  await expect(visitor.getByLabel("Pinned Version 1")).toBeVisible();
+  await expect(visitor.getByLabel("Shared Plan Version 1")).toBeVisible();
   const prefix = expiringUrl.split("/").at(-1)!.slice(0, 8);
   execFileSync(
     "psql",
@@ -245,7 +247,7 @@ test("a shared historical version stays pinned, exports safely, and revokes imme
   );
   await visitor.reload();
   await expect(
-    visitor.getByRole("heading", { name: "Shared itinerary unavailable" }),
+    visitor.getByRole("heading", { name: "Shared Plan unavailable" }),
   ).toBeVisible();
 
   const outsiderContext = await browser.newContext();

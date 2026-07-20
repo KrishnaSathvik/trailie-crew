@@ -5,8 +5,8 @@ import { TrailieStreamCard } from "./trailie-stream-card";
 
 describe("Trailie provider reliability state", () => {
   it.each([
-    ["retrying", "Trailie is retrying after a temporary issue."],
-    ["recovering", "Trailie is recovering this response."],
+    ["retrying", "Trailie is trying that again…"],
+    ["recovering", "Trailie is checking the trip…"],
   ] as const)("announces the %s state", (status, copy) => {
     render(
       <TrailieStreamCard
@@ -33,7 +33,7 @@ describe("Trailie provider reliability state", () => {
         onRetry={onRetry}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Retry Trailie" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledOnce();
 
     rerender(
@@ -47,9 +47,9 @@ describe("Trailie provider reliability state", () => {
       />,
     );
     expect(
-      screen.queryByRole("button", { name: "Retry Trailie" }),
+      screen.queryByRole("button", { name: "Try again" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(/recovery/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/still checking/i);
   });
 
   it("uses safe terminal copy without exposing provider details", () => {

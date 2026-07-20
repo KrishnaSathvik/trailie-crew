@@ -45,9 +45,7 @@ describe("version-specific share controls", () => {
         isHost
       />,
     );
-    expect(
-      await screen.findByText("Version 1 sharing & exports"),
-    ).toBeVisible();
+    expect(await screen.findByText("Share Version 1")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Create share link" }),
     ).toBeVisible();
@@ -111,7 +109,7 @@ describe("version-specific share controls", () => {
     );
     expect(await screen.findByDisplayValue(shareUrl)).toBeVisible();
     expect(screen.getByText(/shown once/i)).toBeVisible();
-    expect(screen.getByText(/If it is lost, rotate the link/i)).toBeVisible();
+    expect(screen.getByText(/You can replace it at any time/i)).toBeVisible();
     expect(createPlanShareLinkAction).toHaveBeenCalledWith({
       tripPlanId: ids.plan,
       participantId: ids.participant,
@@ -154,11 +152,10 @@ describe("version-specific share controls", () => {
         isHost
       />,
     );
-    expect(
-      await screen.findByText("Active expiring link · abcdefgh…"),
-    ).toBeVisible();
+    expect(await screen.findByText("Active expiring link")).toBeVisible();
+    expect(screen.queryByText(/abcdefgh/)).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue(/\/share\//)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Rotate link" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Replace link" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Revoke link" }));
     await waitFor(() =>
       expect(revokePlanShareLinkAction).toHaveBeenCalledWith({

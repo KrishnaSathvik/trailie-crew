@@ -47,6 +47,8 @@ describe("AccountDangerZone", () => {
     });
     expect(button).toBeEnabled();
     fireEvent.click(button);
-    expect(await screen.findByText(/failed safely/i)).toBeVisible();
+    expect(
+      await screen.findByText(/couldn’t delete your account/i),
+    ).toBeVisible();
   });
 });

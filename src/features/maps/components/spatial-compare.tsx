@@ -59,30 +59,30 @@ export function SpatialCompare({
   if (failed)
     return (
       <p className="text-muted-foreground mt-5 text-sm">
-        The spatial comparison is unavailable. The itinerary diff above remains
-        authoritative.
+        The map comparison is unavailable. The Plan changes above remain
+        available.
       </p>
     );
   if (!loaded)
     return (
       <p className="text-muted-foreground mt-5 text-sm" role="status">
-        Preparing spatial changes…
+        Preparing map changes…
       </p>
     );
   return (
     <section aria-labelledby="spatial-compare-title" className="mt-7">
       <h3 id="spatial-compare-title" className="text-lg font-semibold">
-        Spatial changes
+        Map changes
       </h3>
       <p className="text-muted-foreground mt-2 text-sm">
-        Version {candidateVersion} is the base map. Only materially changed
-        places are emphasized.
+        Map for Version {candidateVersion}. Places changed from Version{" "}
+        {baseVersion} are emphasized.
       </p>
       {annotations.length ? (
         <div className="border-border mt-4 h-[38rem] overflow-hidden rounded-md border">
           <MapWorkspace
             itinerary={{
-              title: `Version ${candidateVersion} spatial comparison`,
+              title: `Version ${candidateVersion} map comparison`,
             }}
             projection={loaded.candidate}
             configuration={loaded.configuration}
@@ -90,9 +90,7 @@ export function SpatialCompare({
           />
         </div>
       ) : (
-        <p className="mt-4 text-sm">
-          No material spatial changes between these versions.
-        </p>
+        <p className="mt-4 text-sm">No map changes between these versions.</p>
       )}
     </section>
   );

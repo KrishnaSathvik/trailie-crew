@@ -12,7 +12,7 @@ async function createApprovedCrew(browser: Browser) {
   await expect(host).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomUrl = host.url();
   const inviteUrl = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -25,7 +25,7 @@ async function createApprovedCrew(browser: Browser) {
     "We all decided on Yosemite and must see Glacier Point sunset",
   );
   await openPlan(host);
-  await host.getByRole("button", { name: "Build Our Itinerary" }).click();
+  await host.getByRole("button", { name: "Prepare trip brief" }).click();
   await expect(
     host.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 20_000 });
@@ -33,10 +33,10 @@ async function createApprovedCrew(browser: Browser) {
   await expect(
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 15_000 });
-  await host.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Approve summary" }).click();
+  await host.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Approve trip brief" }).click();
   await expect(
-    member.getByRole("button", { name: "Generate Itinerary" }),
+    member.getByRole("button", { name: "Create the Plan" }),
   ).toBeVisible({ timeout: 15_000 });
   return { hostContext, host, memberContext, member, roomUrl };
 }
@@ -77,7 +77,7 @@ test("approved crew receives one repaired, validated, immutable itinerary", asyn
     });
   }
 
-  const generate = member.getByRole("button", { name: "Generate Itinerary" });
+  const generate = member.getByRole("button", { name: "Create the Plan" });
   await generate.dblclick();
   await member.getByRole("button", { name: "Chat" }).first().click();
   await expect(member.getByLabel("Message your crew")).toBeEnabled();
@@ -91,19 +91,17 @@ test("approved crew receives one repaired, validated, immutable itinerary", asyn
     ),
   ).toBeVisible();
   await expect(
-    member.getByText("Validated before publishing").first(),
+    member.getByText("Checked before publishing").first(),
   ).toBeVisible();
 
   await expect(
     host.getByRole("heading", { name: "Yosemite crew escape" }),
   ).toBeVisible({ timeout: 15_000 });
-  await member.getByRole("tab", { name: "Validation" }).click();
+  await member.getByRole("tab", { name: "Trip checks" }).click();
   await expect(member.getByText(/checks passed/)).toBeVisible();
   await member.reload();
   await openPlan(member);
-  await expect(
-    member.getByText("Published itinerary · Version 1"),
-  ).toBeVisible();
+  await expect(member.getByText("Current plan · Version 1")).toBeVisible();
   await member.getByRole("button", { name: "Chat" }).first().click();
   await send(member, "@Trailie What time does the hike start?");
   await expect(

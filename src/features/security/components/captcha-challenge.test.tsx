@@ -10,7 +10,7 @@ describe("CaptchaChallenge", () => {
     await waitFor(() =>
       expect(onToken).toHaveBeenCalledWith("trailie-test-captcha"),
     );
-    expect(screen.getByRole("status")).toHaveTextContent(/completed/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/complete/i);
   });
 
   it("reports unavailable configuration without exposing a secret", () => {

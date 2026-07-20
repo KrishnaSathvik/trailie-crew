@@ -45,7 +45,7 @@ async function createCrew(browser: Browser, name: string) {
   await expect(host).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomUrl = host.url();
   const roomId = new URL(roomUrl).pathname.split("/").at(-1)!;
-  const invite = await host.getByLabel("One-time invitation URL").inputValue();
+  const invite = await host.getByLabel("Private invitation link").inputValue();
   const memberContext = await appContext(browser);
   const member = await memberContext.newPage();
   await member.goto(invite);

@@ -1,7 +1,11 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 
-export const inputClassName =
-  "border-border bg-background text-foreground placeholder:text-muted-foreground/70 focus-visible:ring-ring focus-visible:ring-offset-background min-h-12 w-full rounded-md border px-3.5 text-base outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2";
+import {
+  buttonClassName,
+  inputClassName,
+} from "@/components/ui/product-controls";
+
+export { inputClassName };
 
 export function Field({
   id,
@@ -20,14 +24,14 @@ export function Field({
     .join(" ");
 
   return (
-    <div>
+    <div className="space-y-2">
       <label htmlFor={id} className="mb-2 block text-sm font-semibold">
         {label}
       </label>
       {hint ? (
         <p
           id={`${id}-hint`}
-          className="text-muted-foreground mb-2 text-xs leading-5"
+          className="text-muted-foreground text-xs leading-5"
         >
           {hint}
         </p>
@@ -37,13 +41,13 @@ export function Field({
         id={id}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy || undefined}
-        className={inputClassName}
+        className={`${inputClassName} min-h-12`}
       />
       {error ? (
         <p
           id={`${id}-error`}
-          className="mt-2 text-sm font-medium"
-          role="status"
+          className="text-destructive text-sm font-medium"
+          role="alert"
         >
           {error}
         </p>
@@ -52,5 +56,7 @@ export function Field({
   );
 }
 
-export const submitClassName =
-  "bg-foreground text-background focus-visible:ring-ring focus-visible:ring-offset-background inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-opacity focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-60";
+export const submitClassName = buttonClassName({
+  variant: "primary",
+  className: "min-h-12 w-full px-5",
+});

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   PlanChangeRequest,
   PlanChangeType,
@@ -37,38 +37,81 @@ const types: Array<{ value: PlanChangeType; label: string }> = [
   { value: "change_lodging", label: "Change lodging" },
   { value: "change_food", label: "Change food" },
   { value: "rebalance_day", label: "Rebalance a day" },
-  { value: "update_traveler_logistics", label: "Update traveler logistics" },
+  { value: "update_traveler_logistics", label: "Update crew travel details" },
   { value: "adjust_budget", label: "Adjust budget" },
-  { value: "general_revision", label: "General revision" },
+  { value: "general_revision", label: "Other change" },
 ];
 const progress: Partial<Record<PlanChangeRequest["status"], string>> = {
-  draft: "Reviewing the requested change",
-  analyzing: "Checking affected routes and constraints",
-  approved: "Preparing a candidate itinerary",
-  applying: "Preparing a candidate itinerary",
-  validating: "Validating the revised schedule",
-  awaiting_confirmation: "Candidate ready for confirmation",
-  published: "Published",
-  blocked: "This request is blocked",
-  failed: "The revision stopped safely",
+  draft: "Trailie is reviewing the request",
+  analyzing: "Trailie is checking the impact",
+  approved: "Preparing the updated Plan",
+  applying: "Preparing the updated Plan",
+  validating: "Checking the updated schedule",
+  awaiting_confirmation: "Updated Plan ready for review",
+  published: "Updated Plan published",
+  blocked: "This change needs attention",
+  failed: "We could not complete that change",
 };
 
 const revisionFailureCopy: Record<string, string> = {
   recovery_required:
-    "Validated work was saved for automatic recovery. The published plan remains unchanged while recovery continues.",
+    "Trailie is still checking this request. The current Plan remains unchanged.",
   model_timeout:
-    "The provider exceeded its safe deadline. The published plan remains unchanged.",
+    "Trailie took too long to finish. The current Plan remains unchanged.",
   model_unavailable:
-    "The provider is temporarily unavailable. The published plan remains unchanged.",
+    "Trailie is temporarily unavailable. The current Plan remains unchanged.",
   model_rate_limited:
-    "The provider is temporarily rate limited. The published plan remains unchanged.",
+    "Trailie is receiving too many requests. The current Plan remains unchanged.",
   retry_exhausted:
-    "This request reached its safe retry limit. The published plan remains unchanged.",
+    "Trailie could not finish after several tries. The current Plan remains unchanged.",
   workflow_deadline_exceeded:
-    "This request reached its total deadline and stopped without publishing partial work.",
+    "Trailie could not complete that right now. The current Plan remains unchanged.",
   change_scope_exceeded:
-    "Trailie could not make this change without altering more of the trip than the crew approved. The current itinerary was not changed.",
+    "Trailie could not make this change without altering more of the trip than the crew approved. The current Plan was not changed.",
 };
+
+function useDialogFocus(active: boolean, close: () => void) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(close);
+  useEffect(() => {
+    closeRef.current = close;
+  }, [close]);
+  useEffect(() => {
+    if (!active) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const controls = () =>
+      dialog?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+    controls()?.[0]?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = controls();
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previous?.focus();
+    };
+  }, [active]);
+  return dialogRef;
+}
 
 function ApprovalList({
   state,
@@ -106,10 +149,14 @@ function ApprovalList({
 }
 
 function Diff({ diff }: { diff: PlanVersionDiff }) {
+  const operationLabel = (value: string) =>
+    value === "unchanged_but_impacted"
+      ? "Related update"
+      : value.replaceAll("_", " ");
   return (
     <section aria-labelledby="candidate-diff" className="mt-6">
       <h3 id="candidate-diff" className="text-lg font-semibold">
-        Version {diff.candidateVersion} compared with Version {diff.baseVersion}
+        Changes from Version {diff.baseVersion}
       </h3>
       <p className="text-muted-foreground mt-2 text-sm">{diff.summary}</p>
       <ul className="border-border mt-4 divide-y border-y">
@@ -117,7 +164,7 @@ function Diff({ diff }: { diff: PlanVersionDiff }) {
           <li key={`${item.operation}:${item.itemId}`} className="py-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="bg-subtle rounded-full px-2 py-1 font-mono text-[0.625rem] uppercase">
-                {item.operation.replaceAll("_", " ")}
+                {operationLabel(item.operation)}
               </span>
               <time className="text-muted-foreground text-xs">{item.date}</time>
             </div>
@@ -129,6 +176,25 @@ function Diff({ diff }: { diff: PlanVersionDiff }) {
           </li>
         ))}
       </ul>
+      {diff.routeChanges.length ? (
+        <section className="border-border mt-5 border-t pt-5">
+          <h4 className="font-semibold">Route changed</h4>
+          <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-5 text-sm">
+            {diff.routeChanges.map((change) => (
+              <li key={change}>{change}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {diff.warningsAdded.length || diff.warningsResolved.length ? (
+        <section className="border-border mt-5 border-t pt-5">
+          <h4 className="font-semibold">Travel notes</h4>
+          <p className="text-muted-foreground mt-2 text-sm">
+            {diff.warningsAdded.length} added · {diff.warningsResolved.length}{" "}
+            resolved
+          </p>
+        </section>
+      ) : null}
     </section>
   );
 }
@@ -144,6 +210,7 @@ function ReviewPanel({
   refresh: () => Promise<void>;
   close: () => void;
 }) {
+  const dialogRef = useDialogFocus(true, close);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const analysis = request.analysis;
@@ -162,7 +229,7 @@ function ReviewPanel({
     if (!result.ok)
       setError(
         result.error === "change_request_stale"
-          ? "This request is stale. Start a new request against the current version."
+          ? "This request was made on an earlier version. Start a new request from the current Plan."
           : "Your review could not be saved.",
       );
     else {
@@ -202,6 +269,7 @@ function ReviewPanel({
   }
   return (
     <div
+      ref={dialogRef}
       className="border-border bg-background fixed inset-x-3 top-20 bottom-20 z-20 overflow-y-auto rounded-lg border p-5 shadow-xl sm:right-6 sm:left-auto sm:w-[36rem] lg:bottom-6"
       role="dialog"
       aria-modal="true"
@@ -210,10 +278,10 @@ function ReviewPanel({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-muted-foreground font-mono text-[0.625rem] tracking-wider uppercase">
-            Change request · Version {request.basePlanVersion}
+            Current plan · Version {request.basePlanVersion}
           </p>
           <h2 id="change-review-title" className="mt-2 text-2xl font-semibold">
-            {analysis?.title ?? "Revision in progress"}
+            {analysis?.title ?? "Change in progress"}
           </h2>
         </div>
         <button type="button" onClick={close} className="min-h-10 px-2 text-sm">
@@ -225,8 +293,8 @@ function ReviewPanel({
           role="alert"
           className="border-foreground mt-5 border-l-2 pl-3 text-sm font-semibold"
         >
-          This request is stale. Create a new request against the latest
-          published version.
+          This change started on an earlier version. Start a new request from
+          the current Plan.
         </p>
       ) : null}
       <p className="mt-5 font-semibold">
@@ -235,14 +303,14 @@ function ReviewPanel({
       {["failed", "blocked"].includes(request.status) ? (
         <p className="text-muted-foreground mt-2 text-sm" role="status">
           {revisionFailureCopy[request.errorCode ?? ""] ??
-            "The revision stopped safely. The published plan remains available and unchanged."}
+            "We could not complete that change. The current Plan remains available and unchanged."}
         </p>
       ) : null}
       {request.scopeRepairCount === 1 &&
       ["awaiting_confirmation", "published"].includes(request.status) ? (
         <p className="text-muted-foreground mt-2 text-sm" role="status">
-          Trailie removed unrelated changes and kept the revision within the
-          approved scope.
+          Trailie removed unrelated changes and kept only what the Crew
+          approved.
         </p>
       ) : null}
       {analysis ? (
@@ -252,7 +320,7 @@ function ReviewPanel({
           </p>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <div className="bg-subtle rounded-md p-3">
-              <p className="text-muted-foreground text-xs">Materiality</p>
+              <p className="text-muted-foreground text-xs">Size of change</p>
               <p className="mt-1 font-semibold capitalize">
                 {analysis.materiality}
               </p>
@@ -326,35 +394,9 @@ function ReviewPanel({
             Ready to publish Version {request.basePlanVersion + 1}
           </h3>
           <p className="text-muted-foreground mt-2 text-sm">
-            The complete candidate passed itinerary and change-boundary
-            validation.
+            Trailie checked the requested change, schedule, and affected parts
+            of the trip.
           </p>
-        </div>
-      ) : null}
-      {request.status === "blocked" &&
-      request.errorCode === "change_scope_exceeded" ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={close}
-            className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
-          >
-            Retry analysis
-          </button>
-          <button
-            type="button"
-            onClick={close}
-            className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
-          >
-            Edit request
-          </button>
-          <button
-            type="button"
-            onClick={close}
-            className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
-          >
-            View protected current plan
-          </button>
         </div>
       ) : null}
       {[
@@ -384,7 +426,7 @@ function ReviewPanel({
             onClick={() => void review("approved")}
             className="bg-foreground text-background min-h-11 rounded-md px-4 text-sm font-semibold"
           >
-            Approve analysis
+            Approve change
           </button>
           <button
             type="button"
@@ -402,7 +444,7 @@ function ReviewPanel({
             onClick={() => void confirm("confirmed")}
             className="bg-foreground text-background min-h-11 rounded-md px-4 text-sm font-semibold"
           >
-            Confirm Version {request.basePlanVersion + 1}
+            Publish Version {request.basePlanVersion + 1}
           </button>
           <button
             type="button"
@@ -459,6 +501,11 @@ export function RevisionExperience({
   const [historicalComments, setHistoricalComments] = useState<GuestComment[]>(
     [],
   );
+  const changeDialogRef = useDialogFocus(form, () => setForm(false));
+  const historyDialogRef = useDialogFocus(history, () => {
+    setHistory(false);
+    setComparison(null);
+  });
   const refresh = useCallback(async () => {
     const [requestResult, versionsResult, commentsResult] = await Promise.all([
       getPlanChangeRequestAction(roomId),
@@ -671,6 +718,7 @@ export function RevisionExperience({
       />
       {form ? (
         <div
+          ref={changeDialogRef}
           className="border-border bg-background fixed inset-x-3 top-20 z-30 rounded-lg border p-5 shadow-xl sm:right-6 sm:left-auto sm:w-[30rem]"
           role="dialog"
           aria-modal="true"
@@ -682,7 +730,7 @@ export function RevisionExperience({
                 Version {plan.version}
               </p>
               <h2 id="change-form-title" className="mt-2 text-xl font-semibold">
-                Request a Change
+                Request a change
               </h2>
             </div>
             <button
@@ -729,7 +777,7 @@ export function RevisionExperience({
               value={details}
               onChange={(event) => setDetails(event.target.value)}
               className="border-border mt-2 min-h-32 w-full rounded-md border bg-transparent p-3"
-              placeholder="Describe the exact change you want Trailie to analyze."
+              placeholder="Describe the exact change you want Trailie to check."
             />
             {error ? (
               <p role="alert" className="mt-3 text-sm font-semibold">
@@ -740,7 +788,7 @@ export function RevisionExperience({
               type="submit"
               className="bg-foreground text-background mt-4 min-h-11 rounded-md px-4 text-sm font-semibold"
             >
-              Submit change request
+              Check this change
             </button>
           </form>
         </div>
@@ -755,6 +803,7 @@ export function RevisionExperience({
       ) : null}
       {history ? (
         <div
+          ref={historyDialogRef}
           className={`border-border bg-background fixed inset-x-3 top-20 bottom-20 z-20 overflow-y-auto rounded-lg border p-5 shadow-xl sm:right-6 sm:left-auto ${comparison ? "sm:w-[min(70rem,calc(100vw-3rem))]" : "sm:w-[34rem]"}`}
           role="dialog"
           aria-modal="true"
@@ -794,7 +843,9 @@ export function RevisionExperience({
                       <p className="font-semibold">
                         Version {version.version}{" "}
                         {version.isCurrent ? (
-                          <span className="ml-1 text-xs">Current</span>
+                          <span className="bg-accent-soft text-accent ml-1 rounded-full px-2 py-1 text-xs">
+                            Current plan
+                          </span>
                         ) : null}
                       </p>
                       <p className="text-muted-foreground mt-1 text-sm">
@@ -802,9 +853,14 @@ export function RevisionExperience({
                           "Original approved planning summary"}
                       </p>
                       <p className="text-muted-foreground mt-1 text-xs">
-                        Published{" "}
-                        {new Date(version.publishedAt).toLocaleString()} ·{" "}
-                        {version.validationStatus}
+                        Published on{" "}
+                        {new Date(version.publishedAt).toLocaleString()}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {version.requestedBy
+                          ? `Suggested by ${version.requestedBy.displayName} · `
+                          : ""}
+                        Approved by the Crew
                       </p>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -813,7 +869,7 @@ export function RevisionExperience({
                         onClick={() => void viewVersion(version.version)}
                         className="min-h-9 text-xs font-semibold"
                       >
-                        View version
+                        View Plan
                       </button>
                       {version.version > 1 ? (
                         <button
@@ -821,7 +877,7 @@ export function RevisionExperience({
                           onClick={() => void compare(version.version)}
                           className="min-h-9 text-xs font-semibold"
                         >
-                          Compare to previous
+                          Compare changes
                         </button>
                       ) : null}
                     </div>

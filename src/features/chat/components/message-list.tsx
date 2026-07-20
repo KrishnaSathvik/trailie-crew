@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Route } from "lucide-react";
 
 import type { ReactionType } from "@trailie/schemas";
 import type { ClientRoomMessage } from "@/features/chat/lib/chat-state";
@@ -45,6 +45,9 @@ export function MessageList({
           <p className="text-muted-foreground mt-2 text-sm leading-6">
             Share the first note, question, or decision with your crew.
           </p>
+          <p className="text-muted-foreground mt-4 text-xs">
+            Trailie joins only when someone asks.
+          </p>
         </div>
       </div>
     );
@@ -60,15 +63,15 @@ export function MessageList({
         return (
           <li
             key={message.id}
-            className={`border-border border-b py-5 first:pt-1 ${isTrailie ? "bg-subtle/50 border-l-2 px-4" : isCurrent ? "border-l-2 pl-4" : "pl-0"}`}
+            className={`border-border border-b py-5 first:pt-1 ${isTrailie ? "bg-accent-soft/45 border-accent px-4" : isCurrent ? "border-accent border-l-2 pl-4" : "pl-0"}`}
           >
             <article aria-label={`Message from ${senderName}`}>
               <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <h3 className="text-sm font-semibold">
                   {isTrailie ? (
-                    <Sparkles
+                    <Route
                       aria-hidden="true"
-                      className="mr-1.5 inline size-3.5"
+                      className="text-accent mr-1.5 inline size-3.5"
                     />
                   ) : null}
                   {senderName}
@@ -116,7 +119,7 @@ export function MessageList({
                 <button
                   type="button"
                   onClick={() => onReply(message)}
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-2 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-2 min-h-8 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none"
                 >
                   Reply
                 </button>

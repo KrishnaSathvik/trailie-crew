@@ -22,7 +22,7 @@ describe("public shared itinerary", () => {
     expect(
       screen.getByRole("heading", { name: "Yosemite crew escape" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Pinned Version 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Shared Plan Version 1")).toBeInTheDocument();
     expect(screen.getByText("Shared from Trailie Crew")).toBeInTheDocument();
     for (const heading of [
       "Overview",
@@ -30,7 +30,7 @@ describe("public shared itinerary", () => {
       "Travel",
       "Stay",
       "Food",
-      "Validation and data status",
+      "Trip checks",
     ]) {
       expect(
         screen.getByRole("heading", { name: heading }),
@@ -62,6 +62,16 @@ describe("public shared itinerary", () => {
     expect(container.textContent).not.toMatch(
       /Maya|Chicago|evidence:|validator/i,
     );
+  });
+
+  it("explains when a shared Plan has no booking handoffs", () => {
+    render(<PublicItinerary itinerary={shared()} bookingHandoffs={[]} />);
+    expect(
+      screen.getByRole("heading", { name: "No booking options yet" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/does not currently include anything/i),
+    ).toBeVisible();
   });
 
   it("shows privacy-safe exact-version source labels and freshness disclosure", () => {
@@ -106,10 +116,8 @@ describe("public shared itinerary", () => {
   it("uses one generic unavailable state for every token failure", () => {
     render(<ShareUnavailable />);
     expect(
-      screen.getByRole("heading", { name: "Shared itinerary unavailable" }),
+      screen.getByRole("heading", { name: "Shared Plan unavailable" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/invalid|revoked|expired/i),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText(/expired or been revoked/i)).toBeInTheDocument();
   });
 });

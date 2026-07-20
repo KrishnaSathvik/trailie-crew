@@ -78,7 +78,7 @@ describe("member guest suggestions panel", () => {
       />,
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "Convert to revision" }),
+      await screen.findByRole("button", { name: "Convert to Plan change" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(warning);

@@ -19,7 +19,9 @@ export function InvitePanel({
 
   async function copyInvite() {
     if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
+    await navigator.clipboard.writeText(
+      new URL(inviteUrl, window.location.origin).toString(),
+    );
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
   }
@@ -32,12 +34,12 @@ export function InvitePanel({
       <div className="flex items-center gap-2">
         <Link2 aria-hidden="true" className="size-4" strokeWidth={1.75} />
         <h2 id="invite-heading" className="text-sm font-semibold">
-          Invite Your Crew
+          Invite your crew
         </h2>
       </div>
       <div className="mt-4">
         <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.14em] uppercase">
-          Room code
+          Trip code
         </p>
         <p className="mt-1 font-mono text-lg font-semibold tracking-[0.12em]">
           {shortCode}
@@ -49,7 +51,7 @@ export function InvitePanel({
             htmlFor="invite-url"
             className="text-muted-foreground text-xs font-medium"
           >
-            One-time invitation URL
+            Private invitation link
           </label>
           <div className="mt-2 flex gap-2">
             <input
@@ -62,7 +64,7 @@ export function InvitePanel({
               type="button"
               onClick={copyInvite}
               className="border-border hover:bg-subtle focus-visible:ring-ring inline-flex size-10 shrink-0 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:outline-none"
-              aria-label="Copy invitation URL"
+              aria-label="Copy invitation link"
             >
               {copied ? (
                 <Check aria-hidden="true" className="size-4" />
@@ -76,14 +78,14 @@ export function InvitePanel({
             className="text-muted-foreground mt-2 text-xs leading-5"
           >
             {copied
-              ? "Invitation URL copied."
-              : "Shown from the creation response only. It may not be recoverable after refresh."}
+              ? "Invitation link copied."
+              : "Copy this private link now, or share the Trip code above."}
           </p>
         </div>
       ) : (
         <p className="text-muted-foreground mt-4 text-xs leading-5">
-          The original private invitation URL is no longer available. Share the
-          room code instead.
+          The original invitation link is no longer shown. Share the Trip code
+          instead.
         </p>
       )}
     </section>

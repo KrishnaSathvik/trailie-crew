@@ -57,7 +57,7 @@ describe("ItineraryExperience", () => {
     expect(screen.queryByText(/reasoning/i)).not.toBeInTheDocument();
   });
 
-  it("renders published overview, day, travel, stay, food, and validation views", async () => {
+  it("renders published overview, day, travel, stay, food, evidence, and trip-check views", async () => {
     const generated = await createFakeItineraryProvider().generate({
       operationKey: "test",
       model: "gpt-5.6-sol",
@@ -125,7 +125,7 @@ describe("ItineraryExperience", () => {
     expect(
       screen.getByRole("heading", { name: "Yosemite crew escape" }),
     ).toBeVisible();
-    expect(screen.getAllByText("Validated before publishing")[0]).toBeVisible();
+    expect(screen.getAllByText("Checked before publishing")[0]).toBeVisible();
     expect(
       screen.getByText(
         "Trailie adjusted the schedule after checking travel time.",
@@ -140,9 +140,9 @@ describe("ItineraryExperience", () => {
     expect(screen.getByText("No reservation has been made")).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "Food" }));
     expect(
-      screen.getByText("No verified restaurant details yet"),
+      screen.getByText("No verified restaurant details yet."),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole("tab", { name: "Validation" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Trip checks" }));
     expect(screen.getByText("2 checks passed")).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "Evidence" }));
     expect(screen.getByText("Glacier Point Road closure")).toBeVisible();
@@ -155,6 +155,9 @@ describe("ItineraryExperience", () => {
     expect(
       screen.getAllByRole("link", { name: "Open official source" })[0],
     ).toHaveAttribute("rel", "noreferrer noopener");
+    expect(document.body).not.toHaveTextContent(
+      /provider budget|safe deadline|validation summary|candidate|immutable/i,
+    );
   });
 
   it("renders safe blocked and failed terminal states", () => {
@@ -177,7 +180,7 @@ describe("ItineraryExperience", () => {
     render(<ItineraryExperience plan={plan} />);
     expect(
       screen.getByRole("heading", {
-        name: "This itinerary cannot be published yet.",
+        name: "This Plan cannot be published yet.",
       }),
     ).toBeVisible();
     expect(screen.queryByText(/sql|stack|provider/i)).not.toBeInTheDocument();
@@ -210,7 +213,7 @@ describe("ItineraryExperience", () => {
     render(<ItineraryExperience plan={plan} initialView="Map" />);
     expect(
       await screen.findByText(
-        "Map view is unavailable. Your itinerary remains fully usable.",
+        "Map view is unavailable. Your itinerary is still fully accessible.",
       ),
     ).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "Day-by-day" }));
@@ -298,7 +301,7 @@ describe("ItineraryExperience", () => {
       errorCode: "model_timeout",
     } satisfies TripPlanView;
     render(<ItineraryExperience plan={plan} onRetry={onRetry} />);
-    fireEvent.click(screen.getByRole("button", { name: "Retry itinerary" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 });

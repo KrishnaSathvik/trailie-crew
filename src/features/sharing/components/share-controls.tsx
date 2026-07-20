@@ -96,13 +96,13 @@ export function ShareControls({
       setStatus(safeStatus);
       setNewUrl(shareUrl);
       setMessage(
-        "New link created. The previous link for this version no longer works.",
+        "New link created. The previous link for this Version no longer works.",
       );
     } else {
       setMessage(
         result.error === "rate_limited"
-          ? "Link creation is temporarily rate limited."
-          : "The share link could not be created safely.",
+          ? "Please wait a moment before creating another link."
+          : "We couldn’t create the share link right now.",
       );
     }
     setBusy(false);
@@ -131,9 +131,7 @@ export function ShareControls({
     const absolute = new URL(newUrl, window.location.origin).toString();
     try {
       await navigator.clipboard.writeText(absolute);
-      setMessage(
-        "Link copied. It will not be recoverable after this view is closed.",
-      );
+      setMessage("Link copied.");
     } catch {
       setMessage("Copy is unavailable. Select the link and copy it manually.");
     }
@@ -146,12 +144,10 @@ export function ShareControls({
     >
       <div className="mx-auto flex max-w-5xl flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold">
-            Version {version} sharing &amp; exports
-          </p>
+          <p className="text-sm font-semibold">Share Version {version}</p>
           <p className="text-muted-foreground mt-1 text-xs">
             {active && status
-              ? `Active ${status.mode === "expiring_link" ? "expiring" : "public"} link · ${status.tokenPrefix}…`
+              ? `Active ${status.mode === "expiring_link" ? "expiring" : "public"} link`
               : status?.status === "expired"
                 ? "Expired link · public access is off"
                 : "Private · no public link is active"}
@@ -186,7 +182,7 @@ export function ShareControls({
         <div className="mx-auto mt-4 max-w-5xl">
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-xs font-semibold">
-              Link mode
+              Access
               <select
                 value={mode}
                 onChange={(event) =>
@@ -215,7 +211,7 @@ export function ShareControls({
               onClick={() => void create()}
               className="bg-foreground text-background min-h-10 rounded-md px-3 text-xs font-semibold disabled:opacity-50"
             >
-              {active ? "Rotate link" : "Create share link"}
+              {active ? "Replace link" : "Create share link"}
             </button>
             {active ? (
               <button
@@ -252,7 +248,8 @@ export function ShareControls({
                 </button>
               </div>
               <p className="text-muted-foreground mt-2 text-xs">
-                If it is lost, rotate the link. Trailie cannot recover it.
+                For privacy, this link is shown only once. You can replace it at
+                any time.
               </p>
             </div>
           ) : null}

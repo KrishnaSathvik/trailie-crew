@@ -144,8 +144,9 @@ describe("guest invite controls", () => {
       />,
     );
 
-    expect(await screen.findByText("Commenter · abcdefgh…")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Rotate guest link" }));
+    expect(await screen.findByText("Commenter")).toBeVisible();
+    expect(screen.queryByText(/abcdefgh/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Replace guest link" }));
     expect(
       await screen.findByDisplayValue(`/guest/${"B".repeat(43)}`),
     ).toBeVisible();

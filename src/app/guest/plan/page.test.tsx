@@ -62,9 +62,9 @@ describe("scoped guest plan page", () => {
 
     render(await GuestPlanPage());
     expect(screen.getByLabelText("Guest permission")).toHaveTextContent(
-      "Viewer · read only",
+      "View only",
     );
-    expect(screen.getByLabelText("Pinned Version 1")).toBeVisible();
+    expect(screen.getByLabelText("Shared Plan Version 1")).toBeVisible();
     const itemContainer = screen
       .getByRole("heading", { name: firstItem.title })
       .closest("li");
@@ -90,7 +90,7 @@ describe("scoped guest plan page", () => {
     });
 
     render(await GuestPlanPage());
-    expect(screen.getByText("Commenter · comments enabled")).toBeVisible();
+    expect(screen.getByText("You can comment")).toBeVisible();
     expect(
       screen.getByLabelText(`Comment on ${firstItem.title}`),
     ).toBeVisible();
@@ -109,13 +109,13 @@ describe("scoped guest plan page", () => {
     });
 
     render(await GuestPlanPage());
-    expect(screen.getByText("Suggester · suggestions enabled")).toBeVisible();
+    expect(screen.getByText("You can suggest changes")).toBeVisible();
     const itemContainer = screen
       .getByRole("heading", { name: firstItem.title })
       .closest("li");
     expect(itemContainer).toHaveTextContent("Suggest a change");
     expect(document.body.textContent).toContain(
-      "Suggestions never change the trip directly",
+      "Suggestions never change the Trip directly",
     );
     expect(
       screen.queryByRole("button", { name: /approve|publish/i }),
@@ -126,7 +126,9 @@ describe("scoped guest plan page", () => {
     vi.mocked(loadGuestSessionContext).mockResolvedValue(null);
     render(await GuestPlanPage());
     expect(
-      screen.getByRole("heading", { name: "Guest access unavailable" }),
+      screen.getByRole("heading", {
+        name: "This guest link is no longer available",
+      }),
     ).toBeVisible();
   });
 });

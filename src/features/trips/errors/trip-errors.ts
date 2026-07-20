@@ -25,7 +25,7 @@ const errorMessages: Record<TripErrorCode, string> = {
   authentication_required:
     "We could not start your private session. Please try again.",
   invalid_input: "Check the highlighted fields and try again.",
-  invite_invalid: "That invitation is not valid. Check the link or room code.",
+  invite_invalid: "That invitation is not valid. Check the link or Trip code.",
   invite_revoked: "That invitation has been revoked by the Trip host.",
   invite_expired: "That invitation has expired. Ask the host for a new one.",
   invite_exhausted:
@@ -34,15 +34,14 @@ const errorMessages: Record<TripErrorCode, string> = {
   duplicate_display_name: "That display name is already in use for this Trip.",
   trip_unavailable: "This Trip is unavailable or you do not have access to it.",
   permission_denied: "You do not have permission to do that.",
-  captcha_required: "Complete the anti-bot check and try again.",
-  captcha_invalid: "The anti-bot check was not accepted. Please retry it.",
-  captcha_expired: "The anti-bot check expired. Complete it again.",
+  captcha_required: "Complete the security check and try again.",
+  captcha_invalid: "The security check was not accepted. Please try again.",
+  captcha_expired: "The security check expired. Complete it again.",
   captcha_unavailable:
-    "The anti-bot check is temporarily unavailable. Please try again shortly.",
+    "The security check is temporarily unavailable. Please try again shortly.",
   rate_limited: "Too many attempts. Wait a moment before trying again.",
   network_error: "We could not connect. Check your connection and try again.",
-  invalid_server_response:
-    "The server returned an unexpected response. Please try again.",
+  invalid_server_response: "We could not complete that right now. Try again.",
   unknown_error: "Something went wrong. Please try again.",
 };
 
@@ -51,6 +50,7 @@ const controlledRpcMessages = new Map<string, TripErrorCode>([
   ["Trip name must be between 1 and 100 characters.", "invalid_input"],
   ["Display name must be between 1 and 50 characters.", "invalid_input"],
   ["Expected travelers must be between 1 and 50.", "invalid_input"],
+  ["Expected crew size must be between 1 and 50.", "invalid_input"],
   ["Invite is invalid.", "invite_invalid"],
   ["Invite is revoked.", "invite_revoked"],
   ["Invite has expired.", "invite_expired"],

@@ -64,4 +64,15 @@ test("landing, entry, and authenticated chat have no serious axe findings", asyn
   });
   await expect(page.locator("body")).toBeVisible();
   await expectNoSeriousAxeViolations(page, "200 percent zoom");
+
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = "1";
+  });
+  await page.setViewportSize({ width: 320, height: 800 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await expectNoSeriousAxeViolations(page, "400 percent equivalent reflow");
 });

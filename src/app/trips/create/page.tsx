@@ -5,8 +5,8 @@ export default function CreateTripPage() {
   return (
     <TripEntryLayout
       eyebrow="Create a Trip"
-      title="Name the adventure."
-      description="That is all the planning needed for now. Your crew will discover destinations, dates, and priorities together later."
+      title="Start with a trip name."
+      description="That is all you need for now. Your crew can work out destinations, dates, and priorities together."
     >
       <CreateTripForm />
     </TripEntryLayout>

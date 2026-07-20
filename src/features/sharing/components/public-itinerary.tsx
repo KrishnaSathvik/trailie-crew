@@ -8,7 +8,10 @@ import type { MapConfiguration } from "@/features/maps/config";
 import { PublicItineraryMap } from "@/features/maps/components/public-itinerary-map";
 import { CommentThread } from "@/features/guest-comments/components/comment-thread";
 import { SuggestionThread } from "@/features/guest-comments/components/suggestion-thread";
-import { BookingOptions, type BookingHandoff } from "@/features/booking/components/booking-options";
+import {
+  BookingOptions,
+  type BookingHandoff,
+} from "@/features/booking/components/booking-options";
 import type {
   GuestComment,
   GuestRole,
@@ -21,6 +24,20 @@ function Status({ value }: { value: string }) {
       {value.replaceAll("_", " ")}
     </span>
   );
+}
+
+function evidenceStatus(value: string) {
+  if (value === "verified" || value === "fresh" || value === "cached_fresh")
+    return "Verified";
+  if (value === "stale" || value === "expired")
+    return "Conditions may have changed";
+  return "Could not verify";
+}
+
+function reservationStatus(value: string) {
+  if (value === "required") return "Reservation required";
+  if (value === "recommended") return "Reservation recommended";
+  return "Reservation optional";
 }
 
 function formatPublished(value: string) {
@@ -40,11 +57,11 @@ export function ShareUnavailable() {
           Trailie Crew · Shared plan
         </p>
         <h1 className="mt-5 text-4xl font-semibold tracking-[-0.055em] sm:text-5xl">
-          Shared itinerary unavailable
+          Shared Plan unavailable
         </h1>
         <p className="text-muted-foreground mx-auto mt-5 max-w-md leading-7">
-          This shared itinerary cannot be opened. Ask the trip host for a new
-          link.
+          This link may have expired or been revoked. Ask the Trip host for a
+          new one.
         </p>
       </div>
     </main>
@@ -84,6 +101,9 @@ export function PublicItinerary({
       className="public-itinerary bg-background text-foreground min-h-dvh"
       data-content-hash={contentHash}
     >
+      <a href="#shared-plan-content" className="skip-link">
+        Skip to shared Plan
+      </a>
       <header className="border-border border-b px-5 py-5 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-5">
           <p className="font-mono text-xs font-semibold tracking-[0.14em] uppercase">
@@ -93,17 +113,17 @@ export function PublicItinerary({
         </div>
       </header>
 
-      <article className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
+      <article
+        id="shared-plan-content"
+        className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16"
+      >
         <section aria-labelledby="shared-title" className="relative">
-          <div
-            aria-label={`Pinned Version ${itinerary.version}`}
-            className="public-version-stamp border-foreground inline-flex rotate-[-2deg] flex-col border-2 px-4 py-3 font-mono uppercase"
+          <p
+            aria-label={`Shared Plan Version ${itinerary.version}`}
+            className="border-border bg-surface-raised inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold"
           >
-            <span className="text-[0.5625rem] tracking-[0.18em]">Pinned</span>
-            <span className="mt-0.5 text-sm font-bold tracking-[0.08em]">
-              Version {itinerary.version}
-            </span>
-          </div>
+            Shared Plan · Version {itinerary.version}
+          </p>
           <p className="text-muted-foreground mt-8 font-mono text-[0.6875rem] tracking-[0.16em] uppercase">
             {itinerary.startDate} — {itinerary.endDate} · {itinerary.timezone}
           </p>
@@ -117,14 +137,13 @@ export function PublicItinerary({
             {itinerary.destinationSummary}
           </p>
           <div className="mt-7 flex flex-wrap gap-2">
-            <Status value="validation passed" />
+            <Status value="Checked before publishing" />
             <Status
               value={`published ${formatPublished(itinerary.publishedAt)}`}
             />
-            <Status value={`source version ${itinerary.version}`} />
           </div>
         </section>
-        {bookingHandoffs?.length ? <BookingOptions handoffs={bookingHandoffs} /> : null}
+        {bookingHandoffs ? <BookingOptions handoffs={bookingHandoffs} /> : null}
         {commenting ? (
           <CommentThread
             mode={commenting.mode}
@@ -270,9 +289,9 @@ export function PublicItinerary({
                             <p className="mt-2 text-sm">{item.location.name}</p>
                           ) : null}
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <Status value={item.dataStatus} />
+                            <Status value={evidenceStatus(item.dataStatus)} />
                             <Status
-                              value={`reservation ${item.reservationStatus}`}
+                              value={reservationStatus(item.reservationStatus)}
                             />
                           </div>
                           {commenting ? (
@@ -351,7 +370,7 @@ export function PublicItinerary({
                       {segment.origin.name} → {segment.destination.name}
                     </p>
                     <p className="text-muted-foreground mt-1 text-sm capitalize">
-                      {segment.mode} · {segment.dataStatus}
+                      {segment.mode} · {evidenceStatus(segment.dataStatus)}
                     </p>
                   </div>
                   <p className="text-sm font-semibold">
@@ -391,7 +410,7 @@ export function PublicItinerary({
                     {stay.area} · {stay.checkInDate} to {stay.checkOutDate}
                   </p>
                   <div className="mt-3">
-                    <Status value={`reservation ${stay.reservationStatus}`} />
+                    <Status value={reservationStatus(stay.reservationStatus)} />
                   </div>
                 </article>
               ))}
@@ -497,22 +516,21 @@ export function PublicItinerary({
         </section>
 
         <section
-          aria-labelledby="validation-heading"
+          aria-labelledby="trip-checks-heading"
           className="public-section border-border mt-16 border-t pt-8"
         >
           <h2
-            id="validation-heading"
+            id="trip-checks-heading"
             className="text-2xl font-semibold tracking-[-0.035em]"
           >
-            Validation and data status
+            Trip checks
           </h2>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="border-border rounded-md border p-5">
-              <p className="font-semibold">Validation passed</p>
+              <p className="font-semibold">Checked before publishing</p>
               <p className="text-muted-foreground mt-2 text-sm leading-6">
-                This exact published version passed Trailie&apos;s itinerary
-                validation. Verified, estimated, and unknown labels describe the
-                data available when it was published.
+                Trailie checked the schedule, travel time, and available source
+                information before this Version was shared.
               </p>
             </div>
             <div className="border-border rounded-md border p-5">
@@ -527,8 +545,7 @@ export function PublicItinerary({
 
         <footer className="print-footer border-border text-muted-foreground mt-16 flex flex-wrap justify-between gap-3 border-t pt-6 font-mono text-[0.625rem]">
           <span>Trailie Crew · Version {itinerary.version}</span>
-          <span>Generated {new Date(generatedAt).toISOString()}</span>
-          {contentHash ? <span>Input {contentHash}</span> : null}
+          <span>Shared {formatPublished(generatedAt)}</span>
           <span className="print-page-number" aria-hidden="true">
             Page
           </span>

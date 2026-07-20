@@ -126,9 +126,10 @@ export function MapWorkspace({
   const [sheetPosition, setSheetPosition] =
     useState<SheetPosition>("collapsed");
   const [sdkUnavailable, setSdkUnavailable] = useState(false);
-  const [online, setOnline] = useState(
-    () => typeof navigator === "undefined" || navigator.onLine,
-  );
+  // Keep the server render and the browser's first render identical. Node can
+  // expose a partial `navigator` without `onLine`, so reading it during state
+  // initialization causes the public map to hydrate from two different trees.
+  const [online, setOnline] = useState(true);
   const cardRefs = useRef(new Map<string, HTMLElement>());
   const itemDetails = useMemo(
     () =>
@@ -178,6 +179,7 @@ export function MapWorkspace({
     );
 
   useEffect(() => {
+    setOnline(window.navigator.onLine);
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
     window.addEventListener("online", handleOnline);
@@ -264,7 +266,7 @@ export function MapWorkspace({
             className={`flex min-h-11 items-center gap-2 rounded px-4 text-sm font-semibold ${mobileMode === "map" ? "bg-background shadow-sm" : ""}`}
           >
             <MapIcon aria-hidden="true" className="size-4" />
-            Map mode
+            Map
           </button>
           <button
             type="button"
@@ -273,14 +275,14 @@ export function MapWorkspace({
             className={`flex min-h-11 items-center gap-2 rounded px-4 text-sm font-semibold ${mobileMode === "plan" ? "bg-background shadow-sm" : ""}`}
           >
             <List aria-hidden="true" className="size-4" />
-            Plan mode
+            Plan
           </button>
         </div>
       </div>
 
       <header className="border-border px-5 py-5 sm:px-7">
         <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-          Spatial itinerary · Version {projection.planVersion}
+          Plan map · Version {projection.planVersion}
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -328,7 +330,7 @@ export function MapWorkspace({
         <div
           id="spatial-itinerary-list"
           role="region"
-          aria-label="Spatial itinerary"
+          aria-label="Plan locations"
           className={`${mobileMode === "map" ? "hidden lg:block" : "block"} min-h-0 overflow-y-auto px-5 pb-32 sm:px-7 lg:pb-8`}
         >
           <div className="border-border border-l pb-8">
@@ -455,14 +457,20 @@ export function MapWorkspace({
                 className="text-muted-foreground size-6"
               />
               <p className="mt-4 max-w-sm font-semibold">
-                {!online
-                  ? "Map view is unavailable while offline. Your itinerary and route details are still available."
-                  : projection.markers.every(
-                        (marker) => marker.coordinates === null,
-                      )
-                    ? "This plan does not have enough verified location data to display a map."
-                    : "Map view is unavailable. Your itinerary and route details are still available."}
+                Map view is unavailable. Your itinerary is still fully
+                accessible.
               </p>
+              {!online ? (
+                <p className="text-muted-foreground mt-2 max-w-sm text-sm">
+                  You appear to be offline.
+                </p>
+              ) : projection.markers.every(
+                  (marker) => marker.coordinates === null,
+                ) ? (
+                <p className="text-muted-foreground mt-2 max-w-sm text-sm">
+                  Location details are not available for this Plan.
+                </p>
+              ) : null}
               {projection.privacyMode === "public_share" &&
               projection.markers.some(
                 (marker) => marker.privacyLevel === "omitted",

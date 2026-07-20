@@ -22,7 +22,7 @@ async function publishedCrew(browser: Browser) {
   await host.getByRole("button", { name: "Create Trip" }).click();
   const roomUrl = host.url();
   const inviteUrl = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -35,7 +35,7 @@ async function publishedCrew(browser: Browser) {
     "We all decided on Yosemite and must see Glacier Point sunset",
   );
   await openPlan(host);
-  await host.getByRole("button", { name: "Build Our Itinerary" }).click();
+  await host.getByRole("button", { name: "Prepare trip brief" }).click();
   await expect(
     host.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 20_000 });
@@ -43,9 +43,9 @@ async function publishedCrew(browser: Browser) {
   await expect(
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 15_000 });
-  await host.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Generate Itinerary" }).click();
+  await host.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Create the Plan" }).click();
   await expect(
     member.getByRole("heading", { name: "Yosemite crew escape" }),
   ).toBeVisible({ timeout: 30_000 });
@@ -80,7 +80,7 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
   }
 
   await member.getByRole("button", { name: "Map" }).first().click();
-  await expect(member.getByText("Deterministic local adapter")).toBeVisible({
+  await expect(member.getByText("Map preview")).toBeVisible({
     timeout: 15_000,
   });
   const destinationMarker = member.getByRole("button", {
@@ -102,7 +102,7 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     .locator("..");
   await sunset.getByRole("button", { name: "Change this" }).click();
   await expect(
-    member.getByRole("heading", { name: "Request a Change" }),
+    member.getByRole("heading", { name: "Request a change" }),
   ).toBeVisible();
   if (process.env.TRAILIE_FAKE_REVISION_SCENARIO)
     await member
@@ -111,7 +111,7 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
   await member
     .getByLabel("Request details")
     .fill("Move Glacier Point sunset later without changing another day");
-  await member.getByRole("button", { name: "Submit change request" }).click();
+  await member.getByRole("button", { name: "Check this change" }).click();
   await expect(
     member.getByRole("heading", { name: "Move an itinerary item later" }),
   ).toBeVisible({ timeout: 20_000 });
@@ -122,20 +122,18 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     host.getByRole("heading", { name: "Move an itinerary item later" }),
   ).toBeVisible({ timeout: 15_000 });
 
-  await member.getByRole("button", { name: "Approve analysis" }).click();
+  await member.getByRole("button", { name: "Approve change" }).click();
   await expect(
     member.getByRole("dialog").getByText("Maya", { exact: true }).locator(".."),
   ).toContainText("pending");
-  await host.getByRole("button", { name: "Approve analysis" }).click();
+  await host.getByRole("button", { name: "Approve change" }).click();
   if (process.env.TRAILIE_FAKE_REVISION_SCENARIO === "scope_drift_always") {
     await expect(
       member.getByText(
-        "Trailie could not make this change without altering more of the trip than the crew approved. The current itinerary was not changed.",
+        "Trailie could not make this change without altering more of the trip than the crew approved. The current Plan was not changed.",
       ),
     ).toBeVisible({ timeout: 30_000 });
-    await expect(
-      member.getByText("Published itinerary · Version 1"),
-    ).toBeVisible();
+    await expect(member.getByText("Current plan · Version 1")).toBeVisible();
     await expect(
       member.getByRole("heading", { name: "Ready to publish Version 2" }),
     ).toHaveCount(0);
@@ -164,30 +162,28 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     host.getByRole("heading", { name: "Ready to publish Version 2" }),
   ).toBeVisible({ timeout: 15_000 });
 
-  await member.getByRole("button", { name: "Confirm Version 2" }).click();
+  await member.getByRole("button", { name: "Publish Version 2" }).click();
   await expect(
     member.getByRole("dialog").getByText("Maya", { exact: true }).locator(".."),
   ).toContainText("pending");
-  await host.getByRole("button", { name: "Confirm Version 2" }).click();
-  await expect(host.getByText("Published itinerary · Version 2")).toBeVisible({
+  await host.getByRole("button", { name: "Publish Version 2" }).click();
+  await expect(host.getByText("Current plan · Version 2")).toBeVisible({
     timeout: 20_000,
   });
   await host.reload();
   await openPlan(host);
-  await expect(host.getByText("Published itinerary · Version 2")).toBeVisible();
+  await expect(host.getByText("Current plan · Version 2")).toBeVisible();
 
   await member.getByRole("button", { name: "Version history" }).click();
   await expect(
     member.getByRole("heading", { name: "Version history" }),
   ).toBeVisible();
   await expect(member.getByText("Version 1").first()).toBeVisible();
-  await member.getByRole("button", { name: "View version" }).last().click();
-  await expect(member.getByText("Historical · read only")).toBeVisible();
+  await member.getByRole("button", { name: "View Plan" }).last().click();
+  await expect(member.getByText("Viewing an earlier version")).toBeVisible();
+  await expect(member.getByText("Earlier version · Version 1")).toBeVisible();
   await expect(
-    member.getByText("Published itinerary · Version 1"),
-  ).toBeVisible();
-  await expect(
-    member.getByRole("button", { name: "Request a Change" }),
+    member.getByRole("button", { name: "Request a change" }),
   ).toHaveCount(0);
   await member.getByRole("tab", { name: "Map" }).click();
   await expect(
@@ -197,9 +193,9 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
   ).toBeVisible();
   await member.getByRole("button", { name: "Back to current" }).click();
   await member.getByRole("button", { name: "Version history" }).click();
-  await member.getByRole("button", { name: "Compare to previous" }).click();
+  await member.getByRole("button", { name: "Compare changes" }).click();
   await expect(
-    member.getByRole("heading", { name: "Version 2 compared with Version 1" }),
+    member.getByRole("heading", { name: "Changes from Version 1" }),
   ).toBeVisible();
 
   await member.setViewportSize({ width: 390, height: 844 });
@@ -213,8 +209,9 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     .getByRole("button", { name: "Close" })
     .click();
   await member.getByRole("button", { name: "Map" }).first().click();
-  await expect(member.getByRole("button", { name: "Map mode" })).toBeVisible();
-  await member.getByRole("button", { name: "Map mode" }).click();
+  const mobileMap = member.getByTestId("map-workspace");
+  await expect(mobileMap.getByRole("button", { name: "Map" })).toBeVisible();
+  await mobileMap.getByRole("button", { name: "Map" }).click();
   await member.getByRole("button", { name: "Expand place sheet" }).click();
   await expect(member.getByTestId("place-sheet")).toHaveAttribute(
     "data-position",
@@ -225,8 +222,8 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
     "data-position",
     "collapsed",
   );
-  await member.getByRole("button", { name: "Plan mode" }).click();
-  await expect(member.getByLabel("Spatial itinerary")).toBeVisible();
+  await mobileMap.getByRole("button", { name: "Plan" }).click();
+  await expect(member.getByLabel("Plan locations")).toBeVisible();
   expect(
     await member.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -240,7 +237,7 @@ test("two-person revision publishes Version 2 while Version 1 remains immutable"
   const outsider = await outsiderContext.newPage();
   await outsider.goto(roomUrl);
   await expect(
-    outsider.getByRole("heading", { name: "Name the adventure." }),
+    outsider.getByRole("heading", { name: "Start with a trip name." }),
   ).toBeVisible();
   await expect(
     outsider.getByRole("heading", { name: "Yosemite crew escape" }),

@@ -30,7 +30,7 @@ describe("Trip application errors", () => {
       "network_error",
     );
     expect(getTripErrorMessage("invalid_server_response")).toMatch(
-      /unexpected response/i,
+      /could not complete/i,
     );
   });
 });

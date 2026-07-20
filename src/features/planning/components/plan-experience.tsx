@@ -31,7 +31,7 @@ function SummarySection({
   return (
     <section
       aria-labelledby={`plan-${title.replaceAll(" ", "-").toLowerCase()}`}
-      className="border-border border-t py-5"
+      className="border-border border-t py-6"
     >
       <h2
         id={`plan-${title.replaceAll(" ", "-").toLowerCase()}`}
@@ -39,11 +39,14 @@ function SummarySection({
       >
         {title}
       </h2>
-      <ul className="mt-3 space-y-3">
+      <ul className="mt-4 divide-y">
         {items.map((item) => (
-          <li key={item.id} className="bg-subtle rounded-md p-3">
+          <li
+            key={item.id}
+            className="grid gap-1 py-3 sm:grid-cols-[13rem_1fr] sm:gap-5"
+          >
             <p className="text-xs font-semibold">{item.label}</p>
-            <p className="text-muted-foreground mt-1 text-sm leading-6">
+            <p className="text-muted-foreground text-sm leading-6">
               {item.detail}
             </p>
           </li>
@@ -58,11 +61,13 @@ export function PlanExperience({
   participantId,
   participantRole = "member",
   preferMap = false,
+  onOpenPlan,
 }: {
   roomId: string;
   participantId: string;
   participantRole?: ParticipantRole;
   preferMap?: boolean;
+  onOpenPlan?: () => void;
 }) {
   const [request, setRequest] = useState<PlanningRequestView | null>(null);
   const [plan, setPlan] = useState<TripPlanView | null>(null);
@@ -172,7 +177,7 @@ export function PlanExperience({
       setError(
         result.error === "approved_summary_stale"
           ? "Trip details changed after approval. Regenerate the summary first."
-          : "The itinerary could not be started safely.",
+          : "The Plan could not be started safely.",
       );
       return;
     }
@@ -191,8 +196,8 @@ export function PlanExperience({
       setGenerating(false);
       setError(
         result.error === "retry_exhausted"
-          ? "This itinerary has reached its safe retry limit."
-          : "The itinerary could not be retried safely.",
+          ? "Trailie couldn’t finish after several tries."
+          : "We couldn’t try that again right now.",
       );
       return;
     }
@@ -205,7 +210,29 @@ export function PlanExperience({
         className="flex flex-1 items-center justify-center"
         aria-live="polite"
       >
-        Loading Plan…
+        Loading your Plan…
+      </div>
+    );
+  if (preferMap && !plan)
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12 sm:px-8">
+        <p className="eyebrow">Map</p>
+        <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em]">
+          Your map will follow the Plan.
+        </h1>
+        <p className="text-muted-foreground mt-4 max-w-xl leading-7">
+          Once the crew has reviewed the trip brief and created a Plan, its
+          verified places and routes will appear here.
+        </p>
+        {onOpenPlan ? (
+          <button
+            type="button"
+            onClick={onOpenPlan}
+            className="bg-foreground text-background focus-visible:ring-ring mt-8 min-h-12 self-start rounded-md px-5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            Open Plan
+          </button>
+        ) : null}
       </div>
     );
   if (plan?.status === "published")
@@ -252,19 +279,19 @@ export function PlanExperience({
           Plan together
         </p>
         <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em]">
-          Turn the conversation into a shared brief.
+          Before we build the trip
         </h1>
         <p className="text-muted-foreground mt-4 max-w-xl leading-7">
-          Discuss the trip naturally in Chat. When the crew is ready, Trailie
-          will organize what was decided and ask everyone to review it before
-          any itinerary is built.
+          Trailie will organize the decisions, preferences, open questions, and
+          constraints from Chat. Everyone reviews that trip brief before the
+          Plan is created.
         </p>
         <button
           type="button"
           onClick={() => void start()}
           className="bg-foreground text-background focus-visible:ring-ring mt-8 min-h-12 self-start rounded-md px-5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >
-          Build Our Itinerary
+          Prepare trip brief
         </button>
         {error ? (
           <p role="alert" className="mt-4 text-sm">
@@ -288,10 +315,10 @@ export function PlanExperience({
           className="bg-foreground mx-auto size-3 animate-pulse rounded-full"
         />
         <h1 className="mt-6 text-2xl font-semibold">
-          Trailie is organizing what the crew has decided.
+          Trailie is checking the trip.
         </h1>
         <p className="text-muted-foreground mt-3">
-          Chat stays available while the review summary is prepared.
+          Chat stays available while the crew’s decisions are organized.
         </p>
       </div>
     );
@@ -303,18 +330,18 @@ export function PlanExperience({
         </h1>
         <p className="text-muted-foreground mt-3">
           {request.generationErrorCode === "recovery_required"
-            ? "The validated summary was saved for automatic recovery. Chat and prior plans remain available; no action is required now."
+            ? "Trailie is still checking this request. Chat and earlier Plans remain available."
             : request.generationErrorCode === "workflow_deadline_exceeded"
-              ? "The summary reached its total deadline and stopped without publishing partial work. Chat and prior plans remain available."
+              ? "Trailie could not finish this right now. Chat and earlier Plans remain available."
               : request.generationErrorCode === "retry_exhausted"
-                ? "The summary reached its safe retry limit. Chat and prior plans remain available."
+                ? "Trailie could not finish after several tries. Chat and earlier Plans remain available."
                 : request.generationErrorCode === "ai_disabled"
-                  ? "New AI generation is temporarily paused. Chat and prior plans remain available."
+                  ? "Trailie is temporarily paused. Chat and earlier Plans remain available."
                   : request.generationErrorCode?.includes("ai_limit_reached") ||
                       request.generationErrorCode ===
                         "provider_budget_unavailable"
-                    ? "The current generation allowance is unavailable or has been reached. Chat and prior plans remain available."
-                    : "Chat and private memory are unchanged. You can retry safely."}
+                    ? "Trailie is temporarily unavailable. Chat and earlier Plans remain available."
+                    : "Your conversation and earlier Plans are unchanged. You can try again safely."}
         </p>
         {![
           "recovery_required",
@@ -341,7 +368,7 @@ export function PlanExperience({
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-5 py-8 pb-36 sm:px-8 lg:pb-12">
         <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-          Crew review · Version {request.currentSummaryVersion}
+          Before we build the trip · Version {request.currentSummaryVersion}
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">
           {summary.title}
@@ -362,7 +389,7 @@ export function PlanExperience({
               onClick={() => void regenerate()}
               className="mt-3 text-sm font-semibold underline"
             >
-              Regenerate Summary
+              Regenerate summary
             </button>
           </div>
         ) : null}
@@ -373,15 +400,15 @@ export function PlanExperience({
           >
             <p className="font-semibold">The crew requested changes</p>
             <p className="text-muted-foreground mt-1 text-sm">
-              Regenerate a new immutable version after reviewing the note and
-              conversation.
+              Review the note and conversation, then prepare an updated trip
+              brief.
             </p>
             <button
               type="button"
               onClick={() => void regenerate()}
               className="mt-3 text-sm font-semibold underline"
             >
-              Regenerate Summary
+              Regenerate summary
             </button>
           </div>
         ) : null}
@@ -389,8 +416,8 @@ export function PlanExperience({
           <div className="mt-5 rounded-md border border-emerald-600/40 bg-emerald-500/10 p-4">
             <p className="font-semibold">Summary approved</p>
             <p className="text-muted-foreground mt-1 text-sm">
-              Trailie can now build the itinerary and validate it before the
-              crew sees it as ready.
+              Trailie can now build the Plan and check timing, routes, and crew
+              constraints before it is published.
             </p>
             <button
               type="button"
@@ -398,7 +425,7 @@ export function PlanExperience({
               onClick={() => void generateItinerary()}
               className="bg-foreground text-background mt-4 min-h-11 rounded-md px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {generating ? "Starting…" : "Generate Itinerary"}
+              {generating ? "Starting…" : "Create the Plan"}
             </button>
             {error ? (
               <p role="alert" className="mt-3 text-sm">
@@ -413,7 +440,7 @@ export function PlanExperience({
             items={summary.confirmedDecisions}
           />
           <SummarySection
-            title="Traveler preferences"
+            title="Crew preferences"
             items={summary.travelerPreferences}
           />
           <SummarySection title="Constraints" items={summary.constraints} />
@@ -472,7 +499,7 @@ export function PlanExperience({
               htmlFor="planning-change-note"
               className="text-xs font-semibold"
             >
-              Revision note (required for changes)
+              What should change?
             </label>
             <textarea
               id="planning-change-note"
@@ -491,7 +518,7 @@ export function PlanExperience({
                 onClick={() => void review("approved")}
                 className="bg-foreground text-background min-h-11 rounded-md px-4 text-sm font-semibold disabled:opacity-40"
               >
-                Approve summary
+                Approve trip brief
               </button>
               <button
                 type="button"

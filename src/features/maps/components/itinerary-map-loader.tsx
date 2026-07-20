@@ -39,7 +39,7 @@ export function ItineraryMapLoader({
     return (
       <div className="flex min-h-80 flex-col items-center justify-center px-5 text-center">
         <p className="max-w-md font-semibold">
-          Map view is unavailable. Your itinerary remains fully usable.
+          Map view is unavailable. Your itinerary is still fully accessible.
         </p>
         <p className="text-muted-foreground mt-2 max-w-md text-sm">
           Open Day-by-day or Travel for the complete non-map plan.
@@ -53,7 +53,7 @@ export function ItineraryMapLoader({
         role="status"
         aria-live="polite"
       >
-        Preparing the versioned map…
+        Preparing the map…
       </div>
     );
   return (

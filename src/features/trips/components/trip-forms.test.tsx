@@ -33,7 +33,7 @@ describe("CreateTripForm", () => {
 
     expect(screen.getByLabelText("Trip name")).toBeInTheDocument();
     expect(screen.getByLabelText("Your display name")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Expected travelers/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Expected crew size/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/destination/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/date/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/budget/i)).not.toBeInTheDocument();
@@ -58,7 +58,7 @@ describe("CreateTripForm", () => {
     renderForm(<CreateTripForm ensureSession={ensureSession} />);
     await user.type(screen.getByLabelText("Trip name"), "Boundary Waters");
     await user.type(screen.getByLabelText("Your display name"), "Maya");
-    await user.type(screen.getByLabelText(/Expected travelers/), "51");
+    await user.type(screen.getByLabelText(/Expected crew size/), "51");
     await user.click(screen.getByRole("button", { name: "Create Trip" }));
     expect(await screen.findByText(/between 1 and 50/i)).toBeInTheDocument();
   });
@@ -130,7 +130,7 @@ describe("JoinTripForm", () => {
     ["invite_expired", /expired/i],
     ["invite_revoked", /revoked/i],
     ["invite_exhausted", /usage limit/i],
-    ["invalid_server_response", /unexpected response/i],
+    ["invalid_server_response", /could not complete/i],
   ] as const)("shows the safe %s message", async (error, message) => {
     const user = userEvent.setup();
     renderForm(

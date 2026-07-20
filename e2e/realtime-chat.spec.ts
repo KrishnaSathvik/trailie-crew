@@ -30,7 +30,7 @@ async function createJoinedTrip(browser: Browser, name: string) {
   await expect(hostPage).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomUrl = hostPage.url();
   const invitePath = await hostPage
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
 
   const memberContext = await browser.newContext();

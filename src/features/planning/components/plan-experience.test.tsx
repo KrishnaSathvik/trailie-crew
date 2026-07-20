@@ -70,15 +70,11 @@ describe("PlanExperience", () => {
     });
     render(<PlanExperience roomId={id} participantId={id} />);
     expect(
-      await screen.findByRole("button", { name: "Build Our Itinerary" }),
+      await screen.findByRole("button", { name: "Prepare trip brief" }),
     ).toBeEnabled();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Build Our Itinerary" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Prepare trip brief" }));
     expect(
-      await screen.findByText(
-        "Trailie is organizing what the crew has decided.",
-      ),
+      await screen.findByText("Trailie is checking the trip."),
     ).toBeVisible();
   });
   it("renders review sections and requires a note for changes", async () => {
@@ -146,7 +142,7 @@ describe("PlanExperience", () => {
     });
     render(<PlanExperience roomId={id} participantId={id} />);
     const button = await screen.findByRole("button", {
-      name: "Generate Itinerary",
+      name: "Create the Plan",
     });
     fireEvent.click(button);
     expect(generateItineraryAction).toHaveBeenCalledWith({

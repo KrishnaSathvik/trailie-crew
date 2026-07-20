@@ -22,8 +22,8 @@ import { TripDangerZone } from "@/features/lifecycle/trip-danger-zone";
 const destinations = [
   { label: "Chat", icon: MessageCircle, enabled: true },
   { label: "Plan", icon: CalendarRange, enabled: true },
-  { label: "Settings", icon: Settings, enabled: true },
   { label: "Map", icon: Map, enabled: true },
+  { label: "Settings", icon: Settings, enabled: true },
 ];
 
 type Area = "Chat" | "Plan" | "Map" | "Settings";
@@ -71,24 +71,30 @@ export function TripShell({ data }: { data: TripShellData }) {
   }, [peopleOpen]);
 
   return (
-    <main className="bg-background text-foreground min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)_19rem]">
-      <aside className="border-border hidden min-h-dvh border-r px-6 py-7 lg:flex lg:flex-col">
+    <main className="bg-background text-foreground min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+      <a href="#trip-content" className="skip-link">
+        Skip to Trip content
+      </a>
+      <aside className="border-border bg-surface hidden min-h-dvh border-r px-5 py-6 lg:flex lg:flex-col">
         <Link
           href="/"
           className="focus-visible:ring-ring flex items-center gap-3 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
         >
-          <span aria-hidden="true" className="bg-foreground size-2.5" />
+          <span
+            aria-hidden="true"
+            className="bg-accent size-2.5 rounded-[2px]"
+          />
           <span className="text-sm font-semibold">Trailie Crew</span>
         </Link>
-        <div className="mt-14">
-          <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-            Current Trip
-          </p>
+        <div className="mt-12">
+          <p className="eyebrow">Current Trip</p>
           <h1 className="mt-3 text-2xl leading-7 font-semibold tracking-[-0.04em]">
             {data.room.name}
           </h1>
-          <p className="text-muted-foreground mt-3 font-mono text-xs tracking-[0.12em]">
-            {data.room.roomCode}
+          <p className="text-muted-foreground mt-3 text-xs">
+            {data.room.currentPlanVersion
+              ? `Current plan · Version ${data.room.currentPlanVersion}`
+              : "Planning together"}
           </p>
         </div>
         <nav aria-label="Trip sections" className="mt-12 space-y-1">
@@ -100,7 +106,8 @@ export function TripShell({ data }: { data: TripShellData }) {
                 key={label}
                 onClick={() => enabled && setArea(label as Area)}
                 disabled={!enabled}
-                className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${active ? "bg-subtle font-semibold" : "text-muted-foreground"}`}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-control flex min-h-11 w-full items-center gap-3 px-3 text-sm ${active ? "bg-accent-soft text-accent font-semibold" : "text-muted-foreground hover:bg-subtle hover:text-foreground"}`}
               >
                 <Icon
                   aria-hidden="true"
@@ -127,12 +134,17 @@ export function TripShell({ data }: { data: TripShellData }) {
         </div>
       </aside>
 
-      <section className="flex min-h-dvh min-w-0 flex-col pb-20 lg:pb-0">
-        <header className="border-border flex min-h-16 items-center justify-between border-b px-5 sm:px-7">
+      <section
+        id="trip-content"
+        className="flex min-h-dvh min-w-0 flex-col pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-0"
+      >
+        <header className="border-border bg-background/95 sticky top-0 z-10 flex min-h-16 items-center justify-between border-b px-4 backdrop-blur-sm sm:px-6">
           <div className="min-w-0 lg:hidden">
             <p className="truncate text-sm font-semibold">{data.room.name}</p>
-            <p className="text-muted-foreground mt-0.5 font-mono text-[0.625rem] tracking-wider">
-              {data.room.roomCode}
+            <p className="text-muted-foreground mt-0.5 text-[0.6875rem]">
+              {data.room.currentPlanVersion
+                ? `Version ${data.room.currentPlanVersion}`
+                : "Planning together"}
             </p>
           </div>
           <div className="hidden items-center gap-2 lg:flex">
@@ -143,11 +155,22 @@ export function TripShell({ data }: { data: TripShellData }) {
                 : area === "Plan"
                   ? "Planning review"
                   : area === "Map"
-                    ? "Spatial itinerary"
+                    ? "Trip map"
                     : "Trip settings"}
             </p>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <button
+              ref={peopleButtonRef}
+              type="button"
+              onClick={() => setPeopleOpen(true)}
+              className="border-border hover:bg-subtle focus-visible:ring-ring rounded-control inline-flex size-10 items-center justify-center border focus-visible:ring-2 lg:hidden"
+              aria-label="People"
+            >
+              <UsersRound aria-hidden="true" className="size-4" />
+            </button>
+            <ThemeToggle />
+          </div>
         </header>
         {area === "Chat" ? (
           <ChatExperience data={data} onPresenceChange={handlePresenceChange} />
@@ -157,12 +180,15 @@ export function TripShell({ data }: { data: TripShellData }) {
             participantId={data.currentParticipant.id}
             participantRole={data.currentParticipant.role}
             preferMap={area === "Map"}
+            onOpenPlan={() => setArea("Plan")}
           />
         ) : isHost ? (
           <TripDangerZone
             roomId={data.room.id}
             roomName={data.room.name}
+            roomCode={data.room.roomCode}
             participants={data.participants}
+            onOpenPlan={() => setArea("Plan")}
           />
         ) : (
           <div className="mx-auto w-full max-w-2xl px-5 py-10 sm:px-8">
@@ -180,7 +206,7 @@ export function TripShell({ data }: { data: TripShellData }) {
         )}
       </section>
 
-      <aside className="border-border hidden border-l px-6 py-7 lg:block lg:min-h-dvh">
+      <aside className="border-border bg-surface hidden border-l px-5 py-6 lg:block lg:min-h-dvh">
         <CrewList data={data} onlineParticipantIds={onlineParticipantIds} />
         {isHost ? (
           <div className="mt-8">
@@ -192,7 +218,7 @@ export function TripShell({ data }: { data: TripShellData }) {
         ) : (
           <div className="border-border mt-8 border-t pt-5">
             <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.14em] uppercase">
-              Room code
+              Trip code
             </p>
             <p className="mt-2 font-mono text-lg font-semibold tracking-[0.12em]">
               {data.room.roomCode}
@@ -233,25 +259,18 @@ export function TripShell({ data }: { data: TripShellData }) {
 
       <nav
         aria-label="Trip sections"
-        className="border-border bg-background fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t lg:hidden"
+        className="border-border bg-background fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        {[
-          ...destinations,
-          { label: "People", icon: UsersRound, enabled: true },
-        ].map(({ label, icon: Icon, enabled }) => {
+        {destinations.map(({ label, icon: Icon, enabled }) => {
           const active = area === label;
           return (
             <button
-              ref={label === "People" ? peopleButtonRef : undefined}
               type="button"
               key={label}
-              onClick={() =>
-                label === "People"
-                  ? setPeopleOpen(true)
-                  : enabled && setArea(label as Area)
-              }
+              onClick={() => enabled && setArea(label as Area)}
               disabled={!enabled}
-              className={`flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] ${active ? "font-semibold" : "text-muted-foreground"}`}
+              aria-current={active ? "page" : undefined}
+              className={`flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] ${active ? "text-accent font-semibold" : "text-muted-foreground"}`}
             >
               <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
               <span>{label}</span>

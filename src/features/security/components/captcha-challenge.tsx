@@ -120,31 +120,31 @@ export function CaptchaChallenge({
     return (
       <div className="border-border rounded-md border p-3 text-sm">
         <p role="status" aria-live="assertive">
-          The anti-bot check is unavailable. Please retry shortly.
+          The security check is unavailable. Please try again shortly.
         </p>
         <button
           type="button"
           onClick={retry}
           className="border-border mt-3 min-h-11 rounded-md border px-4 font-semibold"
         >
-          Retry anti-bot check
+          Retry security check
         </button>
       </div>
     );
 
   return (
     <div className="space-y-2">
-      <div ref={containerRef} role="group" aria-label="Anti-bot verification" />
+      <div ref={containerRef} role="group" aria-label="Security check" />
       <p
         role="status"
         aria-live="polite"
         className="text-muted-foreground text-sm"
       >
         {status === "completed"
-          ? "Anti-bot check completed."
+          ? "Security check complete."
           : status === "expired"
-            ? "Anti-bot check expired."
-            : "Complete the anti-bot check."}
+            ? "The security check expired."
+            : "Complete the security check."}
       </p>
       {status === "expired" ? (
         <button
@@ -152,7 +152,7 @@ export function CaptchaChallenge({
           onClick={retry}
           className="border-border min-h-11 rounded-md border px-4 text-sm font-semibold"
         >
-          Retry anti-bot check
+          Retry security check
         </button>
       ) : null}
     </div>

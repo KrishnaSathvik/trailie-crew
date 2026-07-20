@@ -216,7 +216,7 @@ test("protected Preview recovers one controlled Terra and Luna 503", async ({
   const context = await protectedContext(browser);
   const page = await context.newPage();
   await page.goto(`${baseUrl}/trips/create`);
-  await page.getByLabel("Trip name").fill("Phase 5E Provider Drill");
+  await page.getByLabel("Trip name").fill("Yosemite Weekend");
   await page.getByLabel("Your display name").fill("Maya");
   await page.getByRole("button", { name: "Create Trip" }).click();
   await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
@@ -300,14 +300,14 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
     });
 
   await host.goto(`${baseUrl}/trips/create`);
-  await host.getByLabel("Trip name").fill("Phase 5E Hosted Acceptance");
+  await host.getByLabel("Trip name").fill("Yosemite Crew Trip");
   await host.getByLabel("Your display name").fill("Maya");
   await host.getByRole("button", { name: "Create Trip" }).click();
   await expect(host).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomUrl = host.url();
   const roomId = new URL(roomUrl).pathname.split("/").at(-1)!;
   const invitePath = await host
-    .getByLabel("One-time invitation URL")
+    .getByLabel("Private invitation link")
     .inputValue();
 
   await member.goto(new URL(invitePath, baseUrl).href);
@@ -407,7 +407,7 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
 
   await timed(timings, "planning_summary_ms", async () => {
     await openPlan(host);
-    await host.getByRole("button", { name: "Build Our Itinerary" }).click();
+    await host.getByRole("button", { name: "Prepare trip brief" }).click();
     await expect(
       host.getByRole("heading", { name: "Before I build the trip" }),
     ).toBeVisible({ timeout: 120_000 });
@@ -416,16 +416,16 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   await expect(
     member.getByRole("heading", { name: "Before I build the trip" }),
   ).toBeVisible({ timeout: 30_000 });
-  await host.getByRole("button", { name: "Approve summary" }).click();
-  await member.getByRole("button", { name: "Approve summary" }).click();
+  await host.getByRole("button", { name: "Approve trip brief" }).click();
+  await member.getByRole("button", { name: "Approve trip brief" }).click();
   await expect(
-    member.getByRole("button", { name: "Generate Itinerary" }),
+    member.getByRole("button", { name: "Create the Plan" }),
   ).toBeVisible({ timeout: 30_000 });
 
   await timed(timings, "itinerary_generation_ms", async () => {
-    await member.getByRole("button", { name: "Generate Itinerary" }).click();
-    const published = member.getByText("Published itinerary · Version 1");
-    const retry = member.getByRole("button", { name: "Retry itinerary" });
+    await member.getByRole("button", { name: "Create the Plan" }).click();
+    const published = member.getByText("Current plan · Version 1");
+    const retry = member.getByRole("button", { name: "Try again" });
     for (let attempt = 0; attempt < 10; attempt += 1) {
       if (await published.isVisible().catch(() => false)) break;
       if (await retry.isVisible().catch(() => false)) {
@@ -437,10 +437,10 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
     }
     await expect(published).toBeVisible({ timeout: 30_000 });
     await expect(
-      member.getByText("Validated before publishing").first(),
+      member.getByText("Checked before publishing").first(),
     ).toBeVisible();
   });
-  await expect(host.getByText("Published itinerary · Version 1")).toBeVisible({
+  await expect(host.getByText("Current plan · Version 1")).toBeVisible({
     timeout: 30_000,
   });
   await member.getByRole("tab", { name: "Evidence" }).click();
@@ -477,27 +477,27 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
     .getByLabel("Request details")
     .fill("Remove this proposed kayaking item without changing another day.");
   await timed(timings, "revision_analysis_ms", async () => {
-    await member.getByRole("button", { name: "Submit change request" }).click();
+    await member.getByRole("button", { name: "Check this change" }).click();
     await expect(
-      member.getByRole("button", { name: "Approve analysis" }),
+      member.getByRole("button", { name: "Approve change" }),
     ).toBeVisible({ timeout: 120_000 });
   });
-  await member.getByRole("button", { name: "Approve analysis" }).click();
+  await member.getByRole("button", { name: "Approve change" }).click();
   await expect(
-    host.getByRole("button", { name: "Approve analysis" }),
+    host.getByRole("button", { name: "Approve change" }),
   ).toBeVisible({ timeout: 30_000 });
   await timed(timings, "revision_candidate_ms", async () => {
-    await host.getByRole("button", { name: "Approve analysis" }).click();
+    await host.getByRole("button", { name: "Approve change" }).click();
     await expect(
       member.getByRole("heading", { name: "Ready to publish Version 2" }),
     ).toBeVisible({ timeout: 300_000 });
   });
-  await member.getByRole("button", { name: "Confirm Version 2" }).click();
+  await member.getByRole("button", { name: "Publish Version 2" }).click();
   await expect(
     host.getByRole("heading", { name: "Ready to publish Version 2" }),
   ).toBeVisible({ timeout: 30_000 });
-  await host.getByRole("button", { name: "Confirm Version 2" }).click();
-  await expect(host.getByText("Published itinerary · Version 2")).toBeVisible({
+  await host.getByRole("button", { name: "Publish Version 2" }).click();
+  await expect(host.getByText("Current plan · Version 2")).toBeVisible({
     timeout: 60_000,
   });
   await host.screenshot({
@@ -506,10 +506,7 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   });
 
   await host.getByRole("button", { name: "Version history" }).click();
-  await host
-    .getByRole("button", { name: "Compare to previous" })
-    .first()
-    .click();
+  await host.getByRole("button", { name: "Compare changes" }).first().click();
   const approvedScopeDiff = host.locator(
     'section[aria-labelledby="candidate-diff"]',
   );
@@ -518,8 +515,8 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   await host.getByRole("button", { name: "Close" }).click();
 
   await host.getByRole("button", { name: "Version history" }).click();
-  await host.getByRole("button", { name: "View version" }).last().click();
-  await expect(host.getByText("Published itinerary · Version 1")).toBeVisible();
+  await host.getByRole("button", { name: "View Plan" }).last().click();
+  await expect(host.getByText("Earlier version · Version 1")).toBeVisible();
   await host.getByRole("button", { name: "Create share link" }).click();
   const versionOnePath = await host
     .getByLabel("New link · shown once")
@@ -531,7 +528,7 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   const publicResponse = await visitor.goto(
     new URL(versionOnePath, baseUrl).href,
   );
-  await expect(visitor.getByLabel("Pinned Version 1")).toBeVisible();
+  await expect(visitor.getByLabel("Shared Plan Version 1")).toBeVisible();
   await expect(visitor.getByText("Version 2", { exact: true })).toHaveCount(0);
   await expect(visitor.getByText("Maya", { exact: true })).toHaveCount(0);
   await expect(visitor.getByText("Alex", { exact: true })).toHaveCount(0);
@@ -565,7 +562,7 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   expect(ics).not.toContain("@v2.trailie.crew");
   const print = await hostContext.newPage();
   await print.goto(`${baseUrl}/trips/${roomId}/plans/1/print`);
-  await expect(print.getByLabel("Pinned Version 1")).toBeVisible();
+  await expect(print.getByLabel("Shared Plan Version 1")).toBeVisible();
   await print.close();
   await host.getByRole("button", { name: "Revoke link" }).click();
   await expect(host.getByRole("status")).toContainText(
@@ -573,14 +570,14 @@ test("controlled hosted Preview completes Phase 5E final reacceptance", async ({
   );
   await visitor.goto(new URL(versionOnePath, baseUrl).href);
   await expect(
-    visitor.getByRole("heading", { name: "Shared itinerary unavailable" }),
+    visitor.getByRole("heading", { name: "Shared Plan unavailable" }),
   ).toBeVisible();
   await publicContext.close();
 
   await host.getByRole("button", { name: "Back to current" }).click();
   await host.reload();
   await openPlan(host);
-  await expect(host.getByText("Published itinerary · Version 2")).toBeVisible();
+  await expect(host.getByText("Current plan · Version 2")).toBeVisible();
 
   const recoveryCounts = await runBoundedRecovery(hostContext.request);
   expect(recoveryCounts.remaining_eligible).toBe(0);
@@ -680,7 +677,7 @@ test("fresh-room Terra Luna and planning repeatability subset", async ({
   const context = await protectedContext(browser);
   const page = await context.newPage();
   await page.goto(`${baseUrl}/trips/create`);
-  await page.getByLabel("Trip name").fill("Phase 5E Repeatability");
+  await page.getByLabel("Trip name").fill("Yosemite Trail Weekend");
   await page.getByLabel("Your display name").fill("Riley");
   await page.getByRole("button", { name: "Create Trip" }).click();
   await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
@@ -727,7 +724,7 @@ test("fresh-room Terra Luna and planning repeatability subset", async ({
 
   await timed(timings, "planning_summary_ms", async () => {
     await openPlan(page);
-    await page.getByRole("button", { name: "Build Our Itinerary" }).click();
+    await page.getByRole("button", { name: "Prepare trip brief" }).click();
     await expect(
       page.getByRole("heading", { name: "Before I build the trip" }),
     ).toBeVisible({ timeout: 120_000 });

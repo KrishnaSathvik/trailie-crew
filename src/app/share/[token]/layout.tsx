@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shared itinerary · Trailie Crew",
-  description: "A private, version-pinned Trailie Crew itinerary.",
+  title: "Shared Plan · Trailie Crew",
+  description: "A private, version-pinned Trailie Crew Plan.",
   referrer: "no-referrer",
   robots: {
     index: false,

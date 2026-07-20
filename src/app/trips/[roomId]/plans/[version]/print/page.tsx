@@ -13,7 +13,7 @@ import { projectPublicItinerary } from "@/features/sharing/public-projection";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const metadata: Metadata = {
-  title: "Print itinerary · Trailie Crew",
+  title: "Print Plan · Trailie Crew",
   referrer: "no-referrer",
   robots: { index: false, follow: false, noarchive: true, nocache: true },
 };

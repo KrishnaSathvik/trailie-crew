@@ -170,8 +170,8 @@ export function SuggestionThread({
         </button>
       </div>
       <p className="text-muted-foreground mt-2 text-xs">
-        Suggestions never change the trip directly. The crew must convert one
-        into its normal approval workflow.
+        Suggestions never change the Trip directly. The Crew reviews every
+        suggestion before creating a Plan change.
       </p>
       {formOpen ? (
         <form className="mt-4 space-y-3" onSubmit={(event) => void save(event)}>

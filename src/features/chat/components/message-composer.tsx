@@ -35,8 +35,8 @@ export function MessageComposer({
   }
 
   return (
-    <div className="border-border bg-background border-t px-4 py-3 sm:px-6">
-      <div className="border-border focus-within:ring-ring flex items-end gap-2 rounded-lg border p-2 focus-within:ring-2">
+    <div className="border-border bg-background border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+      <div className="border-border bg-surface focus-within:border-foreground focus-within:ring-ring rounded-card flex items-end gap-2 border p-2 transition-[border-color,box-shadow] focus-within:ring-2">
         <label htmlFor="crew-message" className="sr-only">
           Message your crew
         </label>
@@ -46,7 +46,7 @@ export function MessageComposer({
           maxLength={4000}
           rows={1}
           disabled={disabled}
-          placeholder="Message your crew"
+          placeholder="Message your crew or ask @Trailie"
           onChange={(event) => {
             const value = event.target.value.slice(0, 4000);
             setDraft(value);
@@ -65,7 +65,7 @@ export function MessageComposer({
           aria-label="Send message"
           disabled={!draft.trim() || sending || disabled}
           onClick={() => void submit()}
-          className="bg-foreground text-background focus-visible:ring-ring inline-flex size-10 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30"
+          className="bg-foreground text-background focus-visible:ring-ring rounded-control inline-flex size-11 shrink-0 items-center justify-center focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30"
         >
           <SendHorizontal aria-hidden="true" className="size-4" />
         </button>
@@ -74,7 +74,7 @@ export function MessageComposer({
         <p className="text-muted-foreground">
           {invokesTrailie
             ? "Trailie will answer after this message is sent"
-            : "Enter to send · Shift+Enter for a new line"}
+            : "Trailie joins only when someone asks · Enter to send"}
         </p>
         {remaining <= 200 ? (
           <p className="text-muted-foreground tabular-nums" aria-live="polite">

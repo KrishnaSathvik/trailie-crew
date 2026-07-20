@@ -5,45 +5,43 @@ const issues = "https://github.com/KrishnaSathvik/trailie-crew/issues/new";
 export default function SupportPage() {
   return (
     <LegalPage
-      title="Support and abuse reports"
-      summary="A clear path for product help, safety concerns, privacy requests, and abuse reports."
+      title="Support"
+      summary="Get help with Trailie Crew, report a concern, or ask about your privacy."
     >
       <LegalSection title="Get help">
         <p>
-          For Preview support,{" "}
+          For help with the product,{" "}
           <a
             className="text-foreground underline underline-offset-4"
             href={issues}
             rel="noreferrer"
           >
-            open a GitHub issue
+            contact support
           </a>
-          . Label the request as product support, inaccurate information,
-          privacy/deletion, accessibility, security, or abuse. Do not include
-          private trip content or access tokens.
+          . Tell us whether you need product help, want to report inaccurate
+          information, have a privacy or accessibility request, or need to
+          report abuse. Do not include private Trip content or private links.
         </p>
       </LegalSection>
       <LegalSection title="Security reports">
         <p>
-          If public disclosure could increase harm, do not post exploit details
-          or secrets. Use the repository owner’s private security-reporting
-          channel when enabled. Revoke affected share links immediately and
-          describe only safe reproduction details.
+          If public disclosure could increase harm, do not post sensitive
+          details or private links. Revoke affected sharing links immediately
+          and use a private support channel when available.
         </p>
       </LegalSection>
       <LegalSection title="Urgent travel situations">
         <p>
           Trailie is not an emergency or safety service. Contact local emergency
           services, official transportation or park authorities, your travel
-          provider, or a qualified professional as appropriate.
+          booking company, or a qualified professional as appropriate.
         </p>
       </LegalSection>
-      <LegalSection title="Response expectations">
+      <LegalSection title="When to expect a reply">
         <p>
-          This controlled Preview has no guaranteed response time or 24-hour
-          support. Production launch remains blocked until incident ownership
-          and a professionally reviewed contact and escalation policy are
-          configured.
+          Support is not monitored around the clock, and response times may
+          vary. For urgent safety concerns, contact the appropriate local or
+          official service directly.
         </p>
       </LegalSection>
     </LegalPage>

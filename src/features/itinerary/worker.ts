@@ -337,7 +337,10 @@ export function bindOfficialItemEvidence(
   );
   for (const day of itinerary.days) {
     for (const item of day.items) {
-      if (item.location?.latitude !== null && item.location?.latitude !== undefined)
+      if (
+        item.location?.latitude !== null &&
+        item.location?.latitude !== undefined
+      )
         continue;
       const byId = item.sourceEntityId
         ? candidates.filter(
@@ -359,9 +362,11 @@ export function bindOfficialItemEvidence(
         destinationResolution?.npsParkCode &&
         evidence.provider === "nps" &&
         evidence.sourceEntityId &&
-        !evidence.sourceEntityId.toLocaleLowerCase("en-US").includes(
-          destinationResolution.npsParkCode.toLocaleLowerCase("en-US"),
-        )
+        !evidence.sourceEntityId
+          .toLocaleLowerCase("en-US")
+          .includes(
+            destinationResolution.npsParkCode.toLocaleLowerCase("en-US"),
+          )
       )
         continue;
       item.location = {
@@ -373,7 +378,9 @@ export function bindOfficialItemEvidence(
         verificationStatus: "verified",
       };
       item.sourceEntityId = evidence.entityBinding!.canonicalId;
-      item.evidenceRefs = [...new Set([...item.evidenceRefs, evidence.evidenceId])];
+      item.evidenceRefs = [
+        ...new Set([...item.evidenceRefs, evidence.evidenceId]),
+      ];
     }
   }
   return itinerarySchema.parse(itinerary);

@@ -52,7 +52,7 @@ describe("authenticated print route", () => {
       version: 1,
       type: "print",
     });
-    expect(screen.getByLabelText("Pinned Version 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Shared Plan Version 1")).toBeInTheDocument();
     expect(document.querySelector(".public-itinerary")).toHaveAttribute(
       "data-content-hash",
       expect.stringMatching(/^[0-9a-f]{64}$/),
@@ -68,7 +68,7 @@ describe("authenticated print route", () => {
     );
     expect(getPlanVersionAction).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("heading", { name: "Shared itinerary unavailable" }),
+      screen.getByRole("heading", { name: "Shared Plan unavailable" }),
     ).toBeInTheDocument();
   });
 });

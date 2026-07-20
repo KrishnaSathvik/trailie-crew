@@ -8,11 +8,11 @@ export default function AccuracyPage() {
     >
       <LegalSection title="Evidence and freshness">
         <p>
-          Trailie currently produces planning suggestions from available
-          conversation context and model knowledge. A “verified” label means a
-          system validation passed for that exact plan version; it does not mean
-          every real-world fact was independently confirmed. Estimated and
-          unknown labels should be treated cautiously.
+          Trailie uses the Crew’s conversation and available travel sources to
+          prepare suggestions. A “Verified” label means the listed source was
+          checked for that Plan version; it does not mean every real-world fact
+          was independently confirmed. Treat estimated and unknown information
+          cautiously.
         </p>
       </LegalSection>
       <LegalSection title="Always verify">
@@ -20,23 +20,22 @@ export default function AccuracyPage() {
           Confirm opening hours, prices, availability, routes, travel times,
           reservations, lodging rules, weather, closures, park alerts, entry
           requirements, visas, health guidance, accessibility, and safety
-          directly with authoritative providers before travel.
+          directly with official sources before travel.
         </p>
       </LegalSection>
       <LegalSection title="No booking">
         <p>
           Trailie does not complete bookings or purchases. Recommendations,
           reservation statuses, links, and availability snapshots are planning
-          information only. A booking is complete only when the provider
+          information only. A booking is complete only when the booking site
           directly confirms it.
         </p>
       </LegalSection>
       <LegalSection title="Report a problem">
         <p>
           Use the Support page to report unsafe, materially inaccurate, or stale
-          information. Include a non-sensitive description; never send a share
-          token, password, authentication header, or private room content in a
-          public report.
+          information. Include a non-sensitive description; never send a private
+          share link, password, or private Trip conversation in a public report.
         </p>
       </LegalSection>
     </LegalPage>

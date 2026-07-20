@@ -25,7 +25,7 @@ export function DeterministicMapCanvas({
   return (
     <div
       className="bg-subtle relative h-full min-h-[30rem] overflow-hidden"
-      aria-label={`Deterministic itinerary map for Version ${projection.planVersion}`}
+      aria-label={`Plan map for Version ${projection.planVersion}`}
     >
       <div
         aria-hidden="true"
@@ -52,7 +52,7 @@ export function DeterministicMapCanvas({
         );
       })}
       <p className="text-muted-foreground absolute right-4 bottom-4 font-mono text-[0.5625rem] tracking-wider uppercase">
-        Deterministic local adapter
+        Map preview
       </p>
     </div>
   );

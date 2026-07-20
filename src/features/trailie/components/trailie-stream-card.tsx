@@ -1,4 +1,4 @@
-import { Sparkles, X } from "lucide-react";
+import { Route, X } from "lucide-react";
 
 import {
   trailieErrorMessages,
@@ -22,13 +22,16 @@ export function TrailieStreamCard({
 }) {
   return (
     <div
-      className="border-border bg-subtle/50 mx-auto mb-5 w-[calc(100%-2rem)] max-w-3xl border-l-2 px-4 py-4"
+      className="border-accent bg-accent-soft/45 mx-auto mb-5 w-[calc(100%-2rem)] max-w-3xl border-l-2 px-4 py-4"
       role="status"
       aria-live="polite"
     >
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm font-semibold">
-          <Sparkles aria-hidden="true" className="mr-1.5 inline size-3.5" />
+          <Route
+            aria-hidden="true"
+            className="text-accent mr-1.5 inline size-3.5"
+          />
           Trailie
         </p>
         {status === "answering" ? (
@@ -44,17 +47,17 @@ export function TrailieStreamCard({
       </div>
       {status === "answering" && !body ? (
         <p className="text-muted-foreground mt-2 text-sm">
-          Trailie is answering…
+          Trailie is thinking…
         </p>
       ) : null}
       {status === "retrying" ? (
         <p className="text-muted-foreground mt-2 text-sm">
-          Trailie is retrying after a temporary issue.
+          Trailie is trying that again…
         </p>
       ) : null}
       {status === "recovering" ? (
         <p className="text-muted-foreground mt-2 text-sm">
-          Trailie is recovering this response.
+          Trailie is checking the trip…
         </p>
       ) : null}
       {body ? (
@@ -73,7 +76,7 @@ export function TrailieStreamCard({
               onClick={onRetry}
               className="focus-visible:ring-ring mt-2 text-xs font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
             >
-              Retry Trailie
+              Try again
             </button>
           ) : null}
         </div>

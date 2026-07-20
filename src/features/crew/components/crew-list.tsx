@@ -13,7 +13,7 @@ export function CrewList({
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Crew Members</h2>
+        <h2 className="text-sm font-semibold">Your crew</h2>
         <span
           className="text-muted-foreground font-mono text-xs"
           aria-label={`${online.size} online`}

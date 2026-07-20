@@ -17,6 +17,10 @@ const routeModes = [
   { mode: "unknown", dash: [1, 3] },
 ] as const;
 
+function verificationLabel(value: string) {
+  return value === "verified" ? "Verified location" : "Location not verified";
+}
+
 function routeCollection(routeSegments: MapCanvasProps["routeSegments"]) {
   return {
     type: "FeatureCollection" as const,
@@ -353,7 +357,7 @@ export function MapboxCanvas({
         .join(" ");
       element.setAttribute(
         "aria-label",
-        `${marker.label}. ${marker.verificationState} location.`,
+        `${marker.label}. ${verificationLabel(marker.verificationState)}.`,
       );
       const number = document.createElement("span");
       number.textContent = marker.shortLabel;
@@ -370,7 +374,7 @@ export function MapboxCanvas({
         details.textContent = [
           marker.timeLabel,
           marker.category.replaceAll("_", " "),
-          marker.verificationState.replaceAll("_", " "),
+          verificationLabel(marker.verificationState),
         ]
           .filter(Boolean)
           .join(" · ");
@@ -422,7 +426,7 @@ export function MapboxCanvas({
     <div
       ref={containerRef}
       className="h-full min-h-[30rem] w-full"
-      aria-label={`Interactive itinerary map for Version ${projection.planVersion}`}
+      aria-label={`Interactive Plan map for Version ${projection.planVersion}`}
     />
   );
 }

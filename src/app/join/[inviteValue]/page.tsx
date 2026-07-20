@@ -11,7 +11,7 @@ export default async function JoinInvitePage({
     <TripEntryLayout
       eyebrow="Private invitation"
       title="Join the Trip."
-      description="Your invitation is ready. Choose the name your crew will see; trip details come later in the shared space."
+      description="Choose the name your crew will see. You will enter the shared Trip after joining."
     >
       <JoinTripForm initialInviteValue={inviteValue} />
     </TripEntryLayout>

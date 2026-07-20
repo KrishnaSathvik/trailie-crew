@@ -20,7 +20,7 @@ export function AccountDangerZone() {
     void assessAccountDeletionAction().then((result) => {
       if (!active) return;
       if (result.ok) setAssessment(result.data);
-      else setNotice("Account deletion status is temporarily unavailable.");
+      else setNotice("We couldn’t check account deletion right now.");
     });
     return () => {
       active = false;
@@ -38,7 +38,7 @@ export function AccountDangerZone() {
         setNotice(
           result.error === "host_transfer_or_room_deletion_required"
             ? "Transfer or delete every trip you host first."
-            : "Account deletion failed safely. Try again.",
+            : "We couldn’t delete your account right now. Try again.",
         );
         return;
       }
@@ -58,13 +58,14 @@ export function AccountDangerZone() {
         Delete account
       </h2>
       <p className="text-muted-foreground mt-2 text-sm leading-6">
-        This removes your anonymous account, memberships, private participant
-        memory, and active access. Shared history is de-attributed where
-        retained.
+        This permanently removes your account and access to every Trip. Your
+        name is removed from shared Trip history where it must be retained.
       </p>
       {assessment?.hostRooms.length ? (
         <div role="alert" className="bg-subtle mt-4 rounded-md p-4 text-sm">
-          <p className="font-semibold">Resolve hosted trips first:</p>
+          <p className="font-semibold">
+            Take care of the Trips you host first:
+          </p>
           <ul className="mt-2 list-disc pl-5">
             {assessment.hostRooms.map((room) => (
               <li key={room.id}>{room.name}</li>

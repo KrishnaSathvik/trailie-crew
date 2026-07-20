@@ -100,7 +100,7 @@ export function GuestInviteControls({
         current.map((value) => (value.id === invite.id ? metadata : value)),
       );
       setNewUrl(guestUrl);
-      setMessage("Link rotated. The previous link and its sessions are off.");
+      setMessage("Link replaced. The previous link no longer works.");
     } else {
       setMessage("The guest link could not be rotated.");
     }
@@ -149,9 +149,8 @@ export function GuestInviteControls({
               Guest access · Version {planVersion}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Viewer links can only read. Commenter links add plain-text
-              comments. Suggester links submit structured changes for crew
-              review. Every link stays on this exact version.
+              Viewers can read, Commenters can add comments, and Suggesters can
+              propose changes. Each link stays with this Version.
             </p>
             {!isHost ? (
               <p className="text-muted-foreground mt-1 text-xs">
@@ -213,11 +212,11 @@ export function GuestInviteControls({
               >
                 <div>
                   <p className="text-sm font-semibold">
-                    {roleLabel(invite.role)} · {invite.tokenPrefix}…
+                    {roleLabel(invite.role)}
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    Expires {new Date(invite.expiresAt).toLocaleString()} ·{" "}
-                    {invite.useCount}/{invite.maxUses} sessions
+                    Expires {new Date(invite.expiresAt).toLocaleString()} · Used{" "}
+                    {invite.useCount} of {invite.maxUses} times
                   </p>
                 </div>
                 {isHost ? (
@@ -228,7 +227,7 @@ export function GuestInviteControls({
                       onClick={() => void rotate(invite)}
                       className="border-border min-h-9 rounded-md border px-3 text-xs font-semibold"
                     >
-                      Rotate guest link
+                      Replace guest link
                     </button>
                     <button
                       type="button"

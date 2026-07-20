@@ -25,14 +25,14 @@ export default async function GuestPlanPage() {
       >
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-xs font-semibold tracking-[0.12em] uppercase">
-            Exact Version {context.planVersion} · {context.displayName}
+            Plan Version {context.planVersion} · {context.displayName}
           </p>
           <p className="text-xs font-semibold">
             {commenter
-              ? "Commenter · comments enabled"
+              ? "You can comment"
               : suggester
-                ? "Suggester · suggestions enabled"
-                : "Viewer · read only"}
+                ? "You can suggest changes"
+                : "View only"}
           </p>
         </div>
       </section>
