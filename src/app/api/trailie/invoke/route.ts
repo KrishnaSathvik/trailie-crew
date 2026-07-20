@@ -988,7 +988,7 @@ export async function POST(request: Request) {
           workflow: "focused_answer",
           model: selectedModel,
           estimatedTokens: 4_000,
-          reservationId: invocationId,
+          reservationId: runId,
         });
         quota = durableQuota;
         await durableQuota.reserve();
@@ -1006,11 +1006,11 @@ export async function POST(request: Request) {
         const outcome = await runDurableProviderOperation({
           controller: attempts,
           workflow: "focused_answer",
-          operationKey: `focused:${invocationId}`,
+          operationKey: `focused:${invocationId}:${runId}`,
           model: selectedModel,
           stage: "focusedProvider",
           policy: routePolicy,
-          quotaReservationId: invocationId,
+          quotaReservationId: runId,
           correlationId,
           signal: request.signal,
           execute: async ({ signal, retryCount }) => {
