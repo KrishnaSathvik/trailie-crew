@@ -115,19 +115,22 @@ function boundedJson(value: unknown, maximum = 5_000) {
 export function parseRoomMemory(roomId: string, value: unknown) {
   const root = asRecord(value);
   const snapshot = asRecord(root.snapshot ?? value);
+  const sharedContext = asRecord(
+    snapshot.shared_context ?? snapshot.sharedContext,
+  );
   return roomMemorySnapshotSchema.safeParse({
     roomId,
     memoryVersion: snapshot.memory_version ?? snapshot.memoryVersion ?? 0,
     participantProfiles:
       snapshot.participant_profiles ?? snapshot.participantProfiles ?? {},
-    sharedContext: snapshot.shared_context ??
-      snapshot.sharedContext ?? {
-        destinationsUnderConsideration: [],
-        dateWindows: [],
-        budgetContext: [],
-        transportContext: [],
-        lodgingContext: [],
-      },
+    sharedContext: {
+      destinationsUnderConsideration:
+        sharedContext.destinationsUnderConsideration ?? [],
+      dateWindows: sharedContext.dateWindows ?? [],
+      budgetContext: sharedContext.budgetContext ?? [],
+      transportContext: sharedContext.transportContext ?? [],
+      lodgingContext: sharedContext.lodgingContext ?? [],
+    },
     confirmedDecisions:
       snapshot.confirmed_decisions ?? snapshot.confirmedDecisions ?? [],
     rejectedOptions:

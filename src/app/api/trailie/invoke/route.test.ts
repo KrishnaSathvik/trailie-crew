@@ -37,3 +37,32 @@ it("normalizes the private memory RPC wrapper into bounded context input", () =>
     expect(result.data.memoryVersion).toBe(2);
   }
 });
+
+it("treats a fresh room memory projection as empty bounded context", () => {
+  const roomId = "b1741efc-ae50-4015-9cff-fdfaa1deb94e";
+  const result = parseRoomMemory(roomId, {
+    facts: [],
+    extractions: [],
+    snapshot: {
+      updated_at: "2026-07-20T18:34:47.840615+00:00",
+      memory_version: 1,
+      open_questions: [],
+      shared_context: {},
+      rejected_options: [],
+      confirmed_decisions: [],
+      participant_profiles: {},
+    },
+  });
+
+  expect(result.success).toBe(true);
+  if (result.success) {
+    expect(result.data.memoryVersion).toBe(1);
+    expect(result.data.sharedContext).toEqual({
+      destinationsUnderConsideration: [],
+      dateWindows: [],
+      budgetContext: [],
+      transportContext: [],
+      lodgingContext: [],
+    });
+  }
+});
