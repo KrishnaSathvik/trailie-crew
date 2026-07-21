@@ -531,9 +531,13 @@ materially more compact generation contract or an approved structured-capable
 route that reliably returns the complete schema inside the remaining latency
 budget—not weaker validation or a longer hidden wait.
 
-Protected deployment `dpl_XpweBzN1aFWF47ybAGBfsy6fT4i4` is Ready on
-`hosted-acceptance`. Vercel Authentication remains enabled, temporary bypass
-count returned to zero, and Production was untouched. Phase 8C verdict:
+The benchmark ran on protected candidate
+`dpl_XpweBzN1aFWF47ybAGBfsy6fT4i4`. Final protected candidate
+`dpl_7eYQehqmENcCvDqXCyJEoTBe4Wp5` additionally classifies the observed
+provider abort as a timeout; that safe error-label correction was not used to
+claim new performance data. It is Ready on `hosted-acceptance`. Vercel
+Authentication remains enabled, temporary bypass count returned to zero, and
+Production was untouched. Phase 8C verdict:
 **startup, first-token, and planning-summary optimization pass; full-itinerary
 acceptance fails at the main structured-model stage.** Production hardening and
 Production readiness remain blocked on a successful hosted itinerary sample.
