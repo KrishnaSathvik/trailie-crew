@@ -131,8 +131,8 @@ export function createTrailieRuntimeRouter(
     compactItineraryFallback(): TrailieRuntimeRouteDecision {
       return {
         complexity: "full_itinerary",
-        route: "reasoning_planning",
-        model: configuration.itinerary,
+        route: "fast",
+        model: configuration.fast,
         reason: "compact_itinerary_approved_fallback",
         structuredContract: true,
       };
@@ -165,9 +165,9 @@ export function createTrailieRuntimeRouter(
       if (complexity === "full_itinerary") {
         return {
           complexity,
-          route: "fast",
-          model: configuration.fast,
-          reason: "compact_itinerary_fast_path",
+          route: "reasoning_planning",
+          model: configuration.itinerary,
+          reason: "compact_itinerary_structured_path",
           structuredContract: true,
         };
       }
