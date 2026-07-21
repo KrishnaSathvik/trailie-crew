@@ -37,6 +37,7 @@ export type ItineraryProviderOutput = {
   responseId: string | null;
   requestId: string | null;
   usage: ProviderUsage;
+  structuralRepairCount?: number;
 };
 export interface ItineraryProvider {
   generate(input: ItineraryProviderInput): Promise<ItineraryProviderOutput>;

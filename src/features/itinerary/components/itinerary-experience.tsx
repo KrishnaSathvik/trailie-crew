@@ -144,7 +144,13 @@ function ActivePlan({
   );
 }
 
-function Overview({ plan }: { plan: TripPlanView }) {
+function Overview({
+  plan,
+  preview = false,
+}: {
+  plan: TripPlanView;
+  preview?: boolean;
+}) {
   const itinerary = plan.itinerary!;
   const unresolved = itinerary.unresolvedItems.length;
   const lodging = itinerary.lodging[0];
@@ -196,15 +202,19 @@ function Overview({ plan }: { plan: TripPlanView }) {
           </p>
         </section>
       </div>
-      <aside className="border-border h-fit rounded-md border p-5">
-        <p className="text-muted-foreground font-mono text-[0.5625rem] tracking-wider uppercase">
-          Trip checks
-        </p>
-        <p className="mt-3 text-sm font-semibold">Checked before publishing</p>
-        <p className="text-muted-foreground mt-2 text-sm leading-6">
-          Critical timing, route, decision, and crew-constraint checks passed.
-        </p>
-      </aside>
+      {!preview ? (
+        <aside className="border-border h-fit rounded-md border p-5">
+          <p className="text-muted-foreground font-mono text-[0.5625rem] tracking-wider uppercase">
+            Trip checks
+          </p>
+          <p className="mt-3 text-sm font-semibold">
+            Checked before publishing
+          </p>
+          <p className="text-muted-foreground mt-2 text-sm leading-6">
+            Critical timing, route, decision, and crew-constraint checks passed.
+          </p>
+        </aside>
+      ) : null}
     </div>
   );
 }
@@ -583,6 +593,13 @@ export function ItineraryExperience({
   };
 }) {
   const [view, setView] = useState<ItineraryView>(initialView);
+  const isPreview =
+    plan.status === "validating" &&
+    plan.validationStatus === "pass" &&
+    plan.itinerary !== null;
+  const availableViews: ItineraryView[] = isPreview
+    ? ["Overview", "Day-by-day"]
+    : views;
   if (plan.status === "blocked" || plan.status === "failed") {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-5 py-12">
@@ -612,7 +629,7 @@ export function ItineraryExperience({
       </div>
     );
   }
-  if (plan.status !== "published" || !plan.itinerary)
+  if ((!isPreview && plan.status !== "published") || !plan.itinerary)
     return <ActivePlan plan={plan} onCancel={onCancel} />;
   const repaired = plan.validationSummary?.repairedIssues.includes(
     "route_timing_impossible",
@@ -621,8 +638,12 @@ export function ItineraryExperience({
     <div className="min-h-0 flex-1 overflow-y-auto">
       <header className="border-border px-5 pt-7 sm:px-8">
         <p className="text-muted-foreground font-mono text-[0.625rem] tracking-[0.16em] uppercase">
-          {readOnly ? "Earlier version" : "Current plan"} · Version{" "}
-          {plan.version}
+          {isPreview
+            ? "Plan preview"
+            : readOnly
+              ? "Earlier version"
+              : "Current plan"}{" "}
+          · Version {plan.version}
         </p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -639,10 +660,12 @@ export function ItineraryExperience({
                 Viewing an earlier version
               </span>
             ) : null}
-            <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
-              Checked before publishing
-            </span>
-            {onHistory ? (
+            {!isPreview ? (
+              <span className="border-border rounded-full border px-3 py-1.5 text-xs font-semibold">
+                Checked before publishing
+              </span>
+            ) : null}
+            {!isPreview && onHistory ? (
               <button
                 type="button"
                 onClick={onHistory}
@@ -651,7 +674,7 @@ export function ItineraryExperience({
                 Version history
               </button>
             ) : null}
-            {!readOnly && onRequestChange ? (
+            {!isPreview && !readOnly && onRequestChange ? (
               <button
                 type="button"
                 onClick={onRequestChange}
@@ -662,12 +685,21 @@ export function ItineraryExperience({
             ) : null}
           </div>
         </div>
+        {isPreview ? (
+          <p
+            className="border-border bg-muted/40 mt-5 rounded-xl border px-4 py-3 text-sm leading-6"
+            aria-live="polite"
+          >
+            The core schedule passed its checks. Trailie is still preparing
+            optional map and booking details.
+          </p>
+        ) : null}
         {repaired ? (
           <p className="border-foreground mt-5 border-l-2 pl-3 text-sm font-semibold">
             Trailie adjusted the schedule after checking travel time.
           </p>
         ) : null}
-        {commenting ? (
+        {!isPreview && commenting ? (
           <CommentThread
             mode={commenting.mode}
             comments={commenting.comments.filter(
@@ -692,7 +724,7 @@ export function ItineraryExperience({
             onChange={(event) => setView(event.target.value as ItineraryView)}
             className="border-border bg-background focus-visible:ring-ring min-h-11 w-full rounded-md border px-3 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
           >
-            {views.map((item) => (
+            {availableViews.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -705,7 +737,7 @@ export function ItineraryExperience({
           aria-label="Plan views"
         >
           <div className="border-border flex min-w-max gap-6 border-b">
-            {views.map((item) => (
+            {availableViews.map((item) => (
               <button
                 key={item}
                 type="button"
@@ -727,13 +759,15 @@ export function ItineraryExperience({
         />
       ) : (
         <div className="mx-auto w-full max-w-5xl px-5 py-8 pb-28 sm:px-8 lg:pb-12">
-          {view === "Overview" ? <Overview plan={plan} /> : null}
+          {view === "Overview" ? (
+            <Overview plan={plan} preview={isPreview} />
+          ) : null}
           {view === "Day-by-day" ? (
             <Days
               plan={plan}
-              onChangeItem={onChangeItem}
-              readOnly={readOnly}
-              commenting={commenting}
+              onChangeItem={isPreview ? undefined : onChangeItem}
+              readOnly={readOnly || isPreview}
+              commenting={isPreview ? undefined : commenting}
             />
           ) : null}
           {view === "Travel" ? <Travel plan={plan} /> : null}

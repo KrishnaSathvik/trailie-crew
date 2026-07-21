@@ -6,7 +6,7 @@ import {
   getPlanningRequestAction,
   reviewPlanningSummaryAction,
 } from "../actions";
-import { PlanExperience } from "./plan-experience";
+import { PLANNING_POLL_INTERVAL_MS, PlanExperience } from "./plan-experience";
 import type { PlanningSummary } from "@trailie/schemas";
 import {
   generateItineraryAction,
@@ -58,6 +58,9 @@ const summary: PlanningSummary = {
   evidence: { memoryVersion: 1, latestMessageId: null, sourceMessageIds: [id] },
 };
 describe("PlanExperience", () => {
+  it("polls quickly enough to reveal a completed structured result", () => {
+    expect(PLANNING_POLL_INTERVAL_MS).toBeLessThan(1_000);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getTripPlanAction).mockResolvedValue({ ok: true, data: null });

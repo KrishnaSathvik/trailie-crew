@@ -55,7 +55,7 @@ export function buildItineraryContext(input: {
     "<OFFICIAL_PLACE_POLICY>Use allowed official places when naming supported park features. Preserve officialId in sourceEntityId. Never invent or guess an official ID; leave unsupported or vague items unresolved.</OFFICIAL_PLACE_POLICY>",
   ]
     .join("\n")
-    .slice(0, 44_000);
+    .slice(0, 28_000);
 }
 
 export function buildItineraryRepairContext(input: {
@@ -80,5 +80,5 @@ export function buildItineraryRepairContext(input: {
     "<LIVE_EVIDENCE_POLICY>Official closures take precedence. Preserve unavailable, stale, inferred, and conflicting states. Never invent availability, confirmation, or booking.</LIVE_EVIDENCE_POLICY>",
   ]
     .join("\n")
-    .slice(0, 68_000);
+    .slice(0, 44_000);
 }

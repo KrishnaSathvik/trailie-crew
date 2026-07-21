@@ -1,10 +1,10 @@
 import "server-only";
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import { itinerarySchema } from "@trailie/schemas";
 import { createOpenAIClient } from "@/server/ai/openai-client";
 import { extractUsage } from "@/server/ai/usage";
 import { ITINERARY_PROMPT, ITINERARY_REPAIR_PROMPT } from "./prompts/itinerary";
+import { createProviderCompatibleZodTextFormat } from "@/server/ai/provider-compatible-schema";
 import {
   ItineraryProviderError,
   type ItineraryProvider,
@@ -26,9 +26,14 @@ export function buildItineraryRequest(input: {
         : ""
     }`,
     input: input.context,
-    reasoning: { effort: "high" as const },
-    text: { format: zodTextFormat(itinerarySchema, "trailie_itinerary") },
-    max_output_tokens: 12_000,
+    reasoning: { effort: "low" as const },
+    text: {
+      format: createProviderCompatibleZodTextFormat(
+        itinerarySchema,
+        "trailie_itinerary",
+      ),
+    },
+    max_output_tokens: 8_000,
     safety_identifier: input.safetyIdentifier,
     store: false,
   };
@@ -57,6 +62,8 @@ export function mapItineraryProviderError(error: unknown, repair: boolean) {
   if (error instanceof OpenAI.RateLimitError)
     return new ItineraryProviderError("model_rate_limited", true);
   if (error instanceof OpenAI.APIConnectionTimeoutError)
+    return new ItineraryProviderError("model_timeout", true);
+  if (error instanceof OpenAI.APIUserAbortError)
     return new ItineraryProviderError("model_timeout", true);
   if (
     error instanceof OpenAI.BadRequestError ||
@@ -121,9 +128,12 @@ export function createOpenAIItineraryProvider(configuration: {
     }
   }
   function call(input: ItineraryProviderInput, repair: boolean) {
-    return runWithOneStructuralRepair((attempt) =>
-      callOnce(input, repair, attempt === 1),
-    );
+    let structuralRepairCount = 0;
+    return runWithOneStructuralRepair(async (attempt) => {
+      structuralRepairCount = attempt;
+      const output = await callOnce(input, repair, attempt === 1);
+      return { ...output, structuralRepairCount };
+    });
   }
   return {
     generate: (input) => call(input, false),

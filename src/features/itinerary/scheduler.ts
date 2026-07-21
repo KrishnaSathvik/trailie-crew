@@ -23,6 +23,8 @@ import { createOpenAIItineraryProvider } from "./openai-provider";
 import { createFakeItineraryProvider } from "./provider";
 import { createItineraryRepository } from "./repository";
 import { processItineraryGeneration } from "./worker";
+import { withCancellationPolling } from "./cancellation-monitor";
+import { itineraryTerminalError } from "./terminal-state";
 import {
   createTravelProviderRegistry,
   withTravelProviderCache,
@@ -154,32 +156,48 @@ export async function drainItineraryGeneration(id: string) {
         "database_write",
       ],
     },
-    async () => {
-      await processItineraryGeneration(id, {
-        repository: createItineraryRepository(),
-        provider,
-        travelProvider,
-        travelIntelligence,
-        safetyIdentifier: createSafetyIdentifier(
-          `itinerary:${id}`,
-          env.safetyHmacSecret,
-        ),
-        model: selectedModel,
-        quotaSubject,
-        reliabilityPolicy: env.reliabilityPolicy,
-        providerAttempts: createDurableProviderAttemptController(
-          createProviderAttemptRepository<Itinerary>(),
-        ),
+    async (runtimeTrace) => {
+      await withCancellationPolling({
+        intervalMs: 750,
+        isCancelled: async () => {
+          const { data } = await createAdminSupabaseClient()
+            .from("trip_plans")
+            .select("status,error_code")
+            .eq("id", id)
+            .maybeSingle();
+          return (
+            data?.status === "failed" &&
+            data.error_code === "workflow_cancelled"
+          );
+        },
+        run: (cancellationSignal) =>
+          processItineraryGeneration(id, {
+            repository: createItineraryRepository(),
+            provider,
+            travelProvider,
+            travelIntelligence,
+            safetyIdentifier: createSafetyIdentifier(
+              `itinerary:${id}`,
+              env.safetyHmacSecret,
+            ),
+            model: selectedModel,
+            quotaSubject,
+            reliabilityPolicy: env.reliabilityPolicy,
+            providerAttempts: createDurableProviderAttemptController(
+              createProviderAttemptRepository<Itinerary>(),
+            ),
+            cancellationSignal,
+            runtimeTrace,
+          }),
       });
       const { data } = await createAdminSupabaseClient()
         .from("trip_plans")
         .select("status,error_code")
         .eq("id", id)
         .maybeSingle();
-      if (data?.status === "failed" && data.error_code === "workflow_cancelled")
-        throw new Error("workflow_cancelled");
-      if (data?.status === "failed")
-        throw new Error(data.error_code ?? "itinerary_failed");
+      if (!data) throw new Error("itinerary_terminal_state_missing");
+      const terminalError = itineraryTerminalError(data);
+      if (terminalError) throw new Error(terminalError);
     },
   );
 }

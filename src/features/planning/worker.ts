@@ -23,6 +23,7 @@ import {
   type DurableProviderAttemptController,
   type ProviderAttemptExecutionResult,
 } from "@/server/ai/provider-attempts";
+import type { TrailieRuntimeTrace } from "@/server/ai/runtime-telemetry";
 
 type Dependencies = {
   repository: PlanningRepository;
@@ -37,6 +38,7 @@ type Dependencies = {
     random?: () => number;
   };
   providerAttempts?: DurableProviderAttemptController<PlanningSummary>;
+  runtimeTrace?: TrailieRuntimeTrace;
 };
 const sleep = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -46,7 +48,13 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
   for (;;) {
     const claim = await deps.repository.claim(id);
     if (!claim.claimed) return;
+    const contextStartedAt = Date.now();
     const context = await deps.repository.loadContext(id);
+    const planningContext = buildPlanningContext(context);
+    deps.runtimeTrace?.recordDuration(
+      "contextAssembly",
+      Date.now() - contextStartedAt,
+    );
     const started = Date.now();
     try {
       const summarize = () =>
@@ -54,7 +62,7 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
           operationKey: `${id}:${claim.summaryVersion}`,
           model: deps.model ?? "gpt-5.6-sol",
           safetyIdentifier: deps.safetyIdentifier,
-          context: buildPlanningContext(context),
+          context: planningContext,
           signal: AbortSignal.timeout(
             Math.min(
               deps.timeoutMs ?? Number.POSITIVE_INFINITY,
@@ -68,19 +76,30 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
         });
       const execute = async (reservationId?: string) => {
         const providerStartedAt = Date.now();
-        const result = deps.quotaSubject
-          ? await runWithAiQuota(
-              {
-                ...deps.quotaSubject,
-                workflow: "planning_summary",
-                model: deps.model ?? "gpt-5.6-sol",
-                estimatedTokens: 8_000,
-                ...(reservationId ? { reservationId } : {}),
-              },
-              summarize,
-            )
-          : await summarize();
+        let result;
+        try {
+          result = deps.quotaSubject
+            ? await runWithAiQuota(
+                {
+                  ...deps.quotaSubject,
+                  workflow: "planning_summary",
+                  model: deps.model ?? "gpt-5.6-sol",
+                  estimatedTokens: 2_500,
+                  ...(reservationId ? { reservationId } : {}),
+                },
+                summarize,
+              )
+            : await summarize();
+        } catch (error) {
+          deps.runtimeTrace?.recordModelCall(Date.now() - providerStartedAt);
+          throw error;
+        }
         const providerDurationMs = Date.now() - providerStartedAt;
+        deps.runtimeTrace?.recordModelCall(providerDurationMs, {
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+        });
+        const validationStartedAt = Date.now();
         const readiness = computePlanningReadiness({
           destinations: result.summary.tripSnapshot.destinations,
           destinationUnresolved: result.summary.proposals.some((i) =>
@@ -113,6 +132,10 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
             memoryVersion: context.memoryVersion,
           },
         });
+        deps.runtimeTrace?.addDuration(
+          "validation",
+          Date.now() - validationStartedAt,
+        );
         return {
           value: summary,
           responseId: result.responseId,
@@ -131,14 +154,26 @@ export async function processPlanningSummary(id: string, deps: Dependencies) {
         const hash = createHash("sha256")
           .update(JSON.stringify(summary))
           .digest("hex");
-        return deps.repository.complete(
-          id,
-          summary,
-          summary.readiness.status,
-          hash,
-          { summary, ...result },
-          result.totalDurationMs,
-        );
+        const persistenceStartedAt = Date.now();
+        return deps.repository
+          .complete(
+            id,
+            summary,
+            summary.readiness.status,
+            hash,
+            { summary, ...result },
+            result.totalDurationMs,
+          )
+          .finally(() => {
+            deps.runtimeTrace?.addDuration(
+              "persistence",
+              Date.now() - persistenceStartedAt,
+            );
+            deps.runtimeTrace?.recordDuration(
+              "finalRenderReady",
+              Date.now() - workflowStartedAt,
+            );
+          });
       };
       if (deps.providerAttempts) {
         const outcome = await deps.providerAttempts.run({

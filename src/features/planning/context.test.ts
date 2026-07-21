@@ -10,7 +10,7 @@ describe("planning context", () => {
       memoryVersion: 2,
       memorySnapshot: {
         participantProfiles: {},
-        sharedContext: {},
+        sharedContext: { notes: "m".repeat(8_000) },
         confirmedDecisions: [],
         rejectedOptions: [],
         openQuestions: [],
@@ -34,9 +34,12 @@ describe("planning context", () => {
         displayName: "Maya",
         createdAt: "2026-07-13T00:00:00Z",
       })),
-      reviewNotes: [],
+      reviewNotes: Array.from({ length: 20 }, (_, i) => ({
+        id: `${i}`,
+        note: "n".repeat(500),
+      })),
     });
-    expect(context.length).toBeLessThanOrEqual(16_000);
+    expect(context.length).toBeLessThanOrEqual(9_000);
     expect(context).not.toContain("userId");
     expect(context).not.toContain("email");
     expect(context).not.toContain("provider");

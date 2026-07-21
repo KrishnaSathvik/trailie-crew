@@ -154,8 +154,16 @@ export function createTrailieRuntimeRouter(
           structuredContract: true,
         };
       }
+      if (complexity === "planning_summary") {
+        return {
+          complexity,
+          route: "fast",
+          model: configuration.fast,
+          reason: "planning_summary_fast_path",
+          structuredContract: true,
+        };
+      }
       if (
-        complexity === "planning_summary" ||
         complexity === "large_revision" ||
         input.intent === "destination_comparison" ||
         input.intent === "destination_discovery" ||
@@ -164,16 +172,11 @@ export function createTrailieRuntimeRouter(
         return {
           complexity,
           route: "reasoning_planning",
-          model:
-            complexity === "planning_summary"
-              ? configuration.planning
-              : configuration.reasoning,
+          model: configuration.reasoning,
           reason:
             complexity === "large_revision"
               ? "large_revision_scope"
-              : complexity === "planning_summary"
-                ? "planning_summary_contract"
-                : "complex_recommendation",
+              : "complex_recommendation",
           structuredContract: true,
         };
       }

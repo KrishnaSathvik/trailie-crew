@@ -37,7 +37,7 @@ export async function runStructuredRuntime<T>(
     selectedModelRoute: TrailieModelRoute;
     toolClasses: TrailieToolClass[];
   },
-  operation: () => Promise<T>,
+  operation: (trace: ReturnType<typeof createRuntimeTrace>) => Promise<T>,
   recorder: RuntimeRecorder = createRuntimeTelemetryRepository(),
 ) {
   const startedAt = Date.now();
@@ -55,7 +55,7 @@ export async function runStructuredRuntime<T>(
     toolClasses: input.toolClasses,
   });
   try {
-    const result = await operation();
+    const result = await operation(trace);
     await recorder.record(trace.complete({ state: "success" })).catch(() => {});
     return result;
   } catch (error) {

@@ -22,6 +22,8 @@ import {
   reviewPlanningSummaryAction,
 } from "../actions";
 
+export const PLANNING_POLL_INTERVAL_MS = 750;
+
 function SummarySection({
   title,
   items,
@@ -94,7 +96,7 @@ export function PlanExperience({
     const timer =
       plan?.status === "published"
         ? null
-        : window.setInterval(() => void refresh(), 1500);
+        : window.setInterval(() => void refresh(), PLANNING_POLL_INTERVAL_MS);
     return () => {
       window.clearTimeout(initial);
       if (timer !== null) window.clearInterval(timer);

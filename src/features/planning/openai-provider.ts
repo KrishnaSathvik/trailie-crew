@@ -1,10 +1,10 @@
 import "server-only";
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import { planningSummarySchema } from "@trailie/schemas";
 import { createOpenAIClient } from "@/server/ai/openai-client";
 import { extractUsage } from "@/server/ai/usage";
 import { PLANNING_SUMMARY_PROMPT } from "./prompts/planning-summary";
+import { createProviderCompatibleZodTextFormat } from "@/server/ai/provider-compatible-schema";
 import {
   PlanningProviderError,
   type PlanningSummaryProvider,
@@ -19,11 +19,14 @@ export function buildPlanningSummaryRequest(input: {
     model: input.model,
     instructions: PLANNING_SUMMARY_PROMPT,
     input: input.context,
-    reasoning: { effort: "high" as const },
+    reasoning: { effort: "low" as const },
     text: {
-      format: zodTextFormat(planningSummarySchema, "trailie_planning_summary"),
+      format: createProviderCompatibleZodTextFormat(
+        planningSummarySchema,
+        "trailie_planning_summary",
+      ),
     },
-    max_output_tokens: 3000,
+    max_output_tokens: 1800,
     safety_identifier: input.safetyIdentifier,
     store: false,
   };

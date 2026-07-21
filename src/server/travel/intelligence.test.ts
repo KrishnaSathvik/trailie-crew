@@ -7,6 +7,56 @@ import {
 import { collectDestinationTravelEvidence } from "./intelligence";
 
 describe("collectDestinationTravelEvidence", () => {
+  it("runs independent destination follow-up calls concurrently", async () => {
+    const baseline = createFakeTravelProviderAdapter({
+      scenario: "baseline",
+      now: "2026-07-17T20:00:00.000Z",
+    });
+    let active = 0;
+    let maximumActive = 0;
+    const delayed = async <T>(operation: () => Promise<T>) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      try {
+        return await operation();
+      } finally {
+        active -= 1;
+      }
+    };
+    const parks = {
+      ...baseline,
+      providerId: "parks",
+      getParkAlerts: (...args: Parameters<typeof baseline.getParkAlerts>) =>
+        delayed(() => baseline.getParkAlerts(...args)),
+    };
+    const recreation = {
+      ...baseline,
+      providerId: "recreation",
+      getReservationLinks: (
+        ...args: Parameters<typeof baseline.getReservationLinks>
+      ) => delayed(() => baseline.getReservationLinks(...args)),
+    };
+    const weather = {
+      ...baseline,
+      providerId: "weather",
+      getWeather: (...args: Parameters<typeof baseline.getWeather>) =>
+        delayed(() => baseline.getWeather(...args)),
+      getDaylight: (...args: Parameters<typeof baseline.getDaylight>) =>
+        delayed(() => baseline.getDaylight(...args)),
+    };
+
+    await collectDestinationTravelEvidence({
+      destination: "Yosemite National Park",
+      dates: ["2026-07-18", "2026-07-19"],
+      locale: "en-US",
+      providers: { geocoding: baseline, weather, parks, recreation },
+      maximumCallsPerProvider: 8,
+    });
+
+    expect(maximumActive).toBeGreaterThanOrEqual(5);
+  });
+
   it("collects bounded official constraints without duplicating provider calls", async () => {
     const baseline = createFakeTravelProviderAdapter({
       scenario: "baseline",

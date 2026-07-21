@@ -34,6 +34,7 @@ export type ProviderAttemptExecutionResult<T> = {
   totalDurationMs: number;
   retryCount: number;
   repairCount: number;
+  structuralRepairCount?: number;
 };
 
 type ClaimResult = {

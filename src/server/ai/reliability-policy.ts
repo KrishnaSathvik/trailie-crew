@@ -104,6 +104,24 @@ export type WorkflowReliabilityPolicy = ReturnType<
 export type WorkflowProviderStage =
   keyof WorkflowReliabilityPolicy["timeoutsMs"];
 
+const planningPerformanceCapsMs: Partial<
+  Record<WorkflowProviderStage, number>
+> = {
+  planningProvider: 18_000,
+  itineraryGeneration: 45_000,
+  itineraryRepair: 20_000,
+};
+
+export function performanceStageTimeout(
+  stage: WorkflowProviderStage,
+  configuredTimeoutMs: number,
+) {
+  return Math.min(
+    configuredTimeoutMs,
+    planningPerformanceCapsMs[stage] ?? configuredTimeoutMs,
+  );
+}
+
 export function parseWorkflowReliabilityPolicy(source: EnvironmentSource) {
   const values = reliabilityEnvironmentSchema.parse({
     ...source,

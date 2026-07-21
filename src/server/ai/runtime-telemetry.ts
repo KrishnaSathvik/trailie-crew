@@ -168,6 +168,7 @@ export function createRuntimeTrace(input: {
   let firstModelTokenAt: number | null = null;
   let firstVisibleOutputAt: number | null = null;
   let providerCallCount = 0;
+  let modelGenerationDurationMs = 0;
   let repairCount = 0;
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
@@ -198,6 +199,10 @@ export function createRuntimeTrace(input: {
     recordDuration(stage: RuntimeStage, durationMs: number) {
       durations[durationFields[stage]] = boundedDuration(durationMs);
     },
+    addDuration(stage: RuntimeStage, durationMs: number) {
+      const field = durationFields[stage];
+      durations[field] = boundedDuration((durations[field] ?? 0) + durationMs);
+    },
     markModelRequestStarted() {
       providerCallCount += 1;
       if (modelRequestStartedAt === null) modelRequestStartedAt = now();
@@ -207,6 +212,17 @@ export function createRuntimeTrace(input: {
     },
     markFirstVisibleOutput() {
       if (firstVisibleOutputAt === null) firstVisibleOutputAt = now();
+    },
+    recordModelCall(
+      durationMs: number,
+      usage?: { inputTokens?: number | null; outputTokens?: number | null },
+    ) {
+      providerCallCount += 1;
+      modelGenerationDurationMs += boundedDuration(durationMs);
+      if (usage?.inputTokens != null)
+        inputTokens = (inputTokens ?? 0) + Math.max(usage.inputTokens, 0);
+      if (usage?.outputTokens != null)
+        outputTokens = (outputTokens ?? 0) + Math.max(usage.outputTokens, 0);
     },
     recordToolCall(
       toolClass: TrailieToolClass,
@@ -288,9 +304,11 @@ export function createRuntimeTrace(input: {
             ? null
             : boundedDuration(firstVisibleOutputAt - monotonicStartedAt),
         modelGenerationMs:
-          modelRequestStartedAt === null
-            ? null
-            : boundedDuration(completedAt - modelRequestStartedAt),
+          modelGenerationDurationMs > 0
+            ? boundedDuration(modelGenerationDurationMs)
+            : modelRequestStartedAt === null
+              ? null
+              : boundedDuration(completedAt - modelRequestStartedAt),
         toolCallMs,
         toolObservations,
         providerCallCount,
@@ -307,6 +325,8 @@ export function createRuntimeTrace(input: {
     },
   };
 }
+
+export type TrailieRuntimeTrace = ReturnType<typeof createRuntimeTrace>;
 
 function percentile(sorted: number[], percentileValue: number) {
   if (sorted.length === 0) return null;

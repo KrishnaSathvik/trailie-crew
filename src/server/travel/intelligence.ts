@@ -433,18 +433,20 @@ export async function collectDestinationTravelEvidence(input: Input) {
             entry.evidenceType === "park" && entry.sourceEntityId !== null,
         )
       : undefined;
+  const followUps: Array<Promise<TravelProviderResponse>> = [];
   if (parkRecord?.sourceEntityId) {
-    const alerts = await call(
-      input.providers.parks,
-      "park_alerts",
-      `${input.locale}:${parkRecord.sourceEntityId}`,
-      () =>
-        input.providers.parks.getParkAlerts(
-          { parkCode: parkRecord.sourceEntityId!, locale: input.locale },
-          input.signal,
-        ),
+    followUps.push(
+      call(
+        input.providers.parks,
+        "park_alerts",
+        `${input.locale}:${parkRecord.sourceEntityId}`,
+        () =>
+          input.providers.parks.getParkAlerts(
+            { parkCode: parkRecord.sourceEntityId!, locale: input.locale },
+            input.signal,
+          ),
+      ),
     );
-    evidence.push(...alerts.evidence);
   }
 
   const recreationRecord =
@@ -456,21 +458,22 @@ export async function collectDestinationTravelEvidence(input: Input) {
         )
       : undefined;
   if (recreationRecord?.sourceEntityId) {
-    const reservationLinks = await call(
-      input.providers.recreation,
-      "reservation_links",
-      `${input.locale}:${recreationRecord.sourceEntityId}`,
-      () =>
-        input.providers.recreation.getReservationLinks(
-          {
-            providerEntityId: recreationRecord.sourceEntityId!,
-            entityType: "park",
-            locale: input.locale,
-          },
-          input.signal,
-        ),
+    followUps.push(
+      call(
+        input.providers.recreation,
+        "reservation_links",
+        `${input.locale}:${recreationRecord.sourceEntityId}`,
+        () =>
+          input.providers.recreation.getReservationLinks(
+            {
+              providerEntityId: recreationRecord.sourceEntityId!,
+              entityType: "park",
+              locale: input.locale,
+            },
+            input.signal,
+          ),
+      ),
     );
-    evidence.push(...reservationLinks.evidence);
   }
 
   const geocodeRecord =
@@ -484,24 +487,25 @@ export async function collectDestinationTravelEvidence(input: Input) {
     ),
   ].slice(0, 8);
   if (coordinates && dates.length) {
-    const weather = await call(
-      input.providers.weather,
-      "weather",
-      `${coordinates.latitude}:${coordinates.longitude}:${dates[0]}:${dates.at(-1)}`,
-      () =>
-        input.providers.weather.getWeather(
-          {
-            ...coordinates,
-            startDate: dates[0],
-            endDate: dates.at(-1)!,
-            locale: input.locale,
-          },
-          input.signal,
-        ),
+    followUps.push(
+      call(
+        input.providers.weather,
+        "weather",
+        `${coordinates.latitude}:${coordinates.longitude}:${dates[0]}:${dates.at(-1)}`,
+        () =>
+          input.providers.weather.getWeather(
+            {
+              ...coordinates,
+              startDate: dates[0],
+              endDate: dates.at(-1)!,
+              locale: input.locale,
+            },
+            input.signal,
+          ),
+      ),
     );
-    evidence.push(...weather.evidence);
-    const daylight = await Promise.all(
-      dates.map((date) =>
+    followUps.push(
+      ...dates.map((date) =>
         call(
           input.providers.weather,
           "daylight",
@@ -514,8 +518,9 @@ export async function collectDestinationTravelEvidence(input: Input) {
         ),
       ),
     );
-    evidence.push(...daylight.flatMap((response) => response.evidence));
   }
+  const followUpEvidence = await Promise.all(followUps);
+  evidence.push(...followUpEvidence.flatMap((response) => response.evidence));
 
   return {
     destinationState: destinationResolution.status,

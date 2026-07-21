@@ -7,6 +7,7 @@ import { createDurableProviderAttemptController } from "@/server/ai/provider-att
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
 import { createTrailieRuntimeRouter } from "@/server/ai/model-router";
 import { runStructuredRuntime } from "@/server/ai/structured-runtime";
+import { performanceStageTimeout } from "@/server/ai/reliability-policy";
 import { createCorrelationId } from "@/server/operations/logger";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import type { PlanningSummary } from "@trailie/schemas";
@@ -48,7 +49,10 @@ export async function drainPlanningSummary(id: string) {
       ? createFakePlanningSummaryProvider()
       : createOpenAIPlanningSummaryProvider({
           apiKey: env.apiKey!,
-          timeoutMs: env.reliabilityPolicy.timeoutsMs.planningProvider,
+          timeoutMs: performanceStageTimeout(
+            "planningProvider",
+            env.reliabilityPolicy.timeoutsMs.planningProvider,
+          ),
         });
   const quotaSubject = await resolveAiQuotaSubject("planning", id);
   await runStructuredRuntime(
@@ -61,7 +65,7 @@ export async function drainPlanningSummary(id: string) {
       selectedModelRoute: route.route,
       toolClasses: ["database_read", "database_write"],
     },
-    async () => {
+    async (runtimeTrace) => {
       await processPlanningSummary(id, {
         repository: createPlanningRepository({
           model: selectedModel,
@@ -79,6 +83,7 @@ export async function drainPlanningSummary(id: string) {
         providerAttempts: createDurableProviderAttemptController(
           createProviderAttemptRepository<PlanningSummary>(),
         ),
+        runtimeTrace,
       });
       const { data } = await createAdminSupabaseClient()
         .from("planning_requests")

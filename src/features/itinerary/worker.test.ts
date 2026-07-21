@@ -249,6 +249,53 @@ describe("itinerary worker", () => {
     );
   });
 
+  it("records a validated core preview before optional enrichment completes", async () => {
+    const { repo, calls } = repository();
+    const fixtureProvider = createFakeItineraryProvider();
+    const ready = await fixtureProvider.repair({
+      operationKey: "preview-ready",
+      model: "gpt-5.6-sol",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1000),
+    });
+    const provider = {
+      generate: vi.fn().mockResolvedValue(ready),
+      repair: vi.fn(),
+    };
+    const travelProvider = createFakeTravelProvider({ scenario: "valid" });
+    const originalPlaceDetails =
+      travelProvider.placeDetails.bind(travelProvider);
+    let releaseEnrichment: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseEnrichment = resolve;
+    });
+    const placeDetails = vi
+      .spyOn(travelProvider, "placeDetails")
+      .mockImplementation(async (input) => {
+        await gate;
+        return originalPlaceDetails(input);
+      });
+
+    const processing = processItineraryGeneration("plan-preview", {
+      repository: repo,
+      provider,
+      travelProvider,
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    await vi.waitFor(() => expect(placeDetails).toHaveBeenCalled());
+
+    try {
+      expect(calls.reports).toEqual(["pass"]);
+      expect(calls.published).toBe(0);
+    } finally {
+      releaseEnrichment?.();
+      await processing;
+    }
+    expect(calls.published).toBe(1);
+  });
+
   it("blocks an unrepairable approved-boundary conflict without publishing", async () => {
     const { repo, calls } = repository();
     await processItineraryGeneration("plan-2", {
@@ -276,6 +323,27 @@ describe("itinerary worker", () => {
     });
     expect(calls.reports).toEqual(["needs_revision", "blocked"]);
     expect(calls.claims).toBe(2);
+    expect(calls.published).toBe(0);
+  });
+
+  it("does not start a semantic repair after the one structural repair budget is used", async () => {
+    const { repo, calls } = repository();
+    const provider = createFakeItineraryProvider();
+    const generate = provider.generate.bind(provider);
+    provider.generate = async (input) => ({
+      ...(await generate(input)),
+      structuralRepairCount: 1,
+    });
+    await processItineraryGeneration("plan-structural-budget", {
+      repository: repo,
+      provider,
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+
+    expect(calls.claims).toBe(1);
+    expect(calls.reports).toEqual(["needs_revision", "blocked"]);
     expect(calls.published).toBe(0);
   });
 
@@ -310,6 +378,33 @@ describe("itinerary worker", () => {
     expect(generate).toHaveBeenCalledOnce();
     expect(calls.failed).toEqual(["model_timeout"]);
     expect(calls.reports).toEqual([]);
+  });
+
+  it("maps an external cancellation to a stopped terminal state", async () => {
+    const { repo, calls } = repository();
+    const controller = new AbortController();
+    const generate = vi.fn(
+      ({ signal }: { signal: AbortSignal }) =>
+        new Promise<never>((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          });
+        }),
+    );
+    const processing = processItineraryGeneration("plan-cancel", {
+      repository: repo,
+      provider: { generate, repair: vi.fn() },
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      cancellationSignal: controller.signal,
+      now: "2026-07-13T19:00:00.000Z",
+    });
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
+    controller.abort(new DOMException("Stopped", "AbortError"));
+    await processing;
+
+    expect(calls.failed).toEqual(["workflow_cancelled"]);
+    expect(calls.published).toBe(0);
   });
 
   it("stages generation and the bounded repair through distinct durable attempts", async () => {

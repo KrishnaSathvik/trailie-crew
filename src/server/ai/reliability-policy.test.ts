@@ -8,11 +8,21 @@ import {
   normalizeProviderError,
   parseRetryAfter,
   parseWorkflowReliabilityPolicy,
+  performanceStageTimeout,
   remainingProviderTimeout,
   runProviderOperation,
 } from "./reliability-policy";
 
 describe("workflow reliability policy", () => {
+  it("caps planning critical-path stages to bounded product recovery windows", () => {
+    expect(performanceStageTimeout("planningProvider", 90_000)).toBe(18_000);
+    expect(performanceStageTimeout("itineraryGeneration", 180_000)).toBe(
+      45_000,
+    );
+    expect(performanceStageTimeout("itineraryRepair", 120_000)).toBe(20_000);
+    expect(performanceStageTimeout("focusedProvider", 30_000)).toBe(30_000);
+  });
+
   it("provides bounded workflow-specific defaults", () => {
     expect(parseWorkflowReliabilityPolicy({})).toEqual({
       timeoutsMs: {

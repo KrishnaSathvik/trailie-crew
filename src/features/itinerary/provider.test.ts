@@ -21,9 +21,15 @@ describe("itinerary provider boundary", () => {
         false,
       ).code,
     ).toBe("model_timeout");
+    expect(
+      (mapError as (error: unknown, repair: boolean) => { code: string })(
+        new (await import("openai")).default.APIUserAbortError(),
+        false,
+      ).code,
+    ).toBe("model_timeout");
   });
 
-  it("builds the locked strict Responses API request", () => {
+  it("builds a bounded low-latency strict Responses API request", () => {
     const request = buildItineraryRequest({
       model: "gpt-5.6-sol",
       safetyIdentifier: "safe-id",
@@ -31,9 +37,9 @@ describe("itinerary provider boundary", () => {
     });
     expect(request).toMatchObject({
       model: "gpt-5.6-sol",
-      reasoning: { effort: "high" },
+      reasoning: { effort: "low" },
       store: false,
-      max_output_tokens: 12_000,
+      max_output_tokens: 8_000,
       safety_identifier: "safe-id",
     });
     expect(request).not.toHaveProperty("tools");

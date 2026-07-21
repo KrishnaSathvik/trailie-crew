@@ -142,6 +142,22 @@ describe("Trailie runtime routing policy", () => {
     });
   });
 
+  it("uses the configured fast contract route for a planning summary", () => {
+    expect(
+      router.route({
+        intent: "create_itinerary",
+        request: "Prepare the trip brief",
+        complexity: "planning_summary",
+      }),
+    ).toEqual({
+      complexity: "planning_summary",
+      route: "fast",
+      model: "configured-fast",
+      reason: "planning_summary_fast_path",
+      structuredContract: true,
+    });
+  });
+
   it("uses deterministic handling for unsupported actions", () => {
     expect(
       router.route({

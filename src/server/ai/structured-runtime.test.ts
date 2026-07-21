@@ -32,6 +32,37 @@ describe("structured runtime telemetry", () => {
     );
   });
 
+  it("accepts exact stage observations from a structured worker", async () => {
+    const record = vi.fn().mockResolvedValue(undefined);
+    await runStructuredRuntime(
+      {
+        requestId: "8b000000-0000-4000-8000-000000000020",
+        roomId: "8b000000-0000-4000-8000-000000000021",
+        responseType: "planning_summary",
+        intent: "create_itinerary",
+        complexity: "planning_summary",
+        selectedModelRoute: "fast",
+        toolClasses: ["database_read", "database_write"],
+      },
+      async (trace) => {
+        trace.recordDuration("contextAssembly", 12);
+        trace.recordModelCall(80, { inputTokens: 100, outputTokens: 20 });
+        trace.recordDuration("validation", 4);
+      },
+      { record },
+    );
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contextAssemblyMs: 12,
+        modelGenerationMs: 80,
+        validationMs: 4,
+        providerCallCount: 1,
+        inputTokens: 100,
+        outputTokens: 20,
+      }),
+    );
+  });
+
   it("records cancellation distinctly and rethrows the safe failure", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
     const failure = Object.assign(new Error("workflow_cancelled"), {

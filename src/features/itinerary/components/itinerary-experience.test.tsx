@@ -15,6 +15,49 @@ vi.mock("@/features/maps/actions", () => ({
 const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 
 describe("ItineraryExperience", () => {
+  it("reveals a validated private preview while optional enrichment finishes", async () => {
+    const generated = await createFakeItineraryProvider().generate({
+      operationKey: "preview",
+      model: "gpt-5.6-sol",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1000),
+    });
+    const plan: TripPlanView = {
+      id,
+      roomId: id,
+      planningRequestId: id,
+      version: 1,
+      status: "validating",
+      validationStatus: "pass",
+      basisSummaryVersion: 1,
+      itinerary: generated.itinerary,
+      validationSummary: null,
+      progressEvents: [],
+      createdAt: "2026-07-13T18:00:00.000Z",
+      updatedAt: "2026-07-13T18:00:01.000Z",
+      publishedAt: null,
+      errorCode: null,
+      travelEvidence: [],
+    };
+
+    render(<ItineraryExperience plan={plan} />);
+
+    expect(screen.getByText(/Plan preview/)).toBeVisible();
+    expect(
+      screen.getByText(
+        "The core schedule passed its checks. Trailie is still preparing optional map and booking details.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Yosemite crew escape" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "Map" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Checked before publishing"),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows persisted semantic progress without model reasoning", () => {
     const onCancel = vi.fn();
     const plan: TripPlanView = {
