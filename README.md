@@ -1,154 +1,191 @@
 # Trailie Crew
 
-Phase 4B supports host-managed, version-pinned public links plus authenticated calendar and print/PDF exports for immutable published itineraries. See [sharing](docs/build-week/sharing.md), [exports](docs/build-week/exports.md), and [public privacy](docs/build-week/public-privacy.md).
+> **Plan trips together. Ask Trailie when you need help.**
 
-Phase 5A hosted acceptance is complete with controlled conditions. A dedicated Vercel custom Preview environment is backed by a non-production hosted Supabase project; the two-user Realtime/OpenAI/planning/itinerary/revision/share/export path passed after measured timeout, provider-unavailable, and public-redaction fixes. Vercel Authentication remains required because CAPTCHA is not configured, Mapbox evidence remains unavailable, and Production has not been deployed. This repository does not claim production readiness. See [Preview acceptance](docs/build-week/preview-acceptance.md), [deployment](docs/build-week/deployment.md), and [operations](docs/build-week/operations.md).
+Trailie Crew is a conversation-first collaborative AI trip planner built for **OpenAI Build Week 2026** in the **Apps for Your Life** category. Friends plan in one shared space, bring Trailie into the conversation only when needed, approve the plan together, and keep every published itinerary version trustworthy and shareable.
 
-> Plan trips together. Ask Trailie when you need help.
+[Marketing site](https://trailiecrew.com) · [Open the app](https://app.trailiecrew.com) · [Create a Trip](https://app.trailiecrew.com/create) · [Join a Trip](https://app.trailiecrew.com/join)
 
-Trailie Crew is a standalone collaborative AI trip-planning app being built for OpenAI Build Week 2026 in the **Apps for Your Life** category.
+## Why Trailie Crew
 
-## The problem
+Group travel planning usually gets fragmented across chats, notes, links, polls, and spreadsheets. The hardest part is not generating a list of attractions—it is maintaining shared context, understanding what the group actually agreed on, and turning that agreement into a plan without letting an assistant take over.
 
-Group trip planning is fragmented across chats, notes, links, polls, and spreadsheets. The logistics are difficult, but the harder problem is shared context: everyone needs room to contribute, the group must know what has actually been decided, and an assistant should help without taking over the conversation.
+Trailie Crew gives the group a durable shared conversation. Ordinary messages remain ordinary chat. Mention `@Trailie` anywhere in normal prose when the crew wants focused help, then explicitly move into planning only when everyone is ready.
 
-## The proposed solution
+## What it does
 
-Trailie Crew will give friends a shared Trip with a natural group conversation. The crew will be able to mention or directly invoke Trailie for focused help and explicitly request an itinerary only when the group is ready. Planned itineraries will be structured, validated, versioned, revisable, shareable, and exportable.
+- **Shared Realtime Trips** — create a private Trip, invite the crew, see presence and typing activity, reply, react, and keep a persistent conversation across devices.
+- **Trailie on demand** — `@Trailie` works at the beginning, middle, or end of ordinary prose. Deterministic application code ignores mentions inside code, quotes, email-like text, escaped text, and longer handles such as `@TrailieCrew`.
+- **Private conversation understanding** — eligible human messages can be converted into bounded private preferences, constraints, corrections, decisions, and open questions without generating extra chat messages.
+- **Crew-approved planning** — Trailie prepares a structured “Before I build the trip” summary. The application—not the model—decides readiness, staleness, and whether the required crew approvals are complete.
+- **Validated itineraries** — approved summaries can become structured itineraries with travel evidence, deterministic validation, one bounded repair, and PASS-only publication.
+- **Safe revisions and history** — requested changes are analyzed against an immutable base version, approved by the crew, scope-checked, and published as a new version without changing the old one.
+- **Maps, sharing, and exports** — explore a version-aware itinerary map, share an exact read-only version, download an RFC 5545 calendar, or use the print view to save a PDF.
+- **Evidence-aware answers** — current weather, routes, park information, hours, reservations, and alerts are treated as verified, stale, conflicting, estimated, or unavailable instead of being silently invented.
 
-Phase 2A added silence-by-default focused Trailie answers: explicit mentions, beginning-of-message direct address, and replies to persisted Trailie messages are checked by deterministic code, streamed privately to the invoking browser, validated, persisted once, and delivered to the crew through Realtime. Planning and itinerary capabilities were intentionally unavailable at that phase boundary; Phases 3A through 4B now provide approval-gated planning, validated itineraries, revisions, sharing, and exports.
+## 60-second demo
 
-## Relationship to TrailVerse
+1. Create a Trip and copy the private invitation.
+2. Join from a second browser or device and exchange ordinary Realtime messages.
+3. Type `Let’s ask @Trailie what do you think?` and watch Trailie respond in the shared conversation.
+4. Open **Plan**, build the planning summary, and approve it as a crew.
+5. Generate the itinerary; Trailie’s output must pass application-owned validation before publication.
+6. Request and approve a change to create Version 2 while Version 1 remains immutable.
+7. Share, print, or export the exact published version you selected.
 
-Trailie Crew is a separate application, repository, deployment, and database from TrailVerse. Existing TrailVerse park data or services may be consumed later only through a read-only adapter/API boundary. Trailie Crew must not write to or directly couple itself to the TrailVerse database.
+## Part of the TrailVerse ecosystem
+
+**TrailVerse** is the national-parks discovery and exploration ecosystem. **Trailie Crew** is its collaborative group-planning surface: TrailVerse helps travelers explore parks, while Trailie Crew helps a group discuss choices, reach decisions, and turn those decisions into an approved trip.
+
+[Explore TrailVerse](https://www.nationalparksexplorerusa.com)
+
+The relationship is intentionally safe and loosely coupled:
+
+- Verified official NPS evidence can deterministically unlock an allowlisted TrailVerse park guide.
+- Official provider evidence always takes precedence over curated TrailVerse mappings.
+- The model cannot invent or select a TrailVerse link; application code derives it from a verified NPS park code.
+- Trailie Crew and TrailVerse keep separate repositories, deployments, and databases.
+- Future park-knowledge access stays behind the read-only `@trailie/trailverse-adapter` contract or an equivalent stable API. Trailie Crew never writes directly to TrailVerse data.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Crew["Crew browsers"] --> App["Next.js 16 · Trailie Crew"]
+  App <--> Data["Supabase Auth · Postgres · Realtime"]
+  App --> AI["OpenAI Responses API · GPT-5.6"]
+  App --> Evidence["Mapbox · OpenWeather · NPS · RIDB"]
+  App --> TrailVerse["TrailVerse park guides · read-only"]
+```
+
+The browser receives only public configuration and authorized room data. Authentication, provider credentials, private memory, model calls, travel-provider calls, validation, and publication remain behind server or database boundaries.
+
+## Built with Codex and GPT-5.6
+
+Trailie Crew was built as a human + Codex collaboration. Human direction defined the product, experience, trust boundaries, scope, and final decisions. Codex translated those decisions into a production deployment through test-first implementation, database migrations, security reviews, failure diagnosis, browser verification, and release hardening.
+
+### How Codex was used
+
+Codex helped build and verify the complete product path:
+
+- Next.js, TypeScript, workspace, design-system, and CI foundations
+- Supabase schema, RPC, RLS, Realtime, invitation, and lifecycle boundaries
+- responsive multi-user chat, presence, mentions, replies, reactions, and optimistic reconciliation
+- focused Trailie streaming, silent memory, approval-gated planning, itinerary generation, and revisions
+- strict schemas, deterministic validators, durable provider attempts, quotas, recovery, and safe failures
+- version-pinned sharing, calendar export, print/PDF, evidence rendering, and interactive maps
+- Vitest, React Testing Library, pgTAP, Playwright, provider acceptance, and production debugging
+- Vercel domains, environment contracts, deployment verification, and runtime-log investigation
+
+The detailed human/Codex development record is in the [Codex collaboration log](docs/build-week/codex-collaboration-log.md).
+
+### How GPT-5.6 was used
+
+All model-backed paths use the OpenAI Responses API through pinned `openai@6.46.0`, strict structured outputs, `store: false`, bounded context, HMAC safety identifiers, explicit timeouts, and application-owned routing.
+
+| Role                              | Exact model                      | Responsibility                                                             |
+| --------------------------------- | -------------------------------- | -------------------------------------------------------------------------- |
+| Focused crew answers              | `gpt-5.6-terra`                  | Fast, explicit `@Trailie` questions and narrow analysis                    |
+| Silent conversation memory        | `gpt-5.6-luna`                   | High-volume private extraction that never creates chat output              |
+| Planning and itinerary generation | `gpt-5.6-sol`                    | Approval-gated summaries, multi-constraint itineraries, and bounded repair |
+| Revision analysis                 | `gpt-5.6-terra` or `gpt-5.6-sol` | Deterministic routing sends complex or high-impact changes to Sol          |
+
+GPT-5.6 does **not** decide who may access a Trip, whether a mention invokes Trailie, which tools are permitted, which model runs, whether the crew approved, whether an itinerary passed validation, or whether a plan is published. Those decisions remain in deterministic TypeScript and PostgreSQL code.
+
+See [model routing](docs/build-week/model-routing.md) and the [OpenAI integration](docs/build-week/openai-integration.md) for the exact request shapes and model boundaries.
+
+## Trust and safety by design
+
+- Anonymous Supabase identities provide real authenticated JWTs without requiring personal information for the demo flow.
+- Room membership and ownership are enforced with PostgreSQL RLS and authorization-aware RPCs.
+- Invite and share tokens are high-entropy; persisted share tokens are SHA-256 hashes rather than reusable raw secrets.
+- Trailie is silent unless deterministic invocation or an explicit application action calls it.
+- Provider keys, private memory, model context, and administrative credentials never ship to the browser.
+- AI output is parsed through strict versioned schemas before rendering or persistence.
+- Application validators—not model confidence—control itinerary publication.
+- Public plans are version-pinned, privacy-redacted, read-only, non-indexed projections that fail closed after expiration or revocation.
+- Operational logs use bounded metadata and recursive redaction rather than message bodies, prompts, tokens, or private memory.
 
 ## Technology stack
 
-- Next.js 16 App Router and React 19
-- TypeScript in strict mode
-- Tailwind CSS 4 with Geist Sans and Geist Mono
-- pnpm workspaces with typed internal `@trailie/*` packages
-- Vitest, React Testing Library, jsdom, and Playwright
-- ESLint and Prettier
-- GitHub Actions CI
-- Supabase Auth/Postgres persistence and Realtime with RPC-only writes, private room channels, RLS, and pgTAP tests
-- OpenAI Responses API through exact `openai@6.46.0`, strict structured output, GPT-5.6 Terra/Sol routing, and a deterministic fake provider for tests
+- Next.js 16 App Router, React 19, and strict TypeScript
+- Tailwind CSS 4, Geist Sans, and Geist Mono
+- pnpm workspaces with typed `@trailie/*` packages
+- Supabase Auth, PostgreSQL, Realtime, RLS, and RPC-only sensitive writes
+- OpenAI Responses API with GPT-5.6 Terra, Luna, and Sol
+- Mapbox, OpenWeather, National Park Service, and RIDB provider adapters
+- Vercel production deployment and environment management
+- Vitest, React Testing Library, jsdom, Playwright, and pgTAP
+- ESLint, Prettier, and GitHub Actions
 
-## Local setup
+## Repository map
 
-Prerequisites: Node.js 22 or newer, pnpm 10, PostgreSQL client tools (`psql` for the pagination E2E fixture), and a Docker-compatible container runtime for local Supabase.
+```text
+src/app                         Next.js routes, pages, and API boundaries
+src/features                    Chat, Trailie, planning, itinerary, revisions, maps, sharing
+src/server                      AI, Supabase, travel providers, operations, validation
+packages/schemas                Shared versioned domain contracts
+packages/travel-tools           Provider-neutral travel evidence tools
+packages/trailverse-adapter     Read-only TrailVerse knowledge boundary
+supabase/migrations             Database schema, RPC, RLS, and lifecycle migrations
+supabase/tests                  pgTAP authorization and workflow tests
+e2e                             Multi-browser Playwright acceptance scenarios
+docs/build-week                 Product decisions and implementation evidence
+docs/production                 Environment, security, provider, and operations runbooks
+```
+
+## Local development
+
+### Prerequisites
+
+- Node.js 22 or newer
+- pnpm 10
+- Docker-compatible container runtime
+- Supabase CLI and PostgreSQL client tools for database acceptance tests
+
+### Start locally
 
 ```bash
 pnpm install
 pnpm exec supabase start
-```
-
-For ordinary local product work, no environment file is required: `dev:local`, `build:local`, and Playwright map the local public/secret keys into child-process memory and select the deterministic fake AI provider. Real OpenAI requests require the server-only variables shown in `.env.example`. Never commit them or expose a secret through a `NEXT_PUBLIC_*` variable. The local config uses ports `55320`–`55329`, enables anonymous sign-ins, and starts Realtime.
-
-Set `AI_GENERATION_ENABLED=false` to stop all model-backed generation before provider construction while leaving ordinary crew chat available. The protected recovery route and every hosted variable are operational boundaries documented in [`docs/build-week/environment-variables.md`](docs/build-week/environment-variables.md); do not expose its bearer secret to a browser.
-
-Reset and test the local database, then run the app:
-
-```bash
 pnpm exec supabase db reset
-pnpm exec supabase test db
 pnpm dev:local
-pnpm test:e2e
-pnpm test:openai:smoke # skips unless OPENAI_API_KEY exists
 ```
 
-Run the quality checks with:
+The local development and browser-test paths use deterministic external-provider adapters by default. Real OpenAI or travel-provider requests require the server-only variables documented in [`.env.example`](.env.example). Never expose a secret through a `NEXT_PUBLIC_*` variable.
+
+### Quality gates
 
 ```bash
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build:local
-pnpm test:e2e
-pnpm exec supabase db reset
 pnpm exec supabase test db
+pnpm test:e2e
 ```
 
-## Current implementation status
+Additional opt-in smoke and acceptance commands are documented in `package.json` and the provider runbooks.
 
-Implemented through Phase 6B locally (hosted map acceptance is reported separately):
+## Current boundaries
 
-- production-oriented Next.js and pnpm workspace foundation
-- strict TypeScript, Tailwind design tokens, linting, formatting, tests, and CI
-- typed package boundaries for schemas, validation, travel tools, and read-only TrailVerse access
-- monochrome responsive landing shell with an accessible theme toggle
-- initial Build Week product and architecture documentation
-- real anonymous Supabase identities with browser/server/admin client boundaries
-- Trip, participant, invite, and private room-memory persistence
-- atomic `create_trip` and `join_trip` RPCs with hashed long invite tokens
-- active-membership/host RLS, field-limited room updates, and safe invite metadata
-- pgTAP workflow/permission coverage and TypeScript contract/env/mapper tests
-- functional landing links and accessible Create Trip and Join Trip forms
-- anonymous-session reuse/creation before authenticated Server Action mutations
-- typed safe application errors for validation, auth, invite, network, and response failures
-- RLS-backed Trip shell with current identity, crew membership, host invite controls, and responsive navigation
-- memory-only one-time invitation path display/copy with safe short-code fallback
-- multi-context Playwright verification for host, member, duplicate-name, and outsider workflows
-- immutable persisted user messages with safe replies and idempotent client message IDs
-- stable 30-message cursor pagination with a database cap of 50 and scroll-preserving prepend
-- one authenticated private Realtime channel per Trip with RLS-backed topic membership
-- live cross-context delivery, optimistic reconciliation, explicit failure/retry, and reconnect refresh
-- canonical accessible reactions with optimistic rollback
-- privacy-minimal presence, online crew state, and expiring typing indicators
-- desktop editorial conversation ledger and mobile People drawer with a composer above navigation
-- pgTAP, unit/component, and real multi-context browser coverage for chat collaboration
-- deterministic invocation parsing with silence for ordinary references, code, quotes, email-like text, and longer handles
-- authenticated streamed Trailie answers with private optimistic state and Realtime-persisted final messages
-- private forced-RLS invocation/run accounting, transactional idempotency, one safe retry, usage metadata, and rate controls
-- exact GPT-5.6 Terra/Sol model routing, HMAC safety identifiers, bounded untrusted context, and versioned focused prompt
-- strict safe response/stream schemas, server-only OpenAI provider, deterministic fake provider, and optional live smoke test
-- silent normalized conversation memory with stale-job recovery and no browser inspection route
-- explicit Build Our Itinerary action, immutable planning summaries, deterministic readiness, stale protection, and all-active/host-only approval
-- immutable published-plan history, approval-gated revisions, comparison, and exact historical reads
-- 256-bit opaque share tokens with SHA-256-only persistence, host-only rotation/revocation, expiration, and one active link per version
-- server-only public projection with deterministic identity, preference, operational, evidence, coordinate, and cost redaction
-- anonymous noindex/noarchive `/share/[token]` rendering that fails closed on revocation, expiration, or snapshot drift
-- exact-version RFC 5545 calendar downloads and print-optimized browser Save-as-PDF routes
-- single-use CAPTCHA-protected anonymous create/join workflows and deterministic local acceptance adapter
-- transactional AI invocation/token quotas with user, room, global, workflow, and model controls plus emergency disable
-- leased recovery and anonymous-cleanup cron routes with bounded privacy-safe summaries
-- host transfer, room deletion, account deletion preparation/session revocation, and personal-data export
-- structured redacted operational logging, draft public trust pages, lifecycle settings, and Production runbooks
+Trailie Crew helps a group research and plan; it does not book or purchase travel. Live prices, inventory, operating conditions, weather, routes, permits, and reservations can change and must remain visibly sourced or marked unavailable. Browser print provides Save as PDF; the app does not claim a separately generated server PDF artifact.
 
-Not yet implemented:
+The deployed hackathon experience is live, but that does not imply professional legal review, paid backup/PITR, guaranteed provider availability, or complete assistive-technology certification. Operational and provider limitations remain documented rather than hidden.
 
-- booking, public editing/comments, external guest collaboration, password-protected links, and public indexing
-- live hotel/flight inventory, booking, and a stable TrailVerse service integration
-- protected hosted Mapbox GL acceptance with a dedicated restricted browser token
-- paid Production backup/PITR and restore proof, provider/platform alert ownership, professional legal review, and final manual accessibility acceptance
+## Documentation
 
-Phase 5B details and the intentionally blocked Production verdict are in [`docs/build-week/phase-5b-production-hardening.md`](docs/build-week/phase-5b-production-hardening.md). Operational release documents are under [`docs/production/`](docs/production/).
+- [Architecture](docs/build-week/architecture.md)
+- [Product specification](docs/build-week/product-spec.md)
+- [Codex collaboration log](docs/build-week/codex-collaboration-log.md)
+- [GPT-5.6 model routing](docs/build-week/model-routing.md)
+- [OpenAI integration](docs/build-week/openai-integration.md)
+- [Trailie invocation contract](docs/build-week/trailie-invocation.md)
+- [Database security](docs/build-week/database-security.md)
+- [Travel provider inventory](docs/production/travel-provider-inventory.md)
+- [Production environment contract](docs/production/environment-variables.md)
+- [Operations and release runbooks](docs/production/)
 
-## Build Week timing
+## Submission
 
-Trailie Crew development began with Phase 0 on July 13, 2026. Work completed before Build Week is recorded separately in [`docs/build-week/prior-work.md`](docs/build-week/prior-work.md); subsequent implementation will be logged as it is built.
-
-## Codex collaboration
-
-Codex collaboration decisions and Build Week development checkpoints are recorded in [`docs/build-week/codex-collaboration-log.md`](docs/build-week/codex-collaboration-log.md). This section will be expanded with concrete contributions as the project develops.
-Phase 2B adds invisible, private conversation understanding. Persisted human messages return immediately; eligible messages are processed after the response into normalized private facts and a rebuildable room snapshot. Extraction never creates chat output. See [conversation memory](docs/build-week/conversation-memory.md).
-
-Memory configuration uses `OPENAI_MEMORY_MODEL=gpt-5.6-luna`, prompt `trailie-memory-v1`, schema `1`, and a 20-second timeout. Local and E2E runs use the deterministic fake provider. The opt-in live Luna smoke later passed during the credentialed Phase 4B verification recorded in the collaboration log; it was not rerun during the Phase 4C audit because no key was available.
-
-Phase 3A adds the approval-gated **Before I build the trip** workflow. Sol reconstructs a bounded review summary from private memory and recent conversation; application code owns readiness, staleness, and approval completion. `approved_for_generation` is the stopping point—no itinerary is generated. See [planning approval](docs/build-week/planning-approval.md).
-
-Phase 3B adds the explicit **Generate Itinerary** action, strict itinerary schema, source-attributed travel evidence, deterministic validation, one bounded conflict repair, immutable PASS-only publication, semantic progress, and the crew-visible Plan experience. Local/E2E work uses deterministic external-provider doubles while exercising real PostgreSQL, RLS, validation, and publication. See [itinerary generation](docs/build-week/itinerary-generation.md) and [travel tools](docs/build-week/travel-tools.md).
-
-Phase 4A adds explicit crew-approved revisions and immutable historical comparison. Phase 4B adds exact-version sharing and exports: the room may be on Version 2 while a Version 1 link, calendar, or print view remains Version 1 until its host revokes it. Raw share tokens are shown once and never stored. Public pages are strict, read-only, non-indexed projections with conservative cache headers.
-
-Phase 6A adds server-only live travel intelligence from Mapbox, OpenWeather One Call 3.0, NPS, and RIDB. Every external fact is normalized as versioned evidence with provenance, freshness, verification, confidence, bindings, and explicit unavailable/conflicting states before Sol or deterministic validation can use it. Published plan versions pin immutable privacy-safe evidence snapshots. See [Phase 6A](docs/build-week/phase-6a-live-travel-intelligence.md) and the [travel provider inventory](docs/production/travel-provider-inventory.md).
-
-Phase 6B adds a lazy, version-aware itinerary map backed by a strict server
-projection rather than raw provider data. Desktop and mobile views synchronize
-map markers with itinerary cards, render only verified route geometry, preserve
-historical evidence, and provide a privacy-redacted exact-version public map.
-Local acceptance uses a deterministic no-provider adapter; protected hosted map
-acceptance requires a separate URL-restricted public Mapbox token. See
-[Phase 6B](docs/build-week/phase-6b-interactive-map.md), [map
-architecture](docs/production/map-architecture.md), and [map
-privacy](docs/production/map-privacy-policy.md).
+Trailie Crew demonstrates a practical model for human-centered AI collaboration: the group owns the conversation and the decisions, GPT-5.6 contributes structured intelligence when asked, and deterministic application code keeps authority over data, tools, approvals, validation, and publication.
