@@ -187,6 +187,35 @@ describe("compact itinerary deterministic expansion", () => {
     expect(expanded.days[0].estimatedDailyCost.status).toBe("unknown");
   });
 
+  it("normalizes long compact rationale and warnings into full-contract short projections", () => {
+    const candidate = makeCandidate(["2026-09-12"]);
+    candidate.days[0].items[0].rationale = "r".repeat(500);
+    candidate.days[0].items[0].importantWarning = "w".repeat(500);
+    candidate.warnings = ["c".repeat(500)];
+
+    const expanded = expandCompactItineraryCandidate({
+      candidate,
+      approvedSummary: {
+        ...summary,
+        tripSnapshot: {
+          ...summary.tripSnapshot,
+          dateWindows: ["2026-09-12"],
+        },
+      },
+      travelers: [{ id: "traveler:one", displayName: "Riley", role: "host" }],
+      liveEvidence: [],
+      now: "2026-07-20T12:00:00.000Z",
+    });
+
+    expect(itinerarySchema.safeParse(expanded).success).toBe(true);
+    expect(expanded.days[0].items[0].notes[0]).toHaveLength(200);
+    expect(
+      expanded.days[0].warnings.every((value) => value.length <= 200),
+    ).toBe(true);
+    expect(expanded.days[0].items[0].description).toContain("r".repeat(300));
+    expect(expanded.days[0].items[0].reservation.details).toHaveLength(500);
+  });
+
   it("keeps private lodging details out of the published projection", () => {
     const candidate = makeCandidate();
     candidate.days[0].items[0].importantWarning =

@@ -39,6 +39,10 @@ function compactText(parts: Array<string | null | undefined>, maximum = 1_000) {
   return parts.filter(Boolean).join(" ").slice(0, maximum);
 }
 
+function shortText(value: string) {
+  return value.trim().slice(0, 200);
+}
+
 function timezoneFromEvidence(evidence: readonly TravelEvidenceV1[]) {
   for (const entry of evidence) {
     const timezone = entry.locationBinding?.timezone;
@@ -309,9 +313,9 @@ export function expandCompactItineraryCandidate(input: {
       cost: { ...unknownCost },
       evidenceRefs: [] as string[],
       notes: unique(
-        [item.rationale, item.importantWarning].filter(
-          (value): value is string => value !== null,
-        ),
+        [item.rationale, item.importantWarning]
+          .filter((value): value is string => value !== null)
+          .map(shortText),
       ),
     }));
     const travelSegments = day.travelSegments.map((segment) => {
@@ -350,7 +354,9 @@ export function expandCompactItineraryCandidate(input: {
         ...day.items.flatMap((item) =>
           item.importantWarning ? [item.importantWarning] : [],
         ),
-      ]).slice(0, 24),
+      ])
+        .map(shortText)
+        .slice(0, 24),
     };
   });
   const transfers = candidate.days.flatMap((day) =>
@@ -368,7 +374,7 @@ export function expandCompactItineraryCandidate(input: {
                 location: location(item.locationText),
                 mode: "unknown" as const,
                 reference: null,
-                notes: [item.rationale],
+                notes: [shortText(item.rationale)],
               },
             },
           ]
@@ -395,9 +401,9 @@ export function expandCompactItineraryCandidate(input: {
               cost: { ...unknownCost },
               evidenceRefs: [] as string[],
               notes: unique(
-                [item.rationale, item.importantWarning].filter(
-                  (value): value is string => value !== null,
-                ),
+                [item.rationale, item.importantWarning]
+                  .filter((value): value is string => value !== null)
+                  .map(shortText),
               ),
             },
           ]
@@ -428,7 +434,7 @@ export function expandCompactItineraryCandidate(input: {
           ),
           cost: { ...unknownCost },
           evidenceRefs: [] as string[],
-          notes: [item.rationale],
+          notes: [shortText(item.rationale)],
         },
       ];
     }),

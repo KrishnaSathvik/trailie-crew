@@ -103,23 +103,28 @@ async function createFixtureTrip(
   await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomId = new URL(page.url()).pathname.split("/").at(-1)!;
   const before = await memoryVersion(roomId);
-  await page
-    .getByLabel("Message your crew")
-    .fill(
-      `We chose Yosemite National Park for ${isoDate(0)} through ${isoDate(days - 1)}. There are two travelers. Keep a moderate budget, accessible alternatives, peanut-free meals, and one Glacier Point sunset.`,
-    );
-  await page.getByLabel("Message your crew").press("Enter");
-  const advanced = await expect
+  const input = `We chose Yosemite National Park for ${isoDate(0)} through ${isoDate(days - 1)}. There are two travelers. Keep a moderate budget, accessible alternatives, peanut-free meals, and one Glacier Point sunset.`;
+  const sendInput = async (message: string) => {
+    await page.getByLabel("Message your crew").fill(message);
+    await page.getByLabel("Message your crew").press("Enter");
+  };
+  await sendInput(input);
+  let advanced = await expect
     .poll(() => memoryVersion(roomId), { timeout: 15_000 })
     .toBeGreaterThan(before)
     .then(() => true)
     .catch(() => false);
-  if (!advanced) {
+  for (let attempt = 0; !advanced && attempt < 3; attempt += 1) {
     await recover(context);
-    await expect
-      .poll(() => memoryVersion(roomId), { timeout: 120_000 })
-      .toBeGreaterThan(before);
+    advanced = await expect
+      .poll(() => memoryVersion(roomId), { timeout: 35_000 })
+      .toBeGreaterThan(before)
+      .then(() => true)
+      .catch(() => false);
+    if (!advanced && attempt < 2)
+      await sendInput(`Confirmed for the trip brief: ${input}`);
   }
+  expect(advanced).toBe(true);
   return { page, roomId };
 }
 
@@ -211,7 +216,9 @@ test("protected Phase 8D compact itinerary benchmark", async ({ browser }) => {
     roomIds.push(roomId);
     page.on("pageerror", (error) => browserErrors.push(error.name));
     await prepareSummary(page);
-    timings.push(await createItinerary(page, roomId, days));
+    const timing = await createItinerary(page, roomId, days);
+    timings.push(timing);
+    console.log(`PHASE8D_CASE ${JSON.stringify(timing)}`);
     await context.close();
   }
 
