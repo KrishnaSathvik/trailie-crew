@@ -625,6 +625,14 @@ reject all database credentials in Preview, reject test fixtures and bypasses,
 block Production reset, and disable hosted acceptance until a separate staging
 database exists.
 
+Vercel Speed Insights and Web Analytics were enabled on the empty Production
+project during the infrastructure audit without explicit owner approval. Both
+products were disabled before any deployment or traffic. Vercel reports no
+Production-attributed observability usage, zero Speed Insights data points, and
+zero billed cost; its team-level usage view still reports a $0.32258 prorated
+Speed Insights effective cost as unattributed. Neither product may be enabled
+again without explicit approval.
+
 Before cleanup, a chmod-600 schema/data/roles snapshot and SHA-256 manifest was
 captured under ignored `.local/backups/phase9a-precleanup-20260721`. The
 repository has 36 ordered migrations, state checksum
