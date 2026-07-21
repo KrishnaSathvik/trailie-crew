@@ -14,6 +14,18 @@ import { tryDeliverOperationalAlert } from "@/server/operations/alerts";
 
 type ActionUser = { id: string; created_at?: string };
 
+function captchaEnvironment() {
+  return parseCaptchaEnv({
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+    TURNSTILE_EXPECTED_HOSTNAME: process.env.TURNSTILE_EXPECTED_HOSTNAME,
+    SUPABASE_AUTH_CAPTCHA_ENABLED: process.env.SUPABASE_AUTH_CAPTCHA_ENABLED,
+    CAPTCHA_TEST_MODE: process.env.CAPTCHA_TEST_MODE,
+    APP_ENV: process.env.APP_ENV,
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  });
+}
+
 async function recordReceipt(input: {
   userId: string;
   purpose: CaptchaPurpose;
@@ -39,13 +51,7 @@ export async function verifyCaptchaForAction(input: {
   const correlationId = createCorrelationId();
   const startedAt = Date.now();
   try {
-    const environment = parseCaptchaEnv({
-      TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
-      SUPABASE_AUTH_CAPTCHA_ENABLED: process.env.SUPABASE_AUTH_CAPTCHA_ENABLED,
-      CAPTCHA_TEST_MODE: process.env.CAPTCHA_TEST_MODE,
-      NODE_ENV: process.env.NODE_ENV,
-      VERCEL_ENV: process.env.VERCEL_ENV,
-    });
+    const environment = captchaEnvironment();
     const now = new Date();
     const createdAt = input.user.created_at
       ? new Date(input.user.created_at)
@@ -71,11 +77,12 @@ export async function verifyCaptchaForAction(input: {
       });
     }
 
-    return await createCaptchaVerifier({
+    return await createCaptchaVerifier<CaptchaPurpose>({
       now: () => now,
       fetch: globalThis.fetch,
       recordReceipt,
       secretKey: environment.secretKey,
+      expectedHostname: environment.expectedHostname,
       testMode: environment.testMode,
     })({
       token: input.token,
@@ -101,4 +108,23 @@ export async function verifyCaptchaForAction(input: {
     await tryDeliverOperationalAlert("captcha.failed", metadata);
     throw error;
   }
+}
+
+export async function verifyCaptchaForGuestInvite(input: {
+  token: string;
+  inviteFingerprint: string;
+}) {
+  const environment = captchaEnvironment();
+  await createCaptchaVerifier<"guest_invite">({
+    now: () => new Date(),
+    fetch: globalThis.fetch,
+    recordReceipt: async () => "verified",
+    secretKey: environment.secretKey,
+    expectedHostname: environment.expectedHostname,
+    testMode: environment.testMode,
+  })({
+    token: input.token,
+    purpose: "guest_invite",
+    user: { id: input.inviteFingerprint, createdAt: "" },
+  });
 }

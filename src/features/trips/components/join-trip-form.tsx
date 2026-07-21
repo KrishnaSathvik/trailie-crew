@@ -150,7 +150,7 @@ export function JoinTripForm({
         placeholder="Leo"
         error={fieldErrors.displayName}
       />
-      <CaptchaChallenge onToken={setCaptchaToken} />
+      <CaptchaChallenge action="join_trip" onToken={setCaptchaToken} />
       <button type="submit" disabled={pending} className={submitClassName}>
         {pending ? (
           <>

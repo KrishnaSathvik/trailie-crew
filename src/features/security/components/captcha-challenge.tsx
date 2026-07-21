@@ -9,6 +9,7 @@ type TurnstileOptions = {
   "expired-callback": () => void;
   theme: "auto";
   retry: "never";
+  action: "create_trip" | "join_trip" | "guest_invite";
 };
 
 type TurnstileApi = {
@@ -25,6 +26,7 @@ declare global {
 
 type CaptchaChallengeProps = {
   onToken: (token: string) => void;
+  action: "create_trip" | "join_trip" | "guest_invite";
   siteKey?: string;
   testMode?: boolean;
   scriptReady?: boolean;
@@ -34,6 +36,7 @@ const scriptId = "trailie-turnstile-script";
 
 export function CaptchaChallenge({
   onToken,
+  action,
   siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
   testMode = process.env.NEXT_PUBLIC_CAPTCHA_TEST_MODE === "true",
   scriptReady = false,
@@ -98,12 +101,13 @@ export function CaptchaChallenge({
       },
       theme: "auto",
       retry: "never",
+      action,
     });
     return () => {
       if (widgetIdRef.current) window.turnstile?.remove(widgetIdRef.current);
       widgetIdRef.current = null;
     };
-  }, [onToken, ready, siteKey]);
+  }, [action, onToken, ready, siteKey]);
 
   function retry() {
     onToken("");

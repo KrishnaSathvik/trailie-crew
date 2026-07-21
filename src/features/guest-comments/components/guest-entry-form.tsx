@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { beginGuestSessionAction } from "../actions";
+import { CaptchaChallenge } from "@/features/security/components/captcha-challenge";
 import {
   buttonClassName,
   inputClassName,
@@ -19,6 +20,7 @@ export function GuestEntryForm({
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   async function begin(event: React.FormEvent) {
@@ -28,6 +30,7 @@ export function GuestEntryForm({
     const result = await beginGuestSessionAction({
       inviteToken,
       displayName,
+      captchaToken,
     });
     if (result.ok) router.replace(result.data.redirectTo);
     else
@@ -58,9 +61,12 @@ export function GuestEntryForm({
           {message}
         </p>
       ) : null}
+      <div className="mt-4">
+        <CaptchaChallenge action="guest_invite" onToken={setCaptchaToken} />
+      </div>
       <button
         type="submit"
-        disabled={busy || !displayName.trim()}
+        disabled={busy || !displayName.trim() || !captchaToken}
         className={`${buttonClassName({ variant: "primary" })} mt-4`}
       >
         View Plan Version {planVersion}

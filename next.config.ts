@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { productionSecurityHeaders } from "./src/server/security-headers";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["127.0.0.1"],
@@ -10,6 +12,11 @@ const nextConfig: NextConfig = {
     "@trailie/trailverse-adapter",
   ],
   async headers() {
+    const hostedProductionHeaders =
+      process.env.APP_ENV === "production" &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? productionSecurityHeaders(process.env.NEXT_PUBLIC_SUPABASE_URL)
+        : [];
     const privateHeaders = [
       { key: "Cache-Control", value: "private, no-store, max-age=0" },
       { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
@@ -17,6 +24,9 @@ const nextConfig: NextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
     ];
     return [
+      ...(hostedProductionHeaders.length > 0
+        ? [{ source: "/:path*", headers: hostedProductionHeaders }]
+        : []),
       { source: "/share/:path*", headers: privateHeaders },
       {
         source: "/trips/:roomId/plans/:version/print",

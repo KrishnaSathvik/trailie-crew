@@ -27,6 +27,7 @@ import {
 } from "./repository";
 import { generateGuestToken, hashGuestToken } from "./token";
 import { schedulePlanChange } from "@/features/revisions/scheduler";
+import { verifyCaptchaForGuestInvite } from "@/features/security/captcha-server";
 
 const GUEST_SESSION_COOKIE = "trailie_guest_session";
 const timestamp = z.iso.datetime({ offset: true });
@@ -203,6 +204,7 @@ const beginSessionInputSchema = z
   .object({
     inviteToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     displayName: guestDisplayNameSchema,
+    captchaToken: z.string().trim().min(1).max(4096),
   })
   .strict();
 
@@ -211,6 +213,14 @@ export async function beginGuestSessionAction(
 ): Promise<Result<{ redirectTo: "/guest/plan" }>> {
   const parsed = beginSessionInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "guest_unavailable" };
+  try {
+    await verifyCaptchaForGuestInvite({
+      token: parsed.data.captchaToken,
+      inviteFingerprint: hashGuestToken(parsed.data.inviteToken),
+    });
+  } catch {
+    return { ok: false, error: "guest_unavailable" };
+  }
   const sessionToken = generateGuestToken();
   const session = await createScopedGuestSession({
     inviteToken: parsed.data.inviteToken,
@@ -222,7 +232,7 @@ export async function beginGuestSessionAction(
   cookieStore.set(GUEST_SESSION_COOKIE, sessionToken, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.APP_ENV === "production",
     path: "/guest",
     expires: new Date(session.expiresAt),
   });

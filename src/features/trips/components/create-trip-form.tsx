@@ -151,7 +151,7 @@ export function CreateTripForm({
         placeholder="4"
         error={fieldErrors.expectedTravelers}
       />
-      <CaptchaChallenge onToken={setCaptchaToken} />
+      <CaptchaChallenge action="create_trip" onToken={setCaptchaToken} />
       <button type="submit" disabled={pending} className={submitClassName}>
         {pending ? (
           <>
