@@ -50,4 +50,50 @@ describe("CaptchaChallenge", () => {
     );
     expect(screen.getByRole("button", { name: /retry/i })).toBeVisible();
   });
+
+  it("degrades to unavailable when the site key is rejected", async () => {
+    const onToken = vi.fn();
+    window.turnstile = {
+      render: vi.fn(() => {
+        throw new Error(
+          '[Cloudflare Turnstile] Invalid input for parameter "sitekey".',
+        );
+      }),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+    render(
+      <CaptchaChallenge
+        onToken={onToken}
+        action="create_trip"
+        siteKey="0x4AAAAAAAlivekey"
+        scriptReady
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(/unavailable/i),
+    );
+    expect(onToken).toHaveBeenLastCalledWith("");
+  });
+
+  it("treats a quoted or padded site key as unconfigured", () => {
+    const onToken = vi.fn();
+    window.turnstile = {
+      render: vi.fn(),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+    render(
+      <CaptchaChallenge
+        onToken={onToken}
+        action="create_trip"
+        siteKey={'  "0x4AAAAAAAlivekey"  '}
+        scriptReady
+      />,
+    );
+    expect(window.turnstile.render).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ sitekey: "0x4AAAAAAAlivekey" }),
+    );
+  });
 });

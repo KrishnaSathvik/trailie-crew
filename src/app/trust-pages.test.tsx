@@ -22,4 +22,24 @@ describe("public trust pages", () => {
       /preview|production|draft|professional review|github issue|room|model|provider|error code|workflow|token counts/i,
     );
   });
+
+  it.each([
+    ["Privacy notice", PrivacyPage],
+    ["Terms of use", TermsPage],
+    ["Accuracy and availability", AccuracyPage],
+  ])("points every jump-list link at a real section on %s", (_title, Page) => {
+    const { container } = render(<Page />);
+
+    const nav = container.querySelector('nav[aria-label="On this page"]');
+    expect(nav).not.toBeNull();
+
+    const links = [...nav!.querySelectorAll("a")];
+    expect(links.length).toBeGreaterThan(1);
+
+    for (const link of links) {
+      const id = link.getAttribute("href")?.slice(1) ?? "";
+      expect(id).not.toBe("");
+      expect(container.querySelector(`[id="${id}"]`)).not.toBeNull();
+    }
+  });
 });

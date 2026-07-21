@@ -31,7 +31,7 @@ export function CrewList({
             >
               <span
                 aria-hidden="true"
-                className="bg-subtle border-border flex size-9 shrink-0 items-center justify-center rounded-md border text-xs font-semibold uppercase"
+                className="bg-subtle border-border rounded-control flex size-9 shrink-0 items-center justify-center border text-xs font-semibold uppercase"
               >
                 {participant.displayName.slice(0, 2)}
               </span>

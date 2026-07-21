@@ -3,6 +3,7 @@ import type {
   TrailieResponseV1,
 } from "@trailie/schemas";
 import { SafeMarkdownView } from "./safe-markdown-view";
+import { trailverseGuideUrl } from "./trailverse-guide";
 
 function label(value: string) {
   return value.replaceAll("_", " ");
@@ -310,6 +311,23 @@ function ResponseBlock({ block }: { block: TrailieResponseBlockV1 }) {
 }
 
 export function TrailieResponse({ response }: { response: TrailieResponseV1 }) {
+  // Derived from sources Trailie already cited, never authored by the model,
+  // and deduped so two sources for one park yield one guide.
+  const trailverseGuides = [
+    ...new Map(
+      response.sources
+        .map((source) => ({
+          label: source.label,
+          url: trailverseGuideUrl(source.url),
+        }))
+        .filter(
+          (guide): guide is { label: string; url: string } =>
+            guide.url !== null,
+        )
+        .map((guide) => [guide.url, guide] as const),
+    ).values(),
+  ];
+
   const duplicatesMessage =
     response.blocks.length === 1 &&
     response.blocks[0]?.type === "markdown" &&
@@ -363,6 +381,30 @@ export function TrailieResponse({ response }: { response: TrailieResponseV1 }) {
             ),
           )}
         </ul>
+      ) : null}
+      {trailverseGuides.length > 0 ? (
+        <section aria-label="Background reading" className="text-xs">
+          <h4 className="text-muted-foreground font-semibold">
+            Background on TrailVerse
+          </h4>
+          <ul className="mt-1 space-y-1">
+            {trailverseGuides.map((guide) => (
+              <li key={guide.url}>
+                <a
+                  className="focus-visible:ring-ring underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+                  href={guide.url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {guide.label}
+                </a>
+                <span className="text-muted-foreground ml-2">
+                  Park guide · not a live source
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
       {response.assumptions.length > 0 ? (
         <ul

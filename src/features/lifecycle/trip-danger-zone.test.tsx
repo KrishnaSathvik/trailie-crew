@@ -18,7 +18,7 @@ const participants = [
 ];
 
 describe("TripDangerZone", () => {
-  it("requires the exact room name and supports cancellation", () => {
+  it("hides the confirmation until deletion is requested, then requires the exact name", () => {
     render(
       <TripDangerZone
         roomId="room"
@@ -26,16 +26,28 @@ describe("TripDangerZone", () => {
         participants={participants}
       />,
     );
-    const remove = screen.getByRole("button", {
-      name: "Delete trip permanently",
-    });
+
+    // Nothing destructive is armed on load — no field, no enabled delete.
+    expect(screen.queryByLabelText(/to confirm/i)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Delete permanently" }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete trip" }));
+
+    const remove = screen.getByRole("button", { name: "Delete permanently" });
     expect(remove).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Trip name"), {
+    fireEvent.change(screen.getByLabelText(/to confirm/i), {
       target: { value: "Boundary Waters" },
     });
     expect(remove).toBeEnabled();
+
+    // Cancelling collapses the confirmation entirely, not just the field.
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(remove).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Delete permanently" }),
+    ).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete trip" })).toBeVisible();
   });
 
   it("calls only the server lifecycle actions", async () => {

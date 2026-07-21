@@ -46,6 +46,9 @@ export function CreateTripForm({
   const [error, setError] = useState<TripErrorCode | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [captchaToken, setCaptchaToken] = useState("");
+  // Mirrors the two name fields purely to preview them. The inputs stay
+  // uncontrolled and submission still reads from FormData.
+  const [names, setNames] = useState({ tripName: "", displayName: "" });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,8 +130,14 @@ export function CreateTripForm({
         label="Trip name"
         autoComplete="off"
         maxLength={100}
-        placeholder="Boundary Waters weekend"
+        placeholder="Name this trip"
         error={fieldErrors.tripName}
+        onChange={(event) =>
+          setNames((current) => ({
+            ...current,
+            tripName: event.target.value,
+          }))
+        }
       />
       <Field
         id="displayName"
@@ -136,9 +145,28 @@ export function CreateTripForm({
         label="Your display name"
         autoComplete="nickname"
         maxLength={50}
-        placeholder="Maya"
+        placeholder="The name your crew will see"
         error={fieldErrors.displayName}
+        onChange={(event) =>
+          setNames((current) => ({
+            ...current,
+            displayName: event.target.value,
+          }))
+        }
       />
+      {names.tripName || names.displayName ? (
+        <p className="border-border text-muted-foreground border-l-2 pl-3 text-xs leading-5">
+          Trip{" "}
+          <span className="text-foreground font-semibold">
+            {names.tripName || "—"}
+          </span>
+          , and your crew sees you as{" "}
+          <span className="text-foreground font-semibold">
+            {names.displayName || "—"}
+          </span>
+          .
+        </p>
+      ) : null}
       <Field
         id="expectedTravelers"
         name="expectedTravelers"
@@ -148,7 +176,7 @@ export function CreateTripForm({
         inputMode="numeric"
         min={1}
         max={50}
-        placeholder="4"
+        placeholder="Number of travelers"
         error={fieldErrors.expectedTravelers}
       />
       <CaptchaChallenge action="create_trip" onToken={setCaptchaToken} />

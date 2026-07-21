@@ -7,6 +7,8 @@ export default function CreateTripPage() {
       eyebrow="Create a Trip"
       title="Start with a trip name."
       description="That is all you need for now. Your crew can work out destinations, dates, and priorities together."
+      footnote="Next: invite your crew and start talking it through."
+      showCreateCta={false}
     >
       <CreateTripForm />
     </TripEntryLayout>

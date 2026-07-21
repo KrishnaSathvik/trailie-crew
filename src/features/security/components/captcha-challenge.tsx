@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type TurnstileOptions = {
@@ -34,13 +35,24 @@ type CaptchaChallengeProps = {
 
 const scriptId = "trailie-turnstile-script";
 
+/**
+ * Deployment consoles frequently store a value with wrapping quotes or a
+ * trailing newline. Turnstile rejects those outright, so normalize before use
+ * and treat anything still unusable as an absent key rather than a crash.
+ */
+function normalizeSiteKey(value: string) {
+  const trimmed = value.trim().replace(/^["']|["']$/g, "");
+  return /^[A-Za-z0-9_-]{8,64}$/.test(trimmed) ? trimmed : "";
+}
+
 export function CaptchaChallenge({
   onToken,
   action,
-  siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
+  siteKey: rawSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
   testMode = process.env.NEXT_PUBLIC_CAPTCHA_TEST_MODE === "true",
   scriptReady = false,
 }: CaptchaChallengeProps) {
+  const siteKey = normalizeSiteKey(rawSiteKey);
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [ready, setReady] = useState(scriptReady);
@@ -85,24 +97,34 @@ export function CaptchaChallenge({
   useEffect(() => {
     if (!ready || !siteKey || !containerRef.current || !window.turnstile)
       return;
-    widgetIdRef.current = window.turnstile.render(containerRef.current, {
-      sitekey: siteKey,
-      callback: (token) => {
-        onToken(token);
-        setStatus("completed");
-      },
-      "error-callback": () => {
-        onToken("");
-        setStatus("unavailable");
-      },
-      "expired-callback": () => {
-        onToken("");
-        setStatus("expired");
-      },
-      theme: "auto",
-      retry: "never",
-      action,
-    });
+    // A rejected site key makes render() throw synchronously. Without this the
+    // widget never mounts, error-callback never fires, and the form stays
+    // permanently un-submittable with no explanation.
+    try {
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        callback: (token) => {
+          onToken(token);
+          setStatus("completed");
+        },
+        "error-callback": () => {
+          onToken("");
+          setStatus("unavailable");
+        },
+        "expired-callback": () => {
+          onToken("");
+          setStatus("expired");
+        },
+        theme: "auto",
+        retry: "never",
+        action,
+      });
+    } catch {
+      widgetIdRef.current = null;
+      onToken("");
+      queueMicrotask(() => setStatus("unavailable"));
+      return;
+    }
     return () => {
       if (widgetIdRef.current) window.turnstile?.remove(widgetIdRef.current);
       widgetIdRef.current = null;
@@ -139,11 +161,21 @@ export function CaptchaChallenge({
   return (
     <div className="space-y-2">
       <div ref={containerRef} role="group" aria-label="Security check" />
+      {/* Reads as a system status line rather than a stray sentence above the
+          submit button. Strings and live-region semantics are unchanged. */}
       <p
         role="status"
         aria-live="polite"
-        className="text-muted-foreground text-sm"
+        className="text-muted-foreground flex items-center gap-1.5 text-xs leading-5"
       >
+        {status === "completed" ? (
+          <Check
+            aria-hidden="true"
+            className="text-positive size-3.5 shrink-0"
+          />
+        ) : (
+          <ShieldCheck aria-hidden="true" className="size-3.5 shrink-0" />
+        )}
         {status === "completed"
           ? "Security check complete."
           : status === "expired"

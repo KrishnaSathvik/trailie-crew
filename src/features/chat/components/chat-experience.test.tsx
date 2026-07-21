@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -148,11 +148,11 @@ describe("ChatExperience", () => {
       screen.getByLabelText("Message your crew"),
       "@Trailie help{enter}",
     );
+    // The body renders across several elements now that @Trailie is chipped,
+    // so assert on the article's text rather than a single node.
     expect(
-      within(
-        await screen.findByRole("article", { name: "Message from Maya" }),
-      ).getByText("@Trailie help"),
-    ).toBeVisible();
+      await screen.findByRole("article", { name: "Message from Maya" }),
+    ).toHaveTextContent("@Trailie help");
     expect(
       screen.queryByText(/thinking|assistant response/i),
     ).not.toBeInTheDocument();
@@ -327,7 +327,13 @@ describe("ChatExperience", () => {
         onPresenceChange={vi.fn()}
       />,
     );
-    await user.click(screen.getByLabelText("Add reaction"));
+    // Reactions are reached by selecting the message; there is no hover UI.
+    await user.click(
+      screen.getByRole("article", { name: "Message from Maya" }),
+    );
+    // The click alone must not react — reacting is an explicit menu choice.
+    expect(toggleReactionAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Add reaction" }));
     await user.click(screen.getByRole("button", { name: "React with Like" }));
     await waitFor(() =>
       expect(

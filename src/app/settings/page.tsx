@@ -1,46 +1,27 @@
-import Link from "next/link";
-
-import { AccountDangerZone } from "@/features/lifecycle/account-danger-zone";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { TrustLinks } from "@/components/shared/trust-links";
+import { MarketingFooter } from "@/components/shared/marketing-footer";
+import { MarketingHeader } from "@/components/shared/marketing-header";
+import { AccountSettings } from "@/features/lifecycle/account-settings";
 
 export default function SettingsPage() {
   return (
-    <main className="bg-background text-foreground min-h-dvh">
+    <main className="bg-background text-foreground flex min-h-dvh flex-col">
       <a href="#settings-content" className="skip-link">
         Skip to settings
       </a>
-      <header className="border-border flex min-h-16 items-center justify-between border-b px-5 sm:px-8">
-        <Link href="/" className="font-semibold">
-          Trailie Crew
-        </Link>
-        <ThemeToggle />
-      </header>
+      {/* The shared shell rather than a bespoke header: the footer already
+          carries the trust nav, which is what TrustLinks was standing in for
+          here even though that component is meant for surfaces read outside
+          the app. */}
+      <MarketingHeader />
+
       <div
         id="settings-content"
-        className="mx-auto max-w-2xl px-5 py-10 sm:px-8"
+        className="mx-auto w-full max-w-2xl flex-1 px-5 py-10 sm:px-8 sm:py-14"
       >
-        <p className="eyebrow">Settings</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Your account
-        </h1>
-        <section className="border-border bg-surface-raised rounded-card mt-8 border p-5">
-          <p className="eyebrow">Data</p>
-          <h2 className="mt-2 text-lg font-semibold">Download your data</h2>
-          <p className="text-muted-foreground mt-2 text-sm leading-6">
-            Get a copy of your profile, Trip memberships, messages, and the
-            published Plans you can access.
-          </p>
-          <a
-            href="/api/account/export"
-            className="border-border mt-4 inline-flex min-h-11 items-center rounded-md border px-4 text-sm font-semibold"
-          >
-            Download my data
-          </a>
-        </section>
-        <AccountDangerZone />
-        <TrustLinks className="text-muted-foreground mt-10 flex flex-wrap gap-x-5 gap-y-3 text-sm" />
+        <AccountSettings />
       </div>
+
+      <MarketingFooter />
     </main>
   );
 }

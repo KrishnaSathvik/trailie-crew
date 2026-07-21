@@ -172,6 +172,28 @@ summary:focus-visible {
   white-space: normal;
 }
 
+/* Message actions: hidden until the message is hovered (pointer devices) or
+   tapped (touch, which sets .is-selected). Absolutely positioned, so revealing
+   them never reflows the thread. */
+.message-actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+@media (hover: hover) {
+  .message-row:hover .message-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.message-row:focus-within .message-actions,
+.message-row.is-selected .message-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .route-line {
   position: absolute;
   top: 3rem;

@@ -3,6 +3,11 @@
 import { useEffect, useState, useTransition } from "react";
 
 import {
+  buttonClassName,
+  inputClassName,
+} from "@/components/ui/product-controls";
+
+import {
   assessAccountDeletionAction,
   deleteAccountAction,
   type AccountDeletionAssessment,
@@ -49,11 +54,12 @@ export function AccountDangerZone() {
   return (
     <section
       aria-labelledby="account-deletion-heading"
-      className="border-destructive/50 mt-10 rounded-lg border p-5"
+      className="border-destructive/40 bg-surface-raised rounded-card mt-8 border p-5"
     >
+      <p className="eyebrow text-destructive">Danger zone</p>
       <h2
         id="account-deletion-heading"
-        className="text-destructive text-lg font-semibold"
+        className="text-destructive mt-2 text-lg font-semibold"
       >
         Delete account
       </h2>
@@ -62,7 +68,10 @@ export function AccountDangerZone() {
         name is removed from shared Trip history where it must be retained.
       </p>
       {assessment?.hostRooms.length ? (
-        <div role="alert" className="bg-subtle mt-4 rounded-md p-4 text-sm">
+        <div
+          role="alert"
+          className="bg-subtle rounded-control mt-4 p-4 text-sm"
+        >
           <p className="font-semibold">
             Take care of the Trips you host first:
           </p>
@@ -84,14 +93,14 @@ export function AccountDangerZone() {
         value={confirmation}
         onChange={(event) => setConfirmation(event.target.value)}
         autoComplete="off"
-        className="border-border bg-background mt-2 min-h-11 w-full rounded-md border px-3"
+        className={`${inputClassName} mt-2`}
       />
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
           disabled={pending || blocked || confirmation !== "DELETE MY ACCOUNT"}
           onClick={removeAccount}
-          className="bg-destructive text-destructive-foreground min-h-11 rounded-md px-4 text-sm font-semibold disabled:opacity-50"
+          className={buttonClassName({ variant: "destructive" })}
         >
           Delete my account
         </button>
@@ -101,7 +110,7 @@ export function AccountDangerZone() {
             setConfirmation("");
             setNotice("");
           }}
-          className="border-border min-h-11 rounded-md border px-4 text-sm"
+          className={buttonClassName({ variant: "secondary" })}
         >
           Cancel
         </button>

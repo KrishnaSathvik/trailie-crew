@@ -7,6 +7,7 @@ export default function JoinTripPage() {
       eyebrow="Join a Trip"
       title="Find your crew."
       description="Use the private invitation link or Trip code your host shared, then choose the name your crew will see."
+      footnote="Next: your crew's chat, with everything they have planned so far."
     >
       <JoinTripForm />
     </TripEntryLayout>

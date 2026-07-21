@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
+import {
+  buttonClassName,
+  inputClassName,
+} from "@/components/ui/product-controls";
 import { deleteRoomAction, transferRoomHostAction } from "./actions";
 
 type Participant = {
@@ -26,15 +30,19 @@ export function TripDangerZone({
   roomCode,
   participants,
   onOpenPlan,
+  onOpenAccount,
 }: {
   roomId: string;
   roomName: string;
   roomCode?: string;
   participants: Participant[];
   onOpenPlan?: () => void;
+  /** Opens account settings inside the dashboard rather than navigating away. */
+  onOpenAccount?: () => void;
 }) {
   const router = useRouter();
   const [confirmation, setConfirmation] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
@@ -83,11 +91,11 @@ export function TripDangerZone({
         Manage this Trip
       </h2>
       <p className="text-muted-foreground mt-3 text-sm leading-6">
-        Update access, hand over the host role, or manage your data.
+        Everything here affects only this Trip.
       </p>
 
       <div className="border-border bg-surface-raised rounded-card mt-8 border p-5">
-        <p className="eyebrow">Trip</p>
+        <p className="eyebrow">Trip details</p>
         <h3 className="mt-2 font-semibold">{roomName}</h3>
         {roomCode ? (
           <p className="text-muted-foreground mt-2 text-sm">
@@ -100,7 +108,7 @@ export function TripDangerZone({
       </div>
 
       <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
-        <p className="eyebrow">Guest access &amp; sharing</p>
+        <p className="eyebrow">Access &amp; sharing</p>
         <h3 className="mt-2 font-semibold">Share a published Plan</h3>
         <p className="text-muted-foreground mt-2 text-sm leading-6">
           Create guest links, choose permissions, and manage public sharing from
@@ -110,7 +118,10 @@ export function TripDangerZone({
           <button
             type="button"
             onClick={onOpenPlan}
-            className="border-border rounded-control mt-4 min-h-11 border px-4 text-sm font-semibold"
+            className={buttonClassName({
+              variant: "secondary",
+              className: "mt-4",
+            })}
           >
             Open Plan sharing
           </button>
@@ -119,7 +130,7 @@ export function TripDangerZone({
 
       {members.length ? (
         <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
-          <p className="eyebrow">People</p>
+          <p className="eyebrow">Crew management</p>
           <h3 className="mt-2 font-semibold">Transfer host</h3>
           <p className="text-muted-foreground mt-2 text-sm">
             The new host gains deletion and invitation controls. Your role
@@ -135,7 +146,7 @@ export function TripDangerZone({
             id="transfer-host"
             value={transferTarget}
             onChange={(event) => setTransferTarget(event.target.value)}
-            className="border-border bg-background mt-2 min-h-11 w-full rounded-md border px-3"
+            className={`${inputClassName} mt-2`}
           >
             <option value="">Choose a crew member</option>
             {members.map((participant) => (
@@ -148,14 +159,17 @@ export function TripDangerZone({
             type="button"
             disabled={pending || !transferTarget}
             onClick={transfer}
-            className="border-border mt-4 min-h-11 rounded-md border px-4 text-sm font-semibold disabled:opacity-50"
+            className={buttonClassName({
+              variant: "secondary",
+              className: "mt-4",
+            })}
           >
             Transfer host role
           </button>
         </div>
       ) : (
         <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
-          <p className="eyebrow">People</p>
+          <p className="eyebrow">Crew management</p>
           <h3 className="mt-2 font-semibold">Host role</h3>
           <p className="text-muted-foreground mt-2 text-sm">
             Invite another crew member before transferring the host role.
@@ -163,63 +177,91 @@ export function TripDangerZone({
         </div>
       )}
 
-      <div className="border-border bg-surface-raised rounded-card mt-6 border p-5">
-        <p className="eyebrow">Data</p>
-        <h3 className="mt-2 font-semibold">Account data</h3>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Download your data or manage your Trailie Crew account.
-        </p>
-        <Link
-          href="/settings"
-          className="border-border rounded-control mt-4 inline-flex min-h-11 items-center border px-4 text-sm font-semibold"
-        >
-          Open account settings
-        </Link>
-      </div>
-
       <div className="border-destructive/50 rounded-card mt-10 border p-5">
         <p className="eyebrow text-destructive">Danger zone</p>
         <h3 className="text-destructive mt-2 font-semibold">
           Delete this trip
         </h3>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Type <strong className="text-foreground">{roomName}</strong> to
-          permanently delete the Trip and everything saved in it.
+        <p className="text-muted-foreground mt-2 text-sm leading-6">
+          Permanently deletes this Trip, its conversation, itinerary, saved
+          places, and sharing links.
         </p>
-        <label
-          htmlFor="delete-room-confirmation"
-          className="mt-4 block text-sm font-medium"
-        >
-          Trip name
-        </label>
-        <input
-          id="delete-room-confirmation"
-          value={confirmation}
-          onChange={(event) => setConfirmation(event.target.value)}
-          autoComplete="off"
-          className="border-border bg-background mt-2 min-h-11 w-full rounded-md border px-3"
-        />
-        <div className="mt-4 flex flex-wrap gap-3">
+
+        {/* The confirmation only appears once deletion is requested. Leaving a
+            destructive button and a text field permanently on screen made the
+            page read as hostile. */}
+        {confirmingDelete ? (
+          <>
+            <label
+              htmlFor="delete-room-confirmation"
+              className="mt-4 block text-sm font-medium"
+            >
+              Type <strong className="text-foreground">{roomName}</strong> to
+              confirm
+            </label>
+            <input
+              id="delete-room-confirmation"
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              autoComplete="off"
+              autoFocus
+              className={`${inputClassName} mt-2`}
+            />
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={pending || confirmation !== roomName}
+                onClick={removeRoom}
+                className={buttonClassName({ variant: "destructive" })}
+              >
+                Delete permanently
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setConfirmation("");
+                  setNotice("");
+                }}
+                className={buttonClassName({ variant: "secondary" })}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
           <button
             type="button"
-            disabled={pending || confirmation !== roomName}
-            onClick={removeRoom}
-            className="bg-destructive text-destructive-foreground min-h-11 rounded-md px-4 text-sm font-semibold disabled:opacity-50"
+            onClick={() => setConfirmingDelete(true)}
+            className={buttonClassName({
+              variant: "destructive",
+              className: "mt-4",
+            })}
           >
-            Delete trip permanently
+            Delete trip
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setConfirmation("");
-              setNotice("");
-            }}
-            className="border-border min-h-11 rounded-md border px-4 text-sm"
-          >
-            Cancel
-          </button>
-        </div>
+        )}
       </div>
+
+      <p className="text-muted-foreground mt-8 text-sm">
+        Looking for profile or account data settings?{" "}
+        {onOpenAccount ? (
+          <button
+            type="button"
+            onClick={onOpenAccount}
+            className="text-foreground font-medium underline underline-offset-4"
+          >
+            Open Account Settings
+          </button>
+        ) : (
+          <Link
+            href="/settings"
+            className="text-foreground font-medium underline underline-offset-4"
+          >
+            Open Account Settings
+          </Link>
+        )}
+      </p>
       <p role="status" aria-live="polite" className="mt-4 min-h-6 text-sm">
         {notice}
       </p>

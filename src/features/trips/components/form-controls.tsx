@@ -12,12 +12,14 @@ export function Field({
   label,
   hint,
   error,
+  trailing,
   ...inputProps
 }: {
   id: string;
   label: string;
   hint?: ReactNode;
   error?: string;
+  trailing?: ReactNode;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "id">) {
   const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
     .filter(Boolean)
@@ -25,7 +27,7 @@ export function Field({
 
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="mb-2 block text-sm font-semibold">
+      <label htmlFor={id} className="block text-sm font-semibold">
         {label}
       </label>
       {hint ? (
@@ -52,6 +54,7 @@ export function Field({
           {error}
         </p>
       ) : null}
+      {trailing}
     </div>
   );
 }

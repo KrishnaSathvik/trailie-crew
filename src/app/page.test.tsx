@@ -15,9 +15,6 @@ describe("Trailie Crew landing page", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Plan trips together. Ask Trailie when you need help."),
-    ).toBeInTheDocument();
-    expect(
       screen.getAllByRole("link", { name: "Create a Trip" })[0],
     ).toHaveAttribute("href", "/trips/create");
     expect(

@@ -84,6 +84,10 @@ export function ChatExperience({
   const [typingEvents, setTypingEvents] = useState<TypingEvent[]>([]);
   const [typingClock, setTypingClock] = useState(0);
   const [replyingTo, setReplyingTo] = useState<ClientRoomMessage | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+    null,
+  );
+  const [composerFocusToken, setComposerFocusToken] = useState(0);
   const [newMessagesAvailable, setNewMessagesAvailable] = useState(false);
   const [composerKey, setComposerKey] = useState(0);
   const [trailieAnswer, setTrailieAnswer] = useState<{
@@ -256,10 +260,50 @@ export function ChatExperience({
   ]);
 
   useEffect(() => {
-    window.requestAnimationFrame(() => {
-      if (historyRef.current) scrollToBottom(historyRef.current);
+    // Two frames, not one: the first lets the bubble layout settle (font
+    // metrics, wrapping, avatars), the second scrolls against the final
+    // scrollHeight. A single frame measures a stale height and leaves the
+    // thread parked at the top.
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        if (historyRef.current) scrollToBottom(historyRef.current);
+      });
     });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      if (inner) window.cancelAnimationFrame(inner);
+    };
   }, []);
+
+  /** One click only opens the action menu — it does not react or reply. */
+  function selectMessage(message: ClientRoomMessage) {
+    setSelectedMessageId((current) =>
+      current === message.id ? null : message.id,
+    );
+  }
+
+  /** Reply is an explicit choice from that menu. */
+  function replyToMessage(message: ClientRoomMessage) {
+    setReplyingTo(message);
+    setSelectedMessageId(null);
+    setComposerFocusToken((token) => token + 1);
+  }
+
+  function clearSelection() {
+    setSelectedMessageId(null);
+    setReplyingTo(null);
+    setSelectedMessageId(null);
+  }
+
+  useEffect(() => {
+    if (!selectedMessageId) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") clearSelection();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedMessageId]);
 
   async function send(
     body: string,
@@ -660,40 +704,55 @@ export function ChatExperience({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={historyRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
         aria-label="Trip conversation"
+        onClick={(event) => {
+          if (!(event.target as HTMLElement).closest(".message-row"))
+            clearSelection();
+        }}
       >
-        {hasMore ? (
-          <div className="flex justify-center px-4 pt-4">
-            <button
-              type="button"
-              onClick={() => void loadEarlier()}
-              className="border-border hover:bg-subtle focus-visible:ring-ring rounded-full border px-4 py-2 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
-            >
-              Load earlier messages
-            </button>
-          </div>
-        ) : null}
-        <MessageList
-          messages={messages}
-          currentParticipantId={data.currentParticipant.id}
-          onRetry={(message) => void retry(message)}
-          onReaction={(message, reaction) =>
-            void toggleReaction(message, reaction)
-          }
-          onReply={setReplyingTo}
-        />
-        {trailieAnswer ? (
-          <TrailieStreamCard
-            body={trailieAnswer.body}
-            status={trailieAnswer.status}
-            stage={trailieAnswer.stage}
-            errorCode={trailieAnswer.errorCode}
-            retryable={trailieAnswer.retryable}
-            onCancel={() => trailieAbortRef.current?.abort()}
-            onRetry={() => enqueueTrailie(trailieAnswer.source)}
+        {/* `mt-auto` rather than `justify-end`: it pins a short conversation to
+            the composer the way chat is expected to behave, without the
+            overflow content becoming unreachable that `justify-end` causes.
+            An empty room keeps its centred empty state instead. */}
+        <div
+          className={messages.length === 0 ? "min-h-full" : "mt-auto w-full"}
+        >
+          {hasMore ? (
+            <div className="flex justify-center px-4 pt-4">
+              <button
+                type="button"
+                onClick={() => void loadEarlier()}
+                className="border-border hover:bg-subtle focus-visible:ring-ring rounded-full border px-4 py-2 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                Load earlier messages
+              </button>
+            </div>
+          ) : null}
+          <MessageList
+            messages={messages}
+            currentParticipantId={data.currentParticipant.id}
+            onRetry={(message) => void retry(message)}
+            onReaction={(message, reaction) =>
+              void toggleReaction(message, reaction)
+            }
+            onReply={replyToMessage}
+            onSelect={selectMessage}
+            participants={data.participants}
+            selectedMessageId={selectedMessageId}
           />
-        ) : null}
+          {trailieAnswer ? (
+            <TrailieStreamCard
+              body={trailieAnswer.body}
+              status={trailieAnswer.status}
+              stage={trailieAnswer.stage}
+              errorCode={trailieAnswer.errorCode}
+              retryable={trailieAnswer.retryable}
+              onCancel={() => trailieAbortRef.current?.abort()}
+              onRetry={() => enqueueTrailie(trailieAnswer.source)}
+            />
+          ) : null}
+        </div>
       </div>
       {newMessagesAvailable ? (
         <button
@@ -723,7 +782,7 @@ export function ChatExperience({
           <button
             type="button"
             aria-label="Cancel reply"
-            onClick={() => setReplyingTo(null)}
+            onClick={clearSelection}
             className="focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
           >
             <X aria-hidden="true" className="size-4" />
@@ -734,6 +793,8 @@ export function ChatExperience({
         key={composerKey}
         onSend={send}
         onDraftActivity={publishTyping}
+        participants={data.participants}
+        focusToken={composerFocusToken}
       />
     </div>
   );

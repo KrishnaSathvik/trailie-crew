@@ -139,6 +139,17 @@ export function JoinTripForm({
           spellCheck={false}
           placeholder="ABCD2345 or an invitation link"
           error={fieldErrors.inviteValue}
+          trailing={
+            <details className="text-muted-foreground text-xs leading-5">
+              <summary className="hover:text-foreground focus-visible:ring-ring cursor-pointer rounded-sm font-medium focus-visible:ring-2 focus-visible:outline-none">
+                Where do I find this?
+              </summary>
+              <p className="mt-2">
+                Your host sends an invitation link by message or email. A Trip
+                code is 8 characters, like ABCD2345. Either one works here.
+              </p>
+            </details>
+          }
         />
       )}
       <Field
@@ -147,7 +158,7 @@ export function JoinTripForm({
         label="Your display name"
         autoComplete="nickname"
         maxLength={50}
-        placeholder="Leo"
+        placeholder="The name your crew will see"
         error={fieldErrors.displayName}
       />
       <CaptchaChallenge action="join_trip" onToken={setCaptchaToken} />

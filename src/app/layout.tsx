@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   title: "Trailie Crew",
   description: "Plan trips together. Ask Trailie when you need help.",
+  // favicon.ico and apple-icon.png are picked up from src/app by file
+  // convention; only the manifest needs declaring.
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

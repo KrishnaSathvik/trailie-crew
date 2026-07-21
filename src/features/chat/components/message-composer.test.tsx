@@ -53,4 +53,77 @@ describe("MessageComposer", () => {
       screen.queryByText("Trailie will answer after this message is sent"),
     ).toBeNull();
   });
+
+  it("explains that a mid-message @Trailie will not ask, and can fix it", async () => {
+    const user = userEvent.setup();
+    render(<MessageComposer onSend={vi.fn()} />);
+    const input = screen.getByLabelText("Message your crew");
+    fireEvent.change(input, {
+      target: { value: "The @Trailie feature looks good" },
+    });
+
+    expect(screen.getByText(/needs to be at the start/i)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /move to start/i }));
+
+    expect(input).toHaveValue("@Trailie The feature looks good");
+    expect(
+      screen.getByText("Trailie will answer after this message is sent"),
+    ).toBeVisible();
+  });
+
+  const crew = [
+    { id: "p1", displayName: "family trip" },
+    { id: "p2", displayName: "Sam" },
+  ];
+
+  it("opens a mention picker on @ and filters as you type", async () => {
+    const user = userEvent.setup();
+    render(<MessageComposer onSend={vi.fn()} participants={crew} />);
+    const input = screen.getByLabelText("Message your crew");
+
+    await user.type(input, "hey @");
+    expect(screen.getByRole("listbox")).toBeVisible();
+    expect(screen.getByRole("option", { name: /Sam/ })).toBeVisible();
+
+    await user.type(input, "fam");
+    expect(screen.queryByRole("option", { name: /^Sam$/ })).toBeNull();
+    expect(screen.getByRole("option", { name: /family trip/ })).toBeVisible();
+  });
+
+  it("keeps the picker open across a space inside a display name", async () => {
+    const user = userEvent.setup();
+    render(<MessageComposer onSend={vi.fn()} participants={crew} />);
+    const input = screen.getByLabelText("Message your crew");
+
+    await user.type(input, "@family ");
+    expect(screen.getByRole("option", { name: /family trip/ })).toBeVisible();
+  });
+
+  it("inserts the mention on Enter instead of sending", async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(true);
+    render(<MessageComposer onSend={onSend} participants={crew} />);
+    const input = screen.getByLabelText("Message your crew");
+
+    await user.type(input, "hey @fam");
+    await user.type(input, "{enter}");
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input).toHaveValue("hey @family trip ");
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    await user.type(input, "{enter}");
+    expect(onSend).toHaveBeenCalledWith("hey @family trip");
+  });
+
+  it("closes the picker on Escape without sending", async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(true);
+    render(<MessageComposer onSend={onSend} participants={crew} />);
+    const input = screen.getByLabelText("Message your crew");
+
+    await user.type(input, "hey @fam{escape}");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(onSend).not.toHaveBeenCalled();
+  });
 });

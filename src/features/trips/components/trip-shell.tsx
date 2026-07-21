@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeft,
   CalendarRange,
   Map,
   MessageCircle,
@@ -11,22 +12,27 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { BrandMark } from "@/components/shared/brand-mark";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { buttonClassName } from "@/components/ui/product-controls";
 import { CrewList } from "@/features/crew/components/crew-list";
 import type { TripShellData } from "@/features/crew/queries/trip-crew";
 import { InvitePanel } from "@/features/trips/components/invite-panel";
 import { ChatExperience } from "@/features/chat/components/chat-experience";
 import { PlanExperience } from "@/features/planning/components/plan-experience";
+import { AccountSettings } from "@/features/lifecycle/account-settings";
 import { TripDangerZone } from "@/features/lifecycle/trip-danger-zone";
 
 const destinations = [
-  { label: "Chat", icon: MessageCircle, enabled: true },
-  { label: "Plan", icon: CalendarRange, enabled: true },
-  { label: "Map", icon: Map, enabled: true },
-  { label: "Settings", icon: Settings, enabled: true },
+  { label: "Chat", icon: MessageCircle },
+  { label: "Plan", icon: CalendarRange },
+  { label: "Map", icon: Map },
+  { label: "Settings", icon: Settings },
 ];
 
-type Area = "Chat" | "Plan" | "Map" | "Settings";
+/** "Account" is reachable from Trip settings but is not a nav destination —
+    it is account-scoped, so it does not belong beside the Trip sections. */
+type Area = "Chat" | "Plan" | "Map" | "Settings" | "Account";
 
 export function TripShell({ data }: { data: TripShellData }) {
   const isHost = data.currentParticipant.role === "host";
@@ -75,15 +81,14 @@ export function TripShell({ data }: { data: TripShellData }) {
       <a href="#trip-content" className="skip-link">
         Skip to Trip content
       </a>
-      <aside className="border-border bg-surface hidden min-h-dvh border-r px-5 py-6 lg:flex lg:flex-col">
+      {/* Sticky, self-start, fixed height: as a stretched grid item the rail
+          would scroll away with the page on tall areas like Settings. */}
+      <aside className="border-border bg-surface hidden border-r px-5 py-6 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:self-start lg:overflow-y-auto">
         <Link
           href="/"
           className="focus-visible:ring-ring flex items-center gap-3 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
         >
-          <span
-            aria-hidden="true"
-            className="bg-accent size-2.5 rounded-[2px]"
-          />
+          <BrandMark className="size-6" />
           <span className="text-sm font-semibold">Trailie Crew</span>
         </Link>
         <div className="mt-12">
@@ -98,16 +103,15 @@ export function TripShell({ data }: { data: TripShellData }) {
           </p>
         </div>
         <nav aria-label="Trip sections" className="mt-12 space-y-1">
-          {destinations.map(({ label, icon: Icon, enabled }) => {
+          {destinations.map(({ label, icon: Icon }) => {
             const active = area === label;
             return (
               <button
                 type="button"
                 key={label}
-                onClick={() => enabled && setArea(label as Area)}
-                disabled={!enabled}
+                onClick={() => setArea(label as Area)}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-control flex min-h-11 w-full items-center gap-3 px-3 text-sm ${active ? "bg-accent-soft text-accent font-semibold" : "text-muted-foreground hover:bg-subtle hover:text-foreground"}`}
+                className={`rounded-control focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 px-3 text-sm focus-visible:ring-2 focus-visible:outline-none ${active ? "bg-accent-soft text-accent font-semibold" : "text-muted-foreground hover:bg-subtle hover:text-foreground"}`}
               >
                 <Icon
                   aria-hidden="true"
@@ -115,28 +119,20 @@ export function TripShell({ data }: { data: TripShellData }) {
                   strokeWidth={1.75}
                 />
                 <span>{label}</span>
-                {!enabled ? (
-                  <span className="ml-auto font-mono text-[0.5625rem] tracking-wider uppercase">
-                    Soon
-                  </span>
-                ) : null}
               </button>
             );
           })}
         </nav>
-        <div className="border-border mt-auto border-t pt-5">
-          <p className="text-sm font-semibold">
-            {data.currentParticipant.displayName}
-          </p>
-          <p className="text-muted-foreground mt-1 text-xs capitalize">
-            {data.currentParticipant.role}
-          </p>
-        </div>
       </aside>
 
+      {/* Chat is bound to the viewport so its history scrolls inside the pane
+          and the composer stays pinned. Plan, Map, and Settings are documents,
+          so they keep their natural height and let the page scroll. */}
       <section
         id="trip-content"
-        className="flex min-h-dvh min-w-0 flex-col pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-0"
+        className={`flex min-w-0 flex-col pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-0 ${
+          area === "Chat" ? "h-dvh overflow-hidden" : "min-h-dvh"
+        }`}
       >
         <header className="border-border bg-background/95 sticky top-0 z-10 flex min-h-16 items-center justify-between border-b px-4 backdrop-blur-sm sm:px-6">
           <div className="min-w-0 lg:hidden">
@@ -182,8 +178,21 @@ export function TripShell({ data }: { data: TripShellData }) {
             preferMap={area === "Map"}
             onOpenPlan={() => setArea("Plan")}
           />
+        ) : area === "Account" ? (
+          <div className="mx-auto w-full max-w-2xl px-5 py-10 sm:px-8">
+            <button
+              type="button"
+              onClick={() => setArea("Settings")}
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-control mb-8 inline-flex items-center gap-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+              Back to Trip settings
+            </button>
+            <AccountSettings />
+          </div>
         ) : isHost ? (
           <TripDangerZone
+            onOpenAccount={() => setArea("Account")}
             roomId={data.room.id}
             roomName={data.room.name}
             roomCode={data.room.roomCode}
@@ -192,21 +201,36 @@ export function TripShell({ data }: { data: TripShellData }) {
           />
         ) : (
           <div className="mx-auto w-full max-w-2xl px-5 py-10 sm:px-8">
-            <h2 className="text-2xl font-semibold">Trip settings</h2>
-            <p className="text-muted-foreground mt-3">
-              Only the current host can transfer ownership or delete this trip.
+            <p className="eyebrow">Trip settings</p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.035em]">
+              Manage this Trip
+            </h2>
+            <p className="text-muted-foreground mt-3 text-sm leading-6">
+              Only the current host can transfer the host role or delete this
+              Trip.
             </p>
-            <Link
-              href="/settings"
-              className="focus-visible:ring-ring mt-6 inline-flex min-h-11 items-center rounded-md underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
-            >
-              Open account settings
-            </Link>
+            <section className="border-border bg-surface-raised rounded-card mt-8 border p-5">
+              <p className="eyebrow">Data</p>
+              <h3 className="mt-2 text-base font-semibold">Account data</h3>
+              <p className="text-muted-foreground mt-2 text-sm leading-6">
+                Download your data or manage your Trailie Crew account.
+              </p>
+              <button
+                type="button"
+                onClick={() => setArea("Account")}
+                className={buttonClassName({
+                  variant: "secondary",
+                  className: "mt-4",
+                })}
+              >
+                Open account settings
+              </button>
+            </section>
           </div>
         )}
       </section>
 
-      <aside className="border-border bg-surface hidden border-l px-5 py-6 lg:block lg:min-h-dvh">
+      <aside className="border-border bg-surface hidden border-l px-5 py-6 lg:sticky lg:top-0 lg:block lg:h-dvh lg:self-start lg:overflow-y-auto">
         <CrewList data={data} onlineParticipantIds={onlineParticipantIds} />
         {isHost ? (
           <div className="mt-8">
@@ -247,7 +271,7 @@ export function TripShell({ data }: { data: TripShellData }) {
                 type="button"
                 aria-label="Close crew"
                 onClick={() => setPeopleOpen(false)}
-                className="border-border focus-visible:ring-ring flex size-9 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:outline-none"
+                className="border-border focus-visible:ring-ring rounded-control flex size-9 items-center justify-center border focus-visible:ring-2 focus-visible:outline-none"
               >
                 <span aria-hidden="true">×</span>
               </button>
@@ -261,14 +285,13 @@ export function TripShell({ data }: { data: TripShellData }) {
         aria-label="Trip sections"
         className="border-border bg-background fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        {destinations.map(({ label, icon: Icon, enabled }) => {
+        {destinations.map(({ label, icon: Icon }) => {
           const active = area === label;
           return (
             <button
               type="button"
               key={label}
-              onClick={() => enabled && setArea(label as Area)}
-              disabled={!enabled}
+              onClick={() => setArea(label as Area)}
               aria-current={active ? "page" : undefined}
               className={`flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] ${active ? "text-accent font-semibold" : "text-muted-foreground"}`}
             >
