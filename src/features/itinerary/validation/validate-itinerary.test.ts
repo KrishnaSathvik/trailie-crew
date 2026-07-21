@@ -688,6 +688,18 @@ describe("deterministic itinerary validation", () => {
     );
   });
 
+  it("allows recurring meal labels without weakening activity duplicate checks", () => {
+    const plan = itinerary();
+    plan.days[0].items[0].type = "meal";
+    plan.days[0].items[0].title = "Peanut-free lunch plan";
+    plan.days[1].items[0].type = "meal";
+    plan.days[1].items[0].title = "Peanut-free lunch plan";
+
+    expect(validate(plan).issues.map((issue) => issue.code)).not.toContain(
+      "duplicate_item",
+    );
+  });
+
   it("blocks unsafe public rendering", () => {
     const plan = itinerary();
     plan.days[0].items[0].description = "<script>alert(1)</script>";

@@ -798,7 +798,7 @@ export function validateItinerary(input: Input): ValidationReport {
 
   const titles = new Map<string, string>();
   for (const item of allItems) {
-    if (item.type === "free_time") continue;
+    if (item.type !== "activity") continue;
     const key = normalized(item.title);
     const prior = titles.get(key);
     if (prior) {
