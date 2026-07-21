@@ -7,6 +7,161 @@ import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 type EnvironmentSource = Record<string, string | undefined>;
 
+export const PREVIEW_SUPABASE_PROJECT_REF = "tkccksmiuucdstvvfglp";
+export const PREVIEW_VERCEL_PROJECT_NAME = "trailie-crew-preview";
+export const PRODUCTION_VERCEL_PROJECT_NAME = "trailie-crew-production";
+export const PREVIEW_SITE_URL = "https://preview.trailiecrew.com";
+export const PRODUCTION_SITE_URL = "https://app.trailiecrew.com";
+
+const deploymentEnvironmentSchema = z.object({
+  APP_ENV: z.enum(["local", "preview", "production"]).optional(),
+  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
+  DEPLOYMENT_PROJECT_NAME: z.string().trim().min(1).optional(),
+  SUPABASE_PROJECT_REF: z
+    .string()
+    .regex(/^[a-z]{20}$/)
+    .optional(),
+  PRODUCTION_SUPABASE_PROJECT_REF: z
+    .string()
+    .regex(/^[a-z]{20}$/)
+    .optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.url().optional(),
+  NEXT_PUBLIC_SITE_URL: z.url().optional(),
+  AI_GENERATION_ENABLED: z.enum(["true", "false"]).optional(),
+  TRAVEL_PROVIDERS_ENABLED: z.enum(["true", "false"]).optional(),
+  MAPBOX_MAPS_ENABLED: z.enum(["true", "false"]).optional(),
+  MAPBOX_GEOCODING_STORAGE_MODE: z
+    .enum(["disabled", "temporary", "permanent"])
+    .optional(),
+});
+
+const productionForbiddenVariables = [
+  "CAPTCHA_TEST_MODE",
+  "NEXT_PUBLIC_CAPTCHA_TEST_MODE",
+  "TRAVEL_CACHE_BYPASS",
+  "HOSTED_ACCEPTANCE",
+  "HOSTED_ACCEPTANCE_PROVIDER_FAULT",
+  "HOSTED_ACCEPTANCE_PROVIDER_FAULT_ENABLED",
+  "TRAILIE_FAKE_ITINERARY_SCENARIO",
+  "TRAILIE_FAKE_REVISION_SCENARIO",
+  "TRAILIE_FAKE_TRAVEL_SCENARIO",
+  "VERCEL_AUTOMATION_BYPASS_SECRET",
+  "ACCEPTED_DEMO_ROOM_ID",
+  "DISPOSABLE_ROOM_ID",
+  "CRON_EVIDENCE",
+  "TURNSTILE_EVIDENCE",
+  "WAF_EVIDENCE",
+  "LOAD_DATABASE_URL",
+] as const;
+
+const productionCredentialVariables = [
+  "OPENAI_API_KEY",
+  "MAPBOX_ACCESS_TOKEN",
+  "NEXT_PUBLIC_MAPBOX_MAP_TOKEN",
+  "NPS_API_KEY",
+  "OPENWEATHER_API_KEY",
+  "RIDB_API_KEY",
+  "TURNSTILE_SECRET_KEY",
+  "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+  "EMAIL_PROVIDER_API_KEY",
+  "ANALYTICS_WRITE_KEY",
+] as const;
+
+function configured(value: string | undefined) {
+  return Boolean(value && !["0", "false"].includes(value.toLowerCase()));
+}
+
+function projectRefFromUrl(value: string) {
+  return new URL(value).hostname.split(".")[0] ?? "";
+}
+
+export function parseDeploymentEnvironment(source: EnvironmentSource) {
+  const values = deploymentEnvironmentSchema.parse(source);
+  if (values.VERCEL_ENV && !values.APP_ENV)
+    throw new Error("APP_ENV is required for every Vercel deployment.");
+
+  const appEnv = values.APP_ENV ?? "local";
+  if (appEnv === "local") {
+    if (values.VERCEL_ENV)
+      throw new Error("Local APP_ENV cannot run as a Vercel deployment.");
+    return {
+      appEnv,
+      projectName: null,
+      supabaseProjectRef: values.SUPABASE_PROJECT_REF ?? null,
+      siteUrl: values.NEXT_PUBLIC_SITE_URL ?? "http://127.0.0.1:3000",
+    } as const;
+  }
+
+  if (
+    !values.DEPLOYMENT_PROJECT_NAME ||
+    !values.SUPABASE_PROJECT_REF ||
+    !values.PRODUCTION_SUPABASE_PROJECT_REF ||
+    !values.NEXT_PUBLIC_SUPABASE_URL ||
+    !values.NEXT_PUBLIC_SITE_URL
+  )
+    throw new Error("Hosted environment identity is incomplete.");
+  if (
+    projectRefFromUrl(values.NEXT_PUBLIC_SUPABASE_URL) !==
+    values.SUPABASE_PROJECT_REF
+  )
+    throw new Error("Supabase URL and project reference do not match.");
+
+  if (appEnv === "preview") {
+    if (values.VERCEL_ENV !== "preview")
+      throw new Error("Preview APP_ENV requires VERCEL_ENV=preview.");
+    if (values.DEPLOYMENT_PROJECT_NAME !== PREVIEW_VERCEL_PROJECT_NAME)
+      throw new Error("Preview must use the Preview Vercel project.");
+    if (values.SUPABASE_PROJECT_REF !== PREVIEW_SUPABASE_PROJECT_REF)
+      throw new Error("Preview must use the Preview Supabase project.");
+    if (values.SUPABASE_PROJECT_REF === values.PRODUCTION_SUPABASE_PROJECT_REF)
+      throw new Error("Preview cannot use the Production Supabase project.");
+    if (values.NEXT_PUBLIC_SITE_URL !== PREVIEW_SITE_URL)
+      throw new Error("Preview must use the Preview hostname.");
+  } else {
+    if (values.VERCEL_ENV !== "production")
+      throw new Error("Production APP_ENV requires VERCEL_ENV=production.");
+    if (values.DEPLOYMENT_PROJECT_NAME !== PRODUCTION_VERCEL_PROJECT_NAME)
+      throw new Error("Production must use the Production Vercel project.");
+    if (values.SUPABASE_PROJECT_REF === PREVIEW_SUPABASE_PROJECT_REF)
+      throw new Error("Production cannot use the Preview Supabase project.");
+    if (values.SUPABASE_PROJECT_REF !== values.PRODUCTION_SUPABASE_PROJECT_REF)
+      throw new Error("Production must use the Production Supabase project.");
+    if (values.NEXT_PUBLIC_SITE_URL !== PRODUCTION_SITE_URL)
+      throw new Error("Production must use the Production hostname.");
+    for (const name of productionForbiddenVariables) {
+      if (configured(source[name]))
+        throw new Error(`Production-only configuration forbids ${name}.`);
+    }
+    for (const name of productionCredentialVariables) {
+      const value = source[name]?.trim();
+      if (
+        value &&
+        /(^|[-_])(dummy|example|fake|replace|test)([-_]|$)/i.test(value)
+      )
+        throw new Error(`Production credential ${name} is not real.`);
+    }
+    if (source.TRAILIE_AI_PROVIDER === "fake")
+      throw new Error("Production-only configuration forbids fake AI.");
+    if (source.MAPBOX_MAP_ADAPTER === "fake")
+      throw new Error("Production-only configuration forbids fake maps.");
+    if (values.AI_GENERATION_ENABLED !== "false")
+      throw new Error("Production must start with AI generation disabled.");
+    if (values.TRAVEL_PROVIDERS_ENABLED !== "false")
+      throw new Error("Production must start with travel providers disabled.");
+    if (values.MAPBOX_MAPS_ENABLED !== "false")
+      throw new Error("Production must start with maps disabled.");
+    if (values.MAPBOX_GEOCODING_STORAGE_MODE !== "disabled")
+      throw new Error("Production geocoding must start disabled.");
+  }
+
+  return {
+    appEnv,
+    projectName: values.DEPLOYMENT_PROJECT_NAME,
+    supabaseProjectRef: values.SUPABASE_PROJECT_REF,
+    siteUrl: values.NEXT_PUBLIC_SITE_URL,
+  } as const;
+}
+
 const serverSupabaseEnvSchema = z.object({
   SUPABASE_SECRET_KEY: z.string().min(20),
 });
@@ -110,6 +265,7 @@ const cleanupEnvSchema = z
 
 const captchaEnvSchema = z.object({
   TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  TURNSTILE_EXPECTED_HOSTNAME: z.string().trim().min(1).optional(),
   SUPABASE_AUTH_CAPTCHA_ENABLED: z
     .enum(["true", "false"])
     .default("false")
@@ -118,6 +274,7 @@ const captchaEnvSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  APP_ENV: z.enum(["local", "preview", "production"]).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
 });
@@ -234,11 +391,26 @@ export function parseCaptchaEnv(source: EnvironmentSource) {
     throw new Error("CAPTCHA test mode is disabled in production.");
   if (
     !values.CAPTCHA_TEST_MODE &&
-    (!values.TURNSTILE_SECRET_KEY || !values.SUPABASE_AUTH_CAPTCHA_ENABLED)
+    (!values.TURNSTILE_SECRET_KEY ||
+      !values.TURNSTILE_EXPECTED_HOSTNAME ||
+      !values.SUPABASE_AUTH_CAPTCHA_ENABLED)
   )
     throw new Error("CAPTCHA server configuration is incomplete.");
+  const requiredHostname =
+    values.APP_ENV === "production"
+      ? "app.trailiecrew.com"
+      : values.APP_ENV === "preview"
+        ? "preview.trailiecrew.com"
+        : null;
+  if (
+    !values.CAPTCHA_TEST_MODE &&
+    requiredHostname &&
+    values.TURNSTILE_EXPECTED_HOSTNAME !== requiredHostname
+  )
+    throw new Error("CAPTCHA hostname does not match APP_ENV.");
   return {
     secretKey: values.TURNSTILE_SECRET_KEY ?? "test-mode-secret",
+    expectedHostname: values.TURNSTILE_EXPECTED_HOSTNAME ?? "test-mode.invalid",
     authCaptchaEnabled: values.SUPABASE_AUTH_CAPTCHA_ENABLED,
     testMode: values.CAPTCHA_TEST_MODE,
   };

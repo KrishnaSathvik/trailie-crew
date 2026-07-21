@@ -32,6 +32,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Format
+        run: pnpm format:check
+
+      - name: Verify migrations
+        run: pnpm migrations:verify
+
+      - name: Scan committed content for secrets
+        run: |
+          if git grep -nE '(sk-proj-[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9_-]{20,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)' -- ':!*.test.ts' ':!*.test.tsx'; then
+            echo 'Potential committed secret detected.' >&2
+            exit 1
+          fi
+
       - name: Lint
         run: pnpm lint
 
@@ -42,4 +55,4 @@ jobs:
         run: pnpm test
 
       - name: Build
-        run: pnpm build
+        run: pnpm build:local

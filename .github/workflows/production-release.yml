@@ -1,0 +1,108 @@
+name: Production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact 40-character commit to release
+        required: true
+        type: string
+      approve_release:
+        description: Type APPROVE_PRODUCTION_RELEASE
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trailie-crew-production-release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: inputs.approve_release == 'APPROVE_PRODUCTION_RELEASE'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      APP_ENV: production
+      VERCEL_PROJECT_NAME: trailie-crew-production
+      SUPABASE_PROJECT_REF: ${{ secrets.PRODUCTION_SUPABASE_PROJECT_REF }}
+      PRODUCTION_SUPABASE_PROJECT_REF: ${{ secrets.PRODUCTION_SUPABASE_PROJECT_REF }}
+      PRODUCTION_RELEASE_APPROVED: "true"
+      PRODUCTION_RELEASE_COMMIT: ${{ inputs.commit_sha }}
+      GIT_COMMIT_SHA: ${{ inputs.commit_sha }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      NEXT_PUBLIC_SITE_URL: https://app.trailiecrew.com
+      RECOVERY_SECRET: ${{ secrets.RECOVERY_SECRET }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      TURNSTILE_EXPECTED_HOSTNAME: app.trailiecrew.com
+      SUPABASE_AUTH_CAPTCHA_ENABLED: "true"
+      OPERATIONAL_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONAL_ALERT_WEBHOOK_URL }}
+      OPERATIONAL_ALERT_WEBHOOK_SECRET: ${{ secrets.OPERATIONAL_ALERT_WEBHOOK_SECRET }}
+      OPERATIONAL_ALERT_OWNER: ${{ vars.OPERATIONAL_ALERT_OWNER }}
+      EMAIL_PROVIDER_API_KEY: ${{ secrets.EMAIL_PROVIDER_API_KEY }}
+      EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
+      SUPPORT_EMAIL: support@trailiecrew.com
+      PRIVACY_EMAIL: privacy@trailiecrew.com
+      SECURITY_EMAIL: security@trailiecrew.com
+    steps:
+      - name: Validate exact commit input
+        shell: bash
+        run: |
+          if [[ ! "$PRODUCTION_RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'An exact lowercase 40-character commit SHA is required.' >&2
+            exit 1
+          fi
+
+      - name: Check out selected commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Enforce Production target boundary
+        run: node --input-type=module -e "import('./scripts/deployment-safety.mjs').then(({assertProductionReleaseTarget,assertProductionLaunchConfiguration}) => { assertProductionReleaseTarget(process.env); assertProductionLaunchConfiguration(process.env); })"
+
+      - name: Verify migration ordering, checksums, and destructive SQL review
+        run: pnpm migrations:verify
+
+      - name: Verify release commit
+        run: test "$(git rev-parse HEAD)" = "$PRODUCTION_RELEASE_COMMIT"
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Deterministic tests
+        run: pnpm test
+
+      - name: Production build preflight
+        run: pnpm build:local
+
+      # Production migration and deploy steps remain intentionally disabled in
+      # Phase 9A. Enable them only after the final launch gate approves database
+      # credentials, protected smoke access, rollback ownership, and public DNS.

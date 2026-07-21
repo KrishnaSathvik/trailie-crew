@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { selectGeneratedAutomationBypass } from "./hosted-acceptance-bypass.mjs";
+import { assertHostedAcceptanceTarget } from "./deployment-safety.mjs";
 
 const [command, ...args] = process.argv.slice(2);
 if (!command) throw new Error("A child command is required.");
@@ -20,6 +21,12 @@ function run(commandName, commandArgs, options = {}) {
 
 const supabaseProjectRef =
   process.env.SUPABASE_PROJECT_REF ?? "tkccksmiuucdstvvfglp";
+assertHostedAcceptanceTarget({
+  APP_ENV: process.env.APP_ENV,
+  VERCEL_PROJECT_NAME: process.env.VERCEL_PROJECT_NAME,
+  SUPABASE_PROJECT_REF: supabaseProjectRef,
+  PRODUCTION_SUPABASE_PROJECT_REF: process.env.PRODUCTION_SUPABASE_PROJECT_REF,
+});
 const supabaseKeys = JSON.parse(
   run("pnpm", [
     "exec",

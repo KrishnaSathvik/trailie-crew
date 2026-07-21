@@ -34,6 +34,7 @@ if (!localEnvironment.API_URL || !localEnvironment.PUBLISHABLE_KEY) {
 const child = spawnSync(command, args, {
   env: {
     ...process.env,
+    APP_ENV: "local",
     NEXT_PUBLIC_SUPABASE_URL: localEnvironment.API_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: localEnvironment.PUBLISHABLE_KEY,
     SUPABASE_SECRET_KEY:

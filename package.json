@@ -17,6 +17,8 @@
     "build": "next build",
     "build:local": "node scripts/with-local-supabase.mjs next build",
     "start": "next start",
+    "db:reset:local": "node scripts/reset-local-database.mjs",
+    "migrations:verify": "node scripts/verify-migrations.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
