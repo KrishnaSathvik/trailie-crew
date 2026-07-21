@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
     "@trailie/travel-tools",
     "@trailie/trailverse-adapter",
   ],
+  async rewrites() {
+    return [{ source: "/create", destination: "/trips/create" }];
+  },
   async headers() {
     const hostedProductionHeaders =
       process.env.APP_ENV === "production" &&

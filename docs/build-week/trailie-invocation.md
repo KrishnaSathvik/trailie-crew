@@ -12,7 +12,7 @@ Canonical invocation types are `explicit_mention`, `direct_address`, `reply_to_t
 
 The parser masks fenced code, inline code, and Markdown quote lines before checking text. It recognizes case-insensitive `@Trailie` and beginning-of-message forms such as `Trailie:`, `Trailie,`, and `Hey Trailie,`. Mention boundaries reject emails and longer handles such as `@TrailieCrew`. Multiple valid mentions create one decision and are removed only from the normalized request; the persisted crew body is never changed.
 
-To avoid surprise responses, a mid-sentence product reference is silent. `We can ask @Trailie later` and `The @Trailie feature looks good` therefore remain ordinary chat. An explicit mention invokes only when it begins the actionable, unmasked message. Empty direct invocation is normalized to the clarifying request `Ask what help the crew needs.` Replies invoke only when the persisted reply target is a visible same-room Trailie message.
+An explicit `@Trailie` mention invokes from any position in ordinary prose, including the middle or end of a message. Unprefixed product references such as `Should we ask Trailie later?` remain ordinary chat. Empty direct invocation is normalized to the clarifying request `Ask what help the crew needs.` Replies invoke only when the persisted reply target is a visible same-room Trailie message.
 
 Both the composer and server run the parser, but only the server decision has authority. The server also proves the authenticated user owns the active participant and source user message in the same room.
 

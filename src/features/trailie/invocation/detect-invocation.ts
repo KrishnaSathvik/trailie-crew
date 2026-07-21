@@ -66,8 +66,6 @@ export function detectTrailieInvocation(
 
   const mention = prose.match(/(^|\s)@trailie(?=$|[\s.,!?;:])/i);
   if (!mention || mention.index === undefined) return { invoked: false };
-  if (mention.index > 0 && prose.slice(0, mention.index).trim().length > 0)
-    return { invoked: false };
 
   return {
     invoked: true,

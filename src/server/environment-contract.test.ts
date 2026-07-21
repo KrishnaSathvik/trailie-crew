@@ -37,6 +37,16 @@ describe("environment variable contract", () => {
     }
   });
 
+  it("documents the browser-visible application origin", () => {
+    expect(environmentVariableContract).toContainEqual(
+      expect.objectContaining({
+        name: "NEXT_PUBLIC_APP_URL",
+        exposure: "public",
+        safeDefault: "https://app.trailiecrew.com",
+      }),
+    );
+  });
+
   it("makes every Production requirement an explicit launch blocker", () => {
     for (const item of environmentVariableContract) {
       if (item.required.production)

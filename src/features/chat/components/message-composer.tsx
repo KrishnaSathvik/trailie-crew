@@ -5,13 +5,9 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   buildMentionCandidates,
-  TRAILIE_MENTION_NAME,
   type MentionParticipant,
 } from "@/features/chat/lib/mentions";
 import { detectTrailieInvocation } from "@/features/trailie/invocation/detect-invocation";
-
-/** Mirrors the mention branch of detect-invocation, for the inactive hint. */
-const trailieMentionPattern = /(^|\s)@trailie(?=$|[\s.,!?;:])/i;
 
 /**
  * Finds the mention being typed at the caret, or null.
@@ -58,7 +54,6 @@ export function MessageComposer({
 
   const remaining = 4000 - draft.length;
   const invokesTrailie = detectTrailieInvocation({ body: draft }).invoked;
-  const trailieInactive = !invokesTrailie && trailieMentionPattern.test(draft);
 
   const candidates = buildMentionCandidates(participants);
   const maxNameLength = candidates.reduce(
@@ -112,14 +107,6 @@ export function MessageComposer({
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(caret, caret);
     });
-  }
-
-  function moveTrailieToStart() {
-    const without = draft
-      .replace(trailieMentionPattern, "$1")
-      .replace(/\s+/g, " ")
-      .trim();
-    updateDraft(`@${TRAILIE_MENTION_NAME} ${without}`);
   }
 
   return (
@@ -268,17 +255,6 @@ export function MessageComposer({
             <p className="text-accent inline-flex items-center gap-1.5 font-semibold">
               <Route aria-hidden="true" className="size-3.5" />
               Trailie will answer after this message is sent
-            </p>
-          ) : trailieInactive ? (
-            <p className="text-muted-foreground inline-flex flex-wrap items-center gap-2">
-              <span>@Trailie needs to be at the start to ask.</span>
-              <button
-                type="button"
-                onClick={moveTrailieToStart}
-                className="text-foreground focus-visible:ring-ring rounded-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                Move to start
-              </button>
             </p>
           ) : (
             <p className="text-muted-foreground">

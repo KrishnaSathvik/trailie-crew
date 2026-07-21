@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { refreshSupabaseSession } from "@/lib/supabase/proxy";
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 vi.mock("@/lib/supabase/proxy", () => ({
   refreshSupabaseSession: vi.fn(),
@@ -30,5 +30,9 @@ describe("security response proxy", () => {
       expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     }
     expect(refreshSupabaseSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes sessions for the public create-trip alias", () => {
+    expect(config.matcher).toContain("/create");
   });
 });

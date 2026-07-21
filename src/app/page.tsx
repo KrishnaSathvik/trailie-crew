@@ -15,6 +15,7 @@ import { MarketingFooter } from "@/components/shared/marketing-footer";
 import { MarketingHeader } from "@/components/shared/marketing-header";
 import { TrailIllustration } from "@/components/shared/trail-illustration";
 import { buttonClassName } from "@/components/ui/product-controls";
+import { applicationBaseUrl } from "@/server/site-configuration";
 
 const steps = [
   {
@@ -90,7 +91,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/trips/create"
+                href={`${applicationBaseUrl}/create`}
                 className={buttonClassName({
                   variant: "primary",
                   className: "min-h-12 px-5",
@@ -100,7 +101,7 @@ export default function Home() {
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
               <Link
-                href="/join"
+                href={`${applicationBaseUrl}/join`}
                 className={buttonClassName({
                   variant: "secondary",
                   className: "min-h-12 px-5",
@@ -195,7 +196,7 @@ export default function Home() {
               </h2>
             </div>
             <Link
-              href="/trips/create"
+              href={`${applicationBaseUrl}/create`}
               className={buttonClassName({
                 variant: "primary",
                 className: "min-h-12 px-5",

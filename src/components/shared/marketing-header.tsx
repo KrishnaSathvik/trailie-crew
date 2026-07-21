@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
 import { buttonClassName } from "@/components/ui/product-controls";
 import { BrandMark } from "./brand-mark";
-import { legalPaths } from "@/server/site-configuration";
+import { applicationBaseUrl, legalPaths } from "@/server/site-configuration";
 
 const navigation = [
   { label: "How it works", href: "/#how-it-works" },
@@ -59,7 +59,7 @@ export function MarketingHeader({
 
         <div className="ml-auto flex items-center gap-2">
           <Link
-            href="/join"
+            href={`${applicationBaseUrl}/join`}
             className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-control hidden min-h-10 items-center px-3 text-sm font-semibold transition-colors focus-visible:ring-2 sm:inline-flex"
           >
             Join a Trip
@@ -69,7 +69,7 @@ export function MarketingHeader({
           {showCreateCta ? (
             <span className="hidden sm:contents">
               <Link
-                href="/trips/create"
+                href={`${applicationBaseUrl}/create`}
                 className={buttonClassName({
                   variant: "primary",
                   compact: true,
@@ -101,13 +101,13 @@ export function MarketingHeader({
                 </Link>
               ))}
               <Link
-                href="/join"
+                href={`${applicationBaseUrl}/join`}
                 className="hover:bg-subtle rounded-control border-border mt-1 flex min-h-11 items-center border-t px-3 text-sm font-semibold"
               >
                 Join a Trip
               </Link>
               <Link
-                href="/trips/create"
+                href={`${applicationBaseUrl}/create`}
                 className={buttonClassName({
                   variant: "primary",
                   className: "mt-1 w-full",

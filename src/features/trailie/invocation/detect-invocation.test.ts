@@ -11,6 +11,14 @@ describe("deterministic Trailie invocation", () => {
     ["Hey Trailie, compare driving and flying.", "compare driving and flying."],
     ["trailie: can you explain that?", "can you explain that?"],
     ["TRAILIE, help us pick.", "help us pick."],
+    [
+      "lets ask @Trailie what do you think?",
+      "lets ask what do you think?",
+    ],
+    [
+      "can you tell me if visiting yellowstone is best in september @Trailie",
+      "can you tell me if visiting yellowstone is best in september",
+    ],
   ])("invokes for directed requests: %s", (body, normalizedRequest) => {
     expect(detectTrailieInvocation({ body })).toMatchObject({
       invoked: true,
@@ -22,8 +30,6 @@ describe("deterministic Trailie invocation", () => {
     "I like the Trailie design",
     "Trailie Crew is working",
     "Should we ask Trailie later?",
-    "We can ask @Trailie later",
-    "The @Trailie feature looks good",
     "`@Trailie do something`",
     "> @Trailie suggested this yesterday",
     "hello@trailie.com",

@@ -20,8 +20,8 @@ The local demo uses real Auth, PostgreSQL, RLS, token hashing, server verificati
 
 1. Open two isolated browser contexts as Maya and Leo in the same Trip. Show the shared persisted chat, online crew state, and restrained monochrome UI.
 2. Have Maya and Leo exchange ordinary planning messages. Point out that Trailie remains silent and no AI request occurs.
-3. Type `We can ask @Trailie later`, an inline-code mention, or a fenced-code mention. Show that each persists as ordinary crew chat without invocation.
-4. Type `@Trailie help us compare driving and flying`. Before sending, show the concise composer helper. Send once.
+3. Type an inline-code mention and a fenced-code mention. Show that each persists as ordinary crew chat without invocation.
+4. Type `Let's ask @Trailie to compare driving and flying`. Before sending, show the concise composer helper and that a mention works mid-message. Send once.
 5. In Maya's window, show the private “Trailie is answering…” streamed state. Explain that it is not a fake Realtime presence identity and Leo does not see another user's partial stream.
 6. Show the one final Trailie message appear in both windows through the existing Supabase Realtime reconciliation. Its reply preview links it to Maya's source message.
 7. Refresh both windows and show exactly one persisted Trailie response. Replay/duplicate submission does not create another answer.

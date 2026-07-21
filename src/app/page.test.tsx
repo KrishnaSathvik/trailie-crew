@@ -16,10 +16,10 @@ describe("Trailie Crew landing page", () => {
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("link", { name: "Create a Trip" })[0],
-    ).toHaveAttribute("href", "/trips/create");
+    ).toHaveAttribute("href", "https://app.trailiecrew.com/create");
     expect(
       screen.getAllByRole("link", { name: "Join a Trip" })[0],
-    ).toHaveAttribute("href", "/join");
+    ).toHaveAttribute("href", "https://app.trailiecrew.com/join");
     expect(
       screen.getByRole("heading", { name: "How your crew gets there" }),
     ).toBeInTheDocument();

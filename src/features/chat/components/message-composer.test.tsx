@@ -36,7 +36,7 @@ describe("MessageComposer", () => {
     expect(input).toHaveValue("x".repeat(4000));
   });
 
-  it("recognizes a verified invocation but stays quiet for product discussion", () => {
+  it("recognizes @Trailie anywhere in a prose message", () => {
     const { rerender } = render(<MessageComposer onSend={vi.fn()} />);
     const input = screen.getByLabelText("Message your crew");
     fireEvent.change(input, {
@@ -47,25 +47,8 @@ describe("MessageComposer", () => {
     ).toBeVisible();
     rerender(<MessageComposer onSend={vi.fn()} />);
     fireEvent.change(input, {
-      target: { value: "The @Trailie feature looks good" },
+      target: { value: "lets ask @Trailie what do you think?" },
     });
-    expect(
-      screen.queryByText("Trailie will answer after this message is sent"),
-    ).toBeNull();
-  });
-
-  it("explains that a mid-message @Trailie will not ask, and can fix it", async () => {
-    const user = userEvent.setup();
-    render(<MessageComposer onSend={vi.fn()} />);
-    const input = screen.getByLabelText("Message your crew");
-    fireEvent.change(input, {
-      target: { value: "The @Trailie feature looks good" },
-    });
-
-    expect(screen.getByText(/needs to be at the start/i)).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /move to start/i }));
-
-    expect(input).toHaveValue("@Trailie The feature looks good");
     expect(
       screen.getByText("Trailie will answer after this message is sent"),
     ).toBeVisible();

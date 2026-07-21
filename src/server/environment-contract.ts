@@ -121,6 +121,10 @@ export const environmentVariableContract = [
     validationRule: "exact canonical origin for APP_ENV",
     safeDefault: "http://127.0.0.1:3000 (local only)",
   }),
+  publicVariable("NEXT_PUBLIC_APP_URL", "PUBLIC", {
+    validationRule: "HTTPS origin for trip entry links",
+    safeDefault: "https://app.trailiecrew.com",
+  }),
   variable("SUPABASE_SECRET_KEY", "DATABASE", {
     required: production,
     rotationOwner: "Database owner",
