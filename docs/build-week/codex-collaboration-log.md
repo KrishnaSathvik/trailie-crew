@@ -662,3 +662,96 @@ Turnstile, provider/budget, email-provider, and external-alert credentials,
 GitHub Production approval, and the controlled protected smoke/rollback gate.
 Production exposure status: **no Production deployment and no invited
 traffic**.
+
+## 2026-07-21 — Phase 9B Production launch-gate audit
+
+Phase 9A commits were pushed and remote `main` was independently verified at
+`8275c288d447fb102e4468585ba7fb4f26372e80`. The local tracking display remains
+stale because this managed workspace cannot update `.git/FETCH_HEAD`; it is not
+evidence of an unpushed remote. Production still has zero deployments, empty
+targets, Vercel Authentication on all Production/Preview deployment URLs, zero
+bypasses, no Git integration, and disabled Web Analytics and Speed Insights.
+
+The 29 Vercel Production variables contain 16 launch-critical baseline values,
+five explicit fail-closed controls, and eight dormant provider/model settings;
+none is invalid. AI, travel, maps, geocoding, and Supabase Auth CAPTCHA remain
+disabled. Real Turnstile keys, alert destination/secret/owner, outbound email
+provider/from-address, and all enabled-provider credentials are missing.
+Values were neither printed nor copied into the repository. Production launch
+validation correctly rejects that incomplete combination.
+
+Supabase Dashboard/PAT access was unavailable, so the exact Site URL/redirect
+allowlist, anonymous Auth CAPTCHA, current empty-state row counts, billing plan,
+physical backups, database-password/API-key rotation, and removal of any former
+hosted-test credential could not be reconfigured or freshly verified. The app
+supports anonymous sessions and logout only; signup, password reset, email
+confirmation, and OAuth callbacks are not implemented and were not enabled.
+The existing pre-cleanup logical dump remains chmod 600 and checksum-valid, but
+it contains historical acceptance data, is local rather than encrypted
+off-site storage, and is not a current Production backup. An isolated local
+application/Auth restore completed in 2 seconds and verified 55 application
+tables, 17 public RLS tables, 38 forced-RLS private tables, zero unsafe
+`SECURITY DEFINER` functions, and the expected historical aggregate counts.
+The temporary restore database was deleted. This partial drill does not provide
+a measured hosted RPO/RTO; the provisional daily-backup RPO target remains up
+to 24 hours, and a fresh off-site backup plus hosted restore drill are blockers.
+PITR was not enabled.
+
+Turnstile code validates server-side success, exact hostname/action, five-minute
+provider age, future skew, single-use provider behavior, and one-time database
+receipts for create/join. It now rejects payloads over Cloudflare's 2,048-byte
+limit before provider traffic. A real Production widget restricted only to
+`app.trailiecrew.com` and a synthetic pass remain blocked on Cloudflare owner
+access. External alert payloads are allowlisted and now require/include only the
+canonical Production app URL, but no alert destination is configured and no
+delivery was claimed. Inbound role-address and Supabase transactional email
+tests were skipped at owner direction; outbound domain sending remains
+unconfigured and unclaimed.
+
+Application/database controls provide explicit AI and travel emergency stops,
+per-user/per-room/global daily AI invocation and token ceilings, per-model
+controls, provider room/global counters, bounded retries, chat and Trailie rate
+limits, CAPTCHA, payload schemas, and method/secret checks for internal routes.
+AI is disabled at the environment boundary. External provider account spend
+limits, soft/monthly alerts, Production credentials, and a tested Vercel WAF
+rule set are absent; no WAF rules were enabled without a protected Production
+deployment on which to test Supabase, streaming, and SSE behavior safely.
+
+The manual GitHub Production workflow now rejects dispatch from a non-main ref,
+requires an exact lowercase commit reachable from `origin/main`, verifies the
+checkout, runs all preflight gates, and rejects tracked workspace changes.
+Repository-environment reviewers, self-review prevention, main-only deployment
+branch policy, and encrypted Production secrets still require repository owner
+access. With zero prior Production deployments, application rollback duration
+and prior-deployment restoration cannot yet be exercised; migrations retain a
+forward-fix-only policy and deployment steps remain disabled.
+
+Cloudflare remains authoritative (`elmo.ns.cloudflare.com` and
+`marge.ns.cloudflare.com`); Cloudflare Email Routing MX and SPF TXT records were
+preserved. Root and `www` are attached to the empty Vercel Production project,
+and Vercel has a permanent 308 `www` to apex redirect configured. The exact
+required A record is `76.76.21.21` for apex, `www`, and `app`, but none currently
+resolves publicly, so Cloudflare DNS, HTTPS, and redirect verification remain
+owner actions. The domain must not be moved to Vercel nameservers.
+
+Mapbox remains disabled. Browser/server token separation, temporary-result
+write barriers, attribution behavior, and disabled/permanent storage modes are
+covered by contract tests, but no Production tokens exist and the “in
+conjunction with a Mapbox map” terms question still requires written Mapbox or
+qualified legal resolution. Automated accessibility passed with no serious or
+critical axe findings across landing, create/join, legal/settings, authenticated
+chat, dialog focus restoration, reduced motion, mobile, 200% zoom, and 400%
+equivalent reflow. A human keyboard/screen-reader/touch/map-alternative review
+of every launch route remains outstanding.
+
+Fresh verification passed format, lint, typecheck, migration checksum review,
+the optimized Next.js build, 848 Vitest tests, 24 pgTAP files with 775
+assertions, 50 focused environment/Turnstile/provider/quota/alert/release tests,
+the accessibility Playwright check, dependency audit, client-bundle/server-key
+scan, tracked secret scan, and `git diff --check`. Phase 9B verdict:
+**not accepted**. Owner credentials/approvals, Auth configuration, live
+Turnstile, email delivery, fresh off-site backup and hosted restore, external
+budgets/alerts, WAF validation, GitHub review settings, Cloudflare A records,
+Mapbox release decision, manual accessibility, and protected rollback exercise
+remain launch blockers. Production exposure status remains **zero deployments,
+zero bypasses, Vercel Authentication enabled, and no invited traffic**.
