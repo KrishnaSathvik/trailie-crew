@@ -8,6 +8,8 @@ describe("itinerary prompts", () => {
       expect(prompt).toMatch(/at least one meaningful/i);
       expect(prompt).toMatch(/free.time/i);
       expect(prompt).toMatch(/unknown/i);
+      expect(prompt).toMatch(/compact/i);
+      expect(prompt).not.toMatch(/full strict itinerary schema/i);
     },
   );
 });

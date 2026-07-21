@@ -40,6 +40,7 @@ type RuntimeStage =
   | "intentClassification"
   | "contextAssembly"
   | "conversationSummary"
+  | "expansion"
   | "validation"
   | "repair"
   | "evidenceBinding"
@@ -76,6 +77,7 @@ export type TrailieRuntimeRecord = {
   toolCallMs: Partial<Record<TrailieToolClass, number>>;
   toolObservations: Partial<Record<TrailieToolClass, ToolObservation>>;
   providerCallCount: number;
+  expansionMs: number | null;
   validationMs: number | null;
   repairMs: number | null;
   repairCount: number;
@@ -103,6 +105,7 @@ const durationFields: Record<
     | "intentClassificationMs"
     | "contextAssemblyMs"
     | "conversationSummaryMs"
+    | "expansionMs"
     | "validationMs"
     | "repairMs"
     | "evidenceBindingMs"
@@ -117,6 +120,7 @@ const durationFields: Record<
   intentClassification: "intentClassificationMs",
   contextAssembly: "contextAssemblyMs",
   conversationSummary: "conversationSummaryMs",
+  expansion: "expansionMs",
   validation: "validationMs",
   repair: "repairMs",
   evidenceBinding: "evidenceBindingMs",
@@ -216,8 +220,9 @@ export function createRuntimeTrace(input: {
     recordModelCall(
       durationMs: number,
       usage?: { inputTokens?: number | null; outputTokens?: number | null },
+      callCount = 1,
     ) {
-      providerCallCount += 1;
+      providerCallCount += Math.max(Math.min(Math.round(callCount), 100), 1);
       modelGenerationDurationMs += boundedDuration(durationMs);
       if (usage?.inputTokens != null)
         inputTokens = (inputTokens ?? 0) + Math.max(usage.inputTokens, 0);
@@ -251,6 +256,9 @@ export function createRuntimeTrace(input: {
       durations.repairMs = boundedDuration(
         (durations.repairMs ?? 0) + durationMs,
       );
+    },
+    recordRepairAttempt(count = 1) {
+      repairCount += Math.max(Math.min(Math.round(count), 1), 0);
     },
     setUsage(value: {
       inputTokens: number | null;

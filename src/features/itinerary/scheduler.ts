@@ -14,11 +14,14 @@ import { createSafetyIdentifier } from "@/server/ai/safety-identifier";
 import { resolveAiQuotaSubject } from "@/server/ai/quota";
 import { createDurableProviderAttemptController } from "@/server/ai/provider-attempts";
 import { createProviderAttemptRepository } from "@/server/ai/provider-attempt-repository";
-import { createTrailieRuntimeRouter } from "@/server/ai/model-router";
+import {
+  assertStructuredItineraryRoute,
+  createTrailieRuntimeRouter,
+} from "@/server/ai/model-router";
 import { runStructuredRuntime } from "@/server/ai/structured-runtime";
 import { createCorrelationId } from "@/server/operations/logger";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
-import type { Itinerary } from "@trailie/schemas";
+import type { CompactItineraryCandidateV1 } from "@trailie/schemas";
 import { createOpenAIItineraryProvider } from "./openai-provider";
 import { createFakeItineraryProvider } from "./provider";
 import { createItineraryRepository } from "./repository";
@@ -50,16 +53,18 @@ async function withSlot(task: () => Promise<void>) {
 
 export async function drainItineraryGeneration(id: string) {
   const env = requireAiGeneration(parseOpenAIEnv(process.env));
-  const route = createTrailieRuntimeRouter({
-    fast: env.conversationModel,
-    reasoning: env.flagshipModel,
-    planning: env.planningModel,
-    itinerary: env.itineraryModel,
-  }).route({
-    intent: "create_itinerary",
-    request: "full itinerary",
-    complexity: "full_itinerary",
-  });
+  const route = assertStructuredItineraryRoute(
+    createTrailieRuntimeRouter({
+      fast: env.conversationModel,
+      reasoning: env.flagshipModel,
+      planning: env.planningModel,
+      itinerary: env.itineraryModel,
+    }).route({
+      intent: "create_itinerary",
+      request: "compact itinerary",
+      complexity: "full_itinerary",
+    }),
+  );
   const selectedModel = route.model;
   if (!selectedModel) throw new Error("itinerary_model_route_unavailable");
   const travelEnvironment = parseTravelProviderEnv(process.env);
@@ -184,7 +189,7 @@ export async function drainItineraryGeneration(id: string) {
             quotaSubject,
             reliabilityPolicy: env.reliabilityPolicy,
             providerAttempts: createDurableProviderAttemptController(
-              createProviderAttemptRepository<Itinerary>(),
+              createProviderAttemptRepository<CompactItineraryCandidateV1>(),
             ),
             cancellationSignal,
             runtimeTrace,

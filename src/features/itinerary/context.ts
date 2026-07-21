@@ -1,6 +1,6 @@
 import type {
-  Itinerary,
   CanonicalDestinationResolutionV1,
+  CompactItineraryCandidateV1,
   PlanningSummary,
   TravelEvidenceV1,
   ValidationReport,
@@ -10,6 +10,95 @@ import type { NormalizedToolEvidence } from "./validation/validate-itinerary";
 function bounded(value: unknown, max: number) {
   const text = JSON.stringify(value);
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+}
+
+function planningInput(summary: PlanningSummary) {
+  const decisions = (items: PlanningSummary["confirmedDecisions"]) =>
+    items.map(({ label, detail }) => ({ label, detail }));
+  return {
+    destination: summary.tripSnapshot.destinations,
+    dates: summary.tripSnapshot.dateWindows,
+    party: {
+      count: summary.tripSnapshot.travelerCount,
+      origins: summary.tripSnapshot.origins,
+      budget: summary.tripSnapshot.budget,
+    },
+    confirmed: decisions(summary.confirmedDecisions),
+    preferences: decisions(summary.travelerPreferences),
+    constraints: decisions(summary.constraints),
+    rejected: decisions(summary.rejectedOptions),
+    openQuestions: decisions(summary.openQuestions),
+    nonAssumptions: decisions(summary.nonAssumptions),
+  };
+}
+
+const materialFactKeys = new Set([
+  "active",
+  "affectedArea",
+  "availabilityStatus",
+  "condition",
+  "date",
+  "hours",
+  "officialName",
+  "parkCode",
+  "requirement",
+  "reservationType",
+  "severeWeather",
+  "severity",
+  "sunrise",
+  "sunset",
+  "title",
+]);
+
+function projectedFacts(value: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, fact]) =>
+        materialFactKeys.has(key) &&
+        (typeof fact === "string" ||
+          typeof fact === "number" ||
+          typeof fact === "boolean" ||
+          fact === null),
+    ),
+  );
+}
+
+function officialEvidence(evidence: TravelEvidenceV1[]) {
+  return evidence.slice(0, 60).map((entry) => ({
+    id: entry.evidenceId,
+    type: entry.evidenceType,
+    provider: entry.provider,
+    freshness: entry.freshnessState,
+    verification: entry.verificationState,
+    confidence: entry.confidence,
+    availability: entry.availabilityState,
+    sourceEntityId: entry.sourceEntityId,
+    entity: entry.entityBinding
+      ? {
+          id: entry.entityBinding.canonicalId,
+          name: entry.entityBinding.name,
+          type: entry.entityBinding.entityType,
+        }
+      : null,
+    facts: projectedFacts(entry.normalizedValue?.data ?? {}),
+  }));
+}
+
+function destinationInput(
+  value:
+    | { resolutionId: string; resolution: CanonicalDestinationResolutionV1 }
+    | undefined,
+) {
+  if (!value) return null;
+  return {
+    resolutionId: value.resolutionId,
+    status: value.resolution.status,
+    canonicalName: value.resolution.canonicalName,
+    canonicalPlaceId: value.resolution.canonicalPlaceId,
+    npsParkCode: value.resolution.npsParkCode,
+    region: value.resolution.region,
+    country: value.resolution.country,
+  };
 }
 
 export function buildItineraryContext(input: {
@@ -41,26 +130,32 @@ export function buildItineraryContext(input: {
       officialName: entry.entityBinding!.name,
       category: entry.entityBinding!.entityType,
       provider: entry.provider,
-      coordinatesAvailable: true,
     }));
   return [
-    `<APPROVED_SUMMARY>${bounded(input.approvedSummary, 12_000)}</APPROVED_SUMMARY>`,
-    `<ACTIVE_TRAVELERS>${bounded(input.travelers.slice(0, 50), 4_000)}</ACTIVE_TRAVELERS>`,
-    `<VERIFIED_EVIDENCE>${bounded(input.evidence.slice(0, 100), 10_000)}</VERIFIED_EVIDENCE>`,
-    `<LIVE_TRAVEL_EVIDENCE>${bounded((input.liveEvidence ?? []).slice(0, 200), 20_000)}</LIVE_TRAVEL_EVIDENCE>`,
-    `<CANONICAL_DESTINATION>${bounded(input.destinationResolution ?? null, 4_000)}</CANONICAL_DESTINATION>`,
-    `<ALLOWED_OFFICIAL_PLACES>${bounded(allowedPlaces, 8_000)}</ALLOWED_OFFICIAL_PLACES>`,
-    "<DESTINATION_IDENTITY_POLICY>The application-owned canonical destination is authoritative. Preserve its resolution ID, canonical identity, NPS park code, and semantic hash. A display label may vary only if it still identifies the same entity.</DESTINATION_IDENTITY_POLICY>",
-    "<LIVE_EVIDENCE_POLICY>Distinguish verified, stale, missing, unavailable, inferred, and conflicting evidence. Official closures take precedence. Never claim live availability or booking completion without verified official evidence. Surface conflicts and required user confirmation.</LIVE_EVIDENCE_POLICY>",
-    "<OFFICIAL_PLACE_POLICY>Use allowed official places when naming supported park features. Preserve officialId in sourceEntityId. Never invent or guess an official ID; leave unsupported or vague items unresolved.</OFFICIAL_PLACE_POLICY>",
+    `<PLANNING_INPUT>${bounded(planningInput(input.approvedSummary), 5_000)}</PLANNING_INPUT>`,
+    `<PARTY>${bounded({ count: input.travelers.length, roles: input.travelers.map((traveler) => traveler.role) }, 500)}</PARTY>`,
+    `<PRIOR_VERIFIED_FACTS>${bounded(
+      input.evidence.slice(0, 40).map((entry) => ({
+        id: entry.id,
+        provider: entry.provider,
+        tool: entry.toolName,
+        status: entry.status,
+        source: entry.sourceReference?.label ?? null,
+      })),
+      2_000,
+    )}</PRIOR_VERIFIED_FACTS>`,
+    `<OFFICIAL_EVIDENCE>${bounded(officialEvidence(input.liveEvidence ?? []), 5_000)}</OFFICIAL_EVIDENCE>`,
+    `<DESTINATION>${bounded(destinationInput(input.destinationResolution), 1_000)}</DESTINATION>`,
+    `<OFFICIAL_PLACES>${bounded(allowedPlaces, 2_000)}</OFFICIAL_PLACES>`,
+    "<OUTPUT_RULES>Use only the requested dates. Official closures and permits override suggestions. sourceEntityHint may use an OFFICIAL_PLACES id only; otherwise use null. Preserve missing and conflicting evidence, require user confirmation, and keep unknown availability and booking unknown.</OUTPUT_RULES>",
   ]
     .join("\n")
-    .slice(0, 28_000);
+    .slice(0, 14_000);
 }
 
 export function buildItineraryRepairContext(input: {
   approvedSummary: PlanningSummary;
-  draft: Itinerary;
+  draft: CompactItineraryCandidateV1;
   validation: ValidationReport;
   evidence: NormalizedToolEvidence[];
   liveEvidence?: TravelEvidenceV1[];
@@ -70,15 +165,22 @@ export function buildItineraryRepairContext(input: {
   };
 }) {
   return [
-    `<APPROVED_SUMMARY>${bounded(input.approvedSummary, 12_000)}</APPROVED_SUMMARY>`,
-    `<DRAFT>${bounded(input.draft, 24_000)}</DRAFT>`,
-    `<VALIDATION_ISSUES>${bounded(input.validation.issues, 8_000)}</VALIDATION_ISSUES>`,
-    `<VERIFIED_EVIDENCE>${bounded(input.evidence.slice(0, 100), 10_000)}</VERIFIED_EVIDENCE>`,
-    `<LIVE_TRAVEL_EVIDENCE>${bounded((input.liveEvidence ?? []).slice(0, 200), 20_000)}</LIVE_TRAVEL_EVIDENCE>`,
-    `<CANONICAL_DESTINATION>${bounded(input.destinationResolution ?? null, 4_000)}</CANONICAL_DESTINATION>`,
-    "<DESTINATION_IDENTITY_POLICY>Repair content only. Preserve the application-owned canonical destination resolution ID, identity, NPS park code, coordinates binding, and semantic hash.</DESTINATION_IDENTITY_POLICY>",
-    "<LIVE_EVIDENCE_POLICY>Official closures take precedence. Preserve unavailable, stale, inferred, and conflicting states. Never invent availability, confirmation, or booking.</LIVE_EVIDENCE_POLICY>",
+    `<PLANNING_INPUT>${bounded(planningInput(input.approvedSummary), 5_000)}</PLANNING_INPUT>`,
+    `<COMPACT_DRAFT>${bounded(input.draft, 10_000)}</COMPACT_DRAFT>`,
+    `<VALIDATION_ISSUES>${bounded(input.validation.issues, 4_000)}</VALIDATION_ISSUES>`,
+    `<PRIOR_VERIFIED_FACTS>${bounded(
+      input.evidence.slice(0, 40).map((entry) => ({
+        id: entry.id,
+        provider: entry.provider,
+        tool: entry.toolName,
+        status: entry.status,
+      })),
+      1_500,
+    )}</PRIOR_VERIFIED_FACTS>`,
+    `<OFFICIAL_EVIDENCE>${bounded(officialEvidence(input.liveEvidence ?? []), 5_000)}</OFFICIAL_EVIDENCE>`,
+    `<DESTINATION>${bounded(destinationInput(input.destinationResolution), 1_000)}</DESTINATION>`,
+    "<REPAIR_RULES>Repair only listed issues. Preserve unchanged clientKey values, unknown evidence states, warnings, and booking requirements. Do not invent availability or confirmation.</REPAIR_RULES>",
   ]
     .join("\n")
-    .slice(0, 44_000);
+    .slice(0, 24_000);
 }

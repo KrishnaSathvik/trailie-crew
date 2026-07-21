@@ -1,6 +1,9 @@
 import "server-only";
 import OpenAI from "openai";
-import { itinerarySchema } from "@trailie/schemas";
+import {
+  compactItineraryCandidateV1Schema,
+  type CompactItineraryCandidateV1,
+} from "@trailie/schemas";
 import { createOpenAIClient } from "@/server/ai/openai-client";
 import { extractUsage } from "@/server/ai/usage";
 import { ITINERARY_PROMPT, ITINERARY_REPAIR_PROMPT } from "./prompts/itinerary";
@@ -10,11 +13,13 @@ import {
   type ItineraryProvider,
   type ItineraryProviderInput,
 } from "./provider";
+import { compactItineraryOutputTokenLimit } from "./compact-candidate";
 
 export function buildItineraryRequest(input: {
   model: string;
   safetyIdentifier: string;
   context: string;
+  dayCount?: number;
   repair?: boolean;
   structuralRepair?: boolean;
 }) {
@@ -29,14 +34,29 @@ export function buildItineraryRequest(input: {
     reasoning: { effort: "low" as const },
     text: {
       format: createProviderCompatibleZodTextFormat(
-        itinerarySchema,
-        "trailie_itinerary",
+        compactItineraryCandidateV1Schema,
+        "trailie_compact_itinerary_v1",
       ),
     },
-    max_output_tokens: 8_000,
+    max_output_tokens: compactItineraryOutputTokenLimit({
+      dayCount: input.dayCount ?? 4,
+    }),
     safety_identifier: input.safetyIdentifier,
     store: false,
   };
+}
+
+export function parseCompactItineraryProviderOutput(
+  value: unknown,
+  repair = false,
+): CompactItineraryCandidateV1 {
+  const parsed = compactItineraryCandidateV1Schema.safeParse(value);
+  if (!parsed.success)
+    throw new ItineraryProviderError(
+      repair ? "repair_failed" : "invalid_itinerary_response",
+      !repair,
+    );
+  return parsed.data;
 }
 
 export async function runWithOneStructuralRepair<T>(
@@ -104,19 +124,17 @@ export function createOpenAIItineraryProvider(configuration: {
           model: input.model,
           safetyIdentifier: input.safetyIdentifier,
           context: input.context,
+          dayCount: input.dayCount,
           repair,
           structuralRepair,
         }),
         { signal: input.signal },
       );
-      const parsed = itinerarySchema.safeParse(response.output_parsed);
-      if (!parsed.success)
-        throw new ItineraryProviderError(
-          repair ? "repair_failed" : "invalid_itinerary_response",
-          !repair,
-        );
       return {
-        itinerary: parsed.data,
+        candidate: parseCompactItineraryProviderOutput(
+          response.output_parsed,
+          repair,
+        ),
         responseId: response.id,
         requestId:
           (response as typeof response & { _request_id?: string })
@@ -129,11 +147,18 @@ export function createOpenAIItineraryProvider(configuration: {
   }
   function call(input: ItineraryProviderInput, repair: boolean) {
     let structuralRepairCount = 0;
-    return runWithOneStructuralRepair(async (attempt) => {
+    const operation = async (attempt: 0 | 1) => {
       structuralRepairCount = attempt;
       const output = await callOnce(input, repair, attempt === 1);
-      return { ...output, structuralRepairCount };
-    });
+      return {
+        ...output,
+        structuralRepairCount,
+        providerCallCount: attempt + 1,
+      };
+    };
+    return input.allowStructuralRepair === false
+      ? operation(0)
+      : runWithOneStructuralRepair(operation);
   }
   return {
     generate: (input) => call(input, false),

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TripPlanView } from "@trailie/schemas";
 import type { GuestComment } from "@/features/guest-comments/contracts";
-import { createFakeItineraryProvider } from "../provider";
+import { revisionItinerary } from "@/features/revisions/test-fixtures";
 import { ItineraryExperience } from "./itinerary-experience";
 
 vi.mock("@/features/maps/actions", () => ({
@@ -16,13 +16,6 @@ const id = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2";
 
 describe("ItineraryExperience", () => {
   it("reveals a validated private preview while optional enrichment finishes", async () => {
-    const generated = await createFakeItineraryProvider().generate({
-      operationKey: "preview",
-      model: "gpt-5.6-sol",
-      safetyIdentifier: "safe",
-      context: "fixture",
-      signal: AbortSignal.timeout(1000),
-    });
     const plan: TripPlanView = {
       id,
       roomId: id,
@@ -31,7 +24,7 @@ describe("ItineraryExperience", () => {
       status: "validating",
       validationStatus: "pass",
       basisSummaryVersion: 1,
-      itinerary: generated.itinerary,
+      itinerary: revisionItinerary(),
       validationSummary: null,
       progressEvents: [],
       createdAt: "2026-07-13T18:00:00.000Z",
@@ -104,13 +97,6 @@ describe("ItineraryExperience", () => {
   });
 
   it("renders published overview, day, travel, stay, food, evidence, and trip-check views", async () => {
-    const generated = await createFakeItineraryProvider().generate({
-      operationKey: "test",
-      model: "gpt-5.6-sol",
-      safetyIdentifier: "safe",
-      context: "fixture",
-      signal: AbortSignal.timeout(1000),
-    });
     const plan: TripPlanView = {
       id,
       roomId: id,
@@ -119,7 +105,7 @@ describe("ItineraryExperience", () => {
       status: "published",
       validationStatus: "pass",
       basisSummaryVersion: 1,
-      itinerary: generated.itinerary,
+      itinerary: revisionItinerary(),
       validationSummary: {
         validatorVersion: "trailie-itinerary-validator-v1",
         status: "pass",
@@ -233,13 +219,6 @@ describe("ItineraryExperience", () => {
   });
 
   it("keeps the published itinerary usable when its map projection is unavailable", async () => {
-    const generated = await createFakeItineraryProvider().generate({
-      operationKey: "map-test",
-      model: "gpt-5.6-sol",
-      safetyIdentifier: "safe",
-      context: "fixture",
-      signal: AbortSignal.timeout(1000),
-    });
     const plan = {
       id,
       roomId: id,
@@ -248,7 +227,7 @@ describe("ItineraryExperience", () => {
       status: "published",
       validationStatus: "pass",
       basisSummaryVersion: 1,
-      itinerary: generated.itinerary,
+      itinerary: revisionItinerary(),
       validationSummary: null,
       progressEvents: [],
       createdAt: "2026-07-13T18:00:00.000Z",
@@ -267,13 +246,6 @@ describe("ItineraryExperience", () => {
   });
 
   it("places exact-version comments beside their itinerary item", async () => {
-    const generated = await createFakeItineraryProvider().generate({
-      operationKey: "comments-test",
-      model: "gpt-5.6-sol",
-      safetyIdentifier: "safe",
-      context: "fixture",
-      signal: AbortSignal.timeout(1000),
-    });
     const plan = {
       id,
       roomId: id,
@@ -282,7 +254,7 @@ describe("ItineraryExperience", () => {
       status: "published",
       validationStatus: "pass",
       basisSummaryVersion: 1,
-      itinerary: generated.itinerary,
+      itinerary: revisionItinerary(),
       validationSummary: null,
       progressEvents: [],
       createdAt: "2026-07-13T18:00:00.000Z",

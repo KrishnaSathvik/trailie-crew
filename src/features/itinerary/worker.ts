@@ -6,8 +6,10 @@ import {
   type TravelToolResult,
 } from "@trailie/travel-tools";
 import {
+  compactItineraryCandidateV1Schema,
   itinerarySchema,
   type CanonicalDestinationResolutionV1,
+  type CompactItineraryCandidateV1,
   type Itinerary,
   type TravelEvidenceV1,
 } from "@trailie/schemas";
@@ -48,6 +50,13 @@ import {
 } from "@/server/travel/intelligence";
 import type { TravelEvidenceRepository } from "@/server/travel/repository";
 import type { TrailieRuntimeTrace } from "@/server/ai/runtime-telemetry";
+import {
+  combineCompactItineraryChunks,
+  compactItineraryCandidateFromItinerary,
+  expandCompactItineraryCandidate,
+  planCompactItineraryGeneration,
+  validateCompactItineraryCandidate,
+} from "./compact-candidate";
 
 export type TravelEvidenceDependencies = {
   repository: Pick<ItineraryRepository, "recordEvidence">;
@@ -62,7 +71,7 @@ type Dependencies = TravelEvidenceDependencies & {
   timeoutMs?: number;
   quotaSubject?: AiQuotaSubject;
   reliabilityPolicy?: WorkflowReliabilityPolicy;
-  providerAttempts?: DurableProviderAttemptController<Itinerary>;
+  providerAttempts?: DurableProviderAttemptController<CompactItineraryCandidateV1>;
   travelIntelligence?: {
     providers: TravelProviderRegistry;
     evidenceRepository: TravelEvidenceRepository;
@@ -133,11 +142,11 @@ export function parseItineraryDates(dateWindows: readonly string[]) {
       continue;
     for (
       let current = start;
-      current <= end && dates.length < 8;
+      current <= end && dates.length < 12;
       current = new Date(current.getTime() + 86_400_000)
     )
       dates.push(current.toISOString().slice(0, 10));
-    if (dates.length >= 8) break;
+    if (dates.length >= 12) break;
   }
   return [...new Set(dates)];
 }
@@ -281,12 +290,53 @@ function callProvider<T extends { usage?: { totalTokens?: number | null } }>(
           ...dependencies.quotaSubject,
           workflow,
           model: dependencies.model ?? "gpt-5.6-sol",
-          estimatedTokens: workflow === "itinerary_repair" ? 4_000 : 8_000,
+          estimatedTokens: workflow === "itinerary_repair" ? 2_500 : 4_000,
           ...(reservationId ? { reservationId } : {}),
         },
         operation,
       )
     : operation();
+}
+
+function sumUsage(
+  outputs: ItineraryProviderOutput[],
+  field: keyof ItineraryProviderOutput["usage"],
+) {
+  const values = outputs
+    .map((output) => output.usage[field])
+    .filter((value): value is number => value !== null);
+  return values.length
+    ? values.reduce((total, value) => total + value, 0)
+    : null;
+}
+
+function combineProviderOutputs(
+  outputs: ItineraryProviderOutput[],
+  candidate: CompactItineraryCandidateV1,
+): ItineraryProviderOutput {
+  const last = outputs.at(-1);
+  if (!last)
+    throw new ItineraryProviderError("invalid_itinerary_response", false);
+  return {
+    candidate,
+    responseId: last.responseId,
+    requestId: last.requestId,
+    usage: {
+      inputTokens: sumUsage(outputs, "inputTokens"),
+      outputTokens: sumUsage(outputs, "outputTokens"),
+      reasoningTokens: sumUsage(outputs, "reasoningTokens"),
+      cachedInputTokens: sumUsage(outputs, "cachedInputTokens"),
+      totalTokens: sumUsage(outputs, "totalTokens"),
+    },
+    providerCallCount: outputs.reduce(
+      (total, output) => total + (output.providerCallCount ?? 1),
+      0,
+    ),
+    structuralRepairCount: outputs.reduce(
+      (total, output) => total + (output.structuralRepairCount ?? 0),
+      0,
+    ),
+  };
 }
 
 function evidenceFromResult<T>(
@@ -848,8 +898,12 @@ export async function processItineraryGeneration(
     operationKey: string;
     attempt: number;
     repairCount: number;
+    expectedDates: string[];
+    allowedSourceEntityIds: ReadonlySet<string>;
+    expand(candidate: CompactItineraryCandidateV1): Itinerary;
     execute(signal: AbortSignal): Promise<ItineraryProviderOutput>;
   }) {
+    let expanded: Itinerary | null = null;
     const execute = async (reservationId?: string) => {
       const providerStartedAt = Date.now();
       let output: ItineraryProviderOutput;
@@ -895,14 +949,33 @@ export async function processItineraryGeneration(
         throw error;
       }
       const providerDurationMs = Date.now() - providerStartedAt;
-      dependencies.runtimeTrace?.recordModelCall(providerDurationMs, {
-        inputTokens: output.usage.inputTokens,
-        outputTokens: output.usage.outputTokens,
-      });
+      dependencies.runtimeTrace?.recordModelCall(
+        providerDurationMs,
+        {
+          inputTokens: output.usage.inputTokens,
+          outputTokens: output.usage.outputTokens,
+        },
+        output.providerCallCount ?? 1,
+      );
+      dependencies.runtimeTrace?.recordRepairAttempt(
+        output.structuralRepairCount ?? 0,
+      );
       if (input.workflow === "itinerary_repair")
         dependencies.runtimeTrace?.recordRepair(providerDurationMs);
+      const compact = validateCompactItineraryCandidate(
+        output.candidate,
+        input.expectedDates,
+        input.allowedSourceEntityIds,
+      );
+      if (!compact.success)
+        throw new ItineraryProviderError(
+          input.workflow === "itinerary_repair"
+            ? "repair_failed"
+            : "invalid_itinerary_response",
+          false,
+        );
       return {
-        value: output.itinerary,
+        value: compact.data,
         responseId: output.responseId,
         requestId: output.requestId,
         usage: output.usage,
@@ -911,22 +984,28 @@ export async function processItineraryGeneration(
         retryCount: Math.max(input.attempt - 1, 0),
         repairCount: input.repairCount,
         structuralRepairCount: output.structuralRepairCount ?? 0,
-      } satisfies ProviderAttemptExecutionResult<Itinerary>;
+      } satisfies ProviderAttemptExecutionResult<CompactItineraryCandidateV1>;
     };
     const apply = (
-      itinerary: Itinerary,
-      result: ProviderAttemptExecutionResult<Itinerary>,
-    ) =>
-      dependencies.repository.recordDraft(id, itinerary, {
-        itinerary,
+      candidate: CompactItineraryCandidateV1,
+      result: ProviderAttemptExecutionResult<CompactItineraryCandidateV1>,
+    ) => {
+      expanded = input.expand(candidate);
+      return dependencies.repository.recordDraft(id, expanded, {
+        candidate,
         ...result,
       });
+    };
     if (!dependencies.providerAttempts) {
       const result = await execute();
       await apply(result.value, result);
       return {
         ownedElsewhere: false,
-        output: { itinerary: result.value, ...result },
+        output: {
+          candidate: result.value,
+          itinerary: expanded ?? input.expand(result.value),
+          ...result,
+        },
       };
     }
     const outcome = await dependencies.providerAttempts.run({
@@ -936,7 +1015,7 @@ export async function processItineraryGeneration(
       model: dependencies.model ?? "gpt-5.6-sol",
       leaseMs: policy.recoveryLeaseMs,
       execute: ({ attemptId }) => execute(attemptId),
-      parse: (value) => itinerarySchema.parse(value),
+      parse: (value) => compactItineraryCandidateV1Schema.parse(value),
       apply,
     });
     if (outcome.status === "owned_elsewhere")
@@ -945,7 +1024,11 @@ export async function processItineraryGeneration(
       return { ownedElsewhere: false, output: null };
     return {
       ownedElsewhere: false,
-      output: { itinerary: outcome.result.value, ...outcome.result },
+      output: {
+        candidate: outcome.result.value,
+        itinerary: expanded ?? input.expand(outcome.result.value),
+        ...outcome.result,
+      },
     };
   }
   try {
@@ -963,10 +1046,37 @@ export async function processItineraryGeneration(
       "evidenceBinding",
       Date.now() - evidenceStartedAt,
     );
+    const expectedDates = parseItineraryDates(
+      context.approvedSummary.tripSnapshot.dateWindows,
+    );
+    if (!expectedDates.length)
+      throw new ItineraryProviderError("invalid_itinerary_response", false);
+    const allowedSourceEntityIds = new Set(
+      live.evidence.flatMap((entry) =>
+        [entry.sourceEntityId, entry.entityBinding?.canonicalId].filter(
+          (value): value is string => Boolean(value),
+        ),
+      ),
+    );
+    const expand = (candidate: CompactItineraryCandidateV1) => {
+      const startedAt = Date.now();
+      const itinerary = expandCompactItineraryCandidate({
+        candidate,
+        approvedSummary: context.approvedSummary,
+        travelers: context.travelers,
+        liveEvidence: live.evidence,
+        now: dependencies.now ?? new Date().toISOString(),
+      });
+      dependencies.runtimeTrace?.addDuration(
+        "expansion",
+        Date.now() - startedAt,
+      );
+      return itinerary;
+    };
     let output;
     if (firstClaim.stage === "repair") {
       if (!context.draft || !context.latestValidation) return;
-      const repairDraft = context.draft;
+      const repairDraft = compactItineraryCandidateFromItinerary(context.draft);
       const repairValidation = context.latestValidation;
       if (live.destinationResolution)
         traceDestinationResolution({
@@ -979,6 +1089,9 @@ export async function processItineraryGeneration(
         operationKey: `${id}:repair`,
         attempt: firstClaim.attemptCount,
         repairCount: 1,
+        expectedDates,
+        allowedSourceEntityIds,
+        expand,
         execute: (signal) =>
           dependencies.provider.repair({
             operationKey: `${id}:repair`,
@@ -994,6 +1107,8 @@ export async function processItineraryGeneration(
                 ? { destinationResolution: live.destinationResolution }
                 : {}),
             }),
+            dayCount: expectedDates.length,
+            allowStructuralRepair: false,
             signal,
           }),
       });
@@ -1013,20 +1128,57 @@ export async function processItineraryGeneration(
         operationKey: `${id}:generate`,
         attempt: firstClaim.attemptCount,
         repairCount: 0,
-        execute: (signal) =>
-          dependencies.provider.generate({
-            operationKey: `${id}:generate`,
-            model: dependencies.model ?? "gpt-5.6-sol",
-            safetyIdentifier: dependencies.safetyIdentifier,
-            context: buildItineraryContext({
-              ...context,
-              liveEvidence: live.evidence,
-              ...(live.destinationResolution
-                ? { destinationResolution: live.destinationResolution }
-                : {}),
-            }),
-            signal,
-          }),
+        expectedDates,
+        allowedSourceEntityIds,
+        expand,
+        execute: async (signal) => {
+          const generationPlan = planCompactItineraryGeneration(expectedDates);
+          const baseContext = buildItineraryContext({
+            ...context,
+            liveEvidence: live.evidence,
+            ...(live.destinationResolution
+              ? { destinationResolution: live.destinationResolution }
+              : {}),
+          });
+          const chunks: CompactItineraryCandidateV1[] = [];
+          const outputs: ItineraryProviderOutput[] = [];
+          let structuralRepairAvailable = true;
+          for (const [index, dates] of generationPlan.groups.entries()) {
+            const generated = await dependencies.provider.generate({
+              operationKey:
+                generationPlan.mode === "single"
+                  ? `${id}:generate`
+                  : `${id}:generate:chunk:${index + 1}`,
+              model: dependencies.model ?? "gpt-5.6-sol",
+              safetyIdentifier: dependencies.safetyIdentifier,
+              context: `${baseContext}\n<DATE_GROUP>${JSON.stringify(dates)}</DATE_GROUP>`,
+              dayCount: dates.length,
+              allowStructuralRepair: structuralRepairAvailable,
+              signal,
+            });
+            structuralRepairAvailable =
+              structuralRepairAvailable &&
+              (generated.structuralRepairCount ?? 0) === 0;
+            const validChunk = validateCompactItineraryCandidate(
+              generated.candidate,
+              dates,
+              allowedSourceEntityIds,
+            );
+            if (!validChunk.success)
+              throw new ItineraryProviderError(
+                "invalid_itinerary_response",
+                false,
+              );
+            chunks.push(validChunk.data);
+            outputs.push(generated);
+          }
+          return combineProviderOutputs(
+            outputs,
+            generationPlan.mode === "single"
+              ? chunks[0]
+              : combineCompactItineraryChunks(chunks, expectedDates),
+          );
+        },
       });
       if (execution.ownedElsewhere) return;
       output = execution.output;
@@ -1126,6 +1278,9 @@ export async function processItineraryGeneration(
       operationKey: `${id}:repair`,
       attempt: repairClaim.attemptCount,
       repairCount: 1,
+      expectedDates,
+      allowedSourceEntityIds,
+      expand,
       execute: (signal) =>
         dependencies.provider.repair({
           operationKey: `${id}:repair`,
@@ -1133,7 +1288,7 @@ export async function processItineraryGeneration(
           safetyIdentifier: dependencies.safetyIdentifier,
           context: buildItineraryRepairContext({
             approvedSummary: context.approvedSummary,
-            draft: result.itinerary,
+            draft: compactItineraryCandidateFromItinerary(result.itinerary),
             validation: result.report,
             evidence: result.evidence,
             liveEvidence: live.evidence,
@@ -1141,6 +1296,8 @@ export async function processItineraryGeneration(
               ? { destinationResolution: live.destinationResolution }
               : {}),
           }),
+          dayCount: expectedDates.length,
+          allowStructuralRepair: false,
           signal,
         }),
     });

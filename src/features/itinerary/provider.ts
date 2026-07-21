@@ -1,6 +1,10 @@
-import { itinerarySchema, type Itinerary } from "@trailie/schemas";
+import {
+  itinerarySchema,
+  type CompactItineraryCandidateV1,
+} from "@trailie/schemas";
 import { createFakeProviderId } from "@/server/ai/fake-provider-id";
 import type { ProviderUsage } from "@/server/ai/provider";
+import { compactItineraryCandidateFromItinerary } from "./compact-candidate";
 
 export type ItineraryErrorCode =
   | "invalid_itinerary_response"
@@ -30,14 +34,17 @@ export type ItineraryProviderInput = {
   model: string;
   safetyIdentifier: string;
   context: string;
+  dayCount?: number;
+  allowStructuralRepair?: boolean;
   signal: AbortSignal;
 };
 export type ItineraryProviderOutput = {
-  itinerary: Itinerary;
+  candidate: CompactItineraryCandidateV1;
   responseId: string | null;
   requestId: string | null;
   usage: ProviderUsage;
   structuralRepairCount?: number;
+  providerCallCount?: number;
 };
 export interface ItineraryProvider {
   generate(input: ItineraryProviderInput): Promise<ItineraryProviderOutput>;
@@ -192,11 +199,11 @@ export function createFakeItineraryProvider(configuration?: {
 }): ItineraryProvider {
   const scenario = configuration?.scenario ?? "conflict";
   const output = (
-    itinerary: Itinerary,
+    candidate: CompactItineraryCandidateV1,
     suffix: string,
     operationKey: string,
   ): ItineraryProviderOutput => ({
-    itinerary,
+    candidate,
     responseId: createFakeProviderId(
       `itinerary_${suffix}_response`,
       operationKey,
@@ -207,10 +214,10 @@ export function createFakeItineraryProvider(configuration?: {
     ),
     usage: {
       inputTokens: 800,
-      outputTokens: 1200,
+      outputTokens: 500,
       reasoningTokens: 180,
       cachedInputTokens: 0,
-      totalTokens: 2180,
+      totalTokens: 1480,
     },
   });
   return {
@@ -218,7 +225,9 @@ export function createFakeItineraryProvider(configuration?: {
       if (scenario === "provider_failure")
         throw new ItineraryProviderError("model_unavailable", true);
       return output(
-        fixture("16:00", scenario === "unrepairable"),
+        compactItineraryCandidateFromItinerary(
+          fixture("16:00", scenario === "unrepairable"),
+        ),
         "generation",
         input.operationKey,
       );
@@ -227,7 +236,9 @@ export function createFakeItineraryProvider(configuration?: {
       if (scenario === "provider_failure")
         throw new ItineraryProviderError("repair_failed", false);
       return output(
-        fixture("17:30", scenario === "unrepairable"),
+        compactItineraryCandidateFromItinerary(
+          fixture("17:30", scenario === "unrepairable"),
+        ),
         "repair",
         input.operationKey,
       );

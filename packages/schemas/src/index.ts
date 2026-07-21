@@ -11,6 +11,7 @@ import { trailieResponseV1Schema } from "./trailie-response";
 export * from "./travel-evidence";
 export * from "./map-projection";
 export * from "./trailie-response";
+export * from "./compact-itinerary";
 
 export const tripIdSchema = z.string().trim().min(1).brand("TripId");
 

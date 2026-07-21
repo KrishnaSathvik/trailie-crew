@@ -55,7 +55,7 @@ const openAIEnvSchema = z.object({
     .trim()
     .min(1)
     .max(100)
-    .default("trailie-itinerary-v1"),
+    .default("trailie-itinerary-compact-v1"),
   OPENAI_ITINERARY_SCHEMA_VERSION: z
     .string()
     .trim()

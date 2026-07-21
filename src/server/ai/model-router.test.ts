@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertStructuredItineraryRoute,
   classifyRequestComplexity,
   createModelRouter,
   createTrailieRuntimeRouter,
@@ -126,7 +127,7 @@ describe("Trailie runtime routing policy", () => {
     });
   });
 
-  it("keeps full itinerary contracts on the configured itinerary route", () => {
+  it("uses the approved structured fast route for compact itinerary contracts", () => {
     expect(
       router.route({
         intent: "create_itinerary",
@@ -135,9 +136,9 @@ describe("Trailie runtime routing policy", () => {
       }),
     ).toEqual({
       complexity: "full_itinerary",
-      route: "reasoning_planning",
-      model: "configured-itinerary",
-      reason: "full_itinerary_contract",
+      route: "fast",
+      model: "configured-fast",
+      reason: "compact_itinerary_fast_path",
       structuredContract: true,
     });
   });
@@ -169,5 +170,21 @@ describe("Trailie runtime routing policy", () => {
       route: "deterministic",
       model: null,
     });
+  });
+
+  it("rejects any primary or fallback itinerary route without structured output support", () => {
+    const compatible = router.route({
+      intent: "create_itinerary",
+      request: "Build the approved itinerary",
+      complexity: "full_itinerary",
+    });
+    expect(assertStructuredItineraryRoute(compatible)).toBe(compatible);
+    expect(() =>
+      assertStructuredItineraryRoute({
+        ...compatible,
+        model: null,
+        structuredContract: false,
+      }),
+    ).toThrow("itinerary_model_route_incompatible");
   });
 });

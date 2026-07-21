@@ -41,6 +41,14 @@ export type TrailieRuntimeRouteDecision = {
   structuredContract: boolean;
 };
 
+export function assertStructuredItineraryRoute(
+  decision: TrailieRuntimeRouteDecision,
+) {
+  if (!decision.model || !decision.structuredContract)
+    throw new Error("itinerary_model_route_incompatible");
+  return decision;
+}
+
 type RuntimeModelConfiguration = {
   fast: string;
   reasoning: string;
@@ -148,9 +156,9 @@ export function createTrailieRuntimeRouter(
       if (complexity === "full_itinerary") {
         return {
           complexity,
-          route: "reasoning_planning",
-          model: configuration.itinerary,
-          reason: "full_itinerary_contract",
+          route: "fast",
+          model: configuration.fast,
+          reason: "compact_itinerary_fast_path",
           structuredContract: true,
         };
       }

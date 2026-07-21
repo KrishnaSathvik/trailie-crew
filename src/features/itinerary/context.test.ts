@@ -1,9 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { createFakeTravelProviderAdapter } from "@trailie/travel-tools";
 import type { PlanningSummary } from "@trailie/schemas";
-
-import { revisionItinerary } from "@/features/revisions/test-fixtures";
 import { buildItineraryContext, buildItineraryRepairContext } from "./context";
+
+const compactDraft = {
+  schemaVersion: "1" as const,
+  title: "Yosemite trip",
+  summary: "A compact Yosemite plan.",
+  assumptions: [],
+  warnings: [],
+  days: [
+    {
+      date: "2026-07-18",
+      theme: "Valley day",
+      locationArea: "Yosemite Valley",
+      items: [
+        {
+          clientKey: "valley-walk",
+          type: "activity" as const,
+          title: "Valley walk",
+          startTime: "10:00",
+          endTime: "12:00",
+          locationText: "Yosemite Valley",
+          sourceEntityHint: null,
+          shortDescription: "Take a valley walk.",
+          rationale: "Matches the approved trip.",
+          bookingRequirement: "not_required" as const,
+          importantWarning: null,
+        },
+      ],
+      travelSegments: [],
+    },
+  ],
+};
 
 describe("itinerary context", () => {
   it("bounds generation and repair context without including old versions", () => {
@@ -58,7 +87,7 @@ describe("itinerary context", () => {
     });
     const repair = buildItineraryRepairContext({
       approvedSummary,
-      draft: revisionItinerary(),
+      draft: compactDraft,
       validation: {
         validatorVersion: "test",
         status: "needs_revision",
@@ -72,9 +101,13 @@ describe("itinerary context", () => {
       liveEvidence: oversizedEvidence,
     });
 
-    expect(generation.length).toBeLessThanOrEqual(28_000);
-    expect(repair.length).toBeLessThanOrEqual(44_000);
+    expect(generation.length).toBeLessThanOrEqual(14_000);
+    expect(repair.length).toBeLessThanOrEqual(24_000);
     expect(generation).not.toContain("oldVersion");
+    expect(generation).not.toContain("sourceMessageIds");
+    expect(generation).not.toContain("providerMetadata");
+    expect(generation).not.toContain("cacheStatus");
+    expect(repair).toContain("valley-walk");
   });
 
   it("labels verified, stale, missing, and conflicting live evidence for Sol", async () => {
@@ -121,10 +154,10 @@ describe("itinerary context", () => {
       liveEvidence: evidence,
     });
 
-    expect(context).toContain("<LIVE_TRAVEL_EVIDENCE>");
-    expect(context).toContain('"verificationState":"verified"');
-    expect(context).toContain('"evidenceType":"park_closure"');
-    expect(context).toContain("<LIVE_EVIDENCE_POLICY>");
+    expect(context).toContain("<OFFICIAL_EVIDENCE>");
+    expect(context).toContain('"verification":"verified"');
+    expect(context).toContain('"type":"park_closure"');
+    expect(context).toContain("<OUTPUT_RULES>");
     expect(context).toMatch(
       /missing[\s\S]*conflicting[\s\S]*user confirmation/i,
     );

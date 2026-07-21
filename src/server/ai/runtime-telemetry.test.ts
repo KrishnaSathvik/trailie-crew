@@ -29,6 +29,7 @@ describe("Trailie runtime telemetry", () => {
     await trace.measure("contextAssembly", async () => {
       clock += 23;
     });
+    trace.recordDuration("expansion", 7);
     trace.markModelRequestStarted();
     clock += 40;
     trace.markFirstModelToken();
@@ -56,6 +57,7 @@ describe("Trailie runtime telemetry", () => {
       toolClassesSelected: ["database_read"],
       permissionCheckMs: 12,
       contextAssemblyMs: 23,
+      expansionMs: 7,
       modelQueueMs: 40,
       timeToFirstModelTokenMs: 75,
       timeToFirstVisibleOutputMs: 80,
@@ -115,6 +117,22 @@ describe("Trailie runtime telemetry", () => {
       providerCallCount: 2,
       timeToFirstModelTokenMs: 75,
       modelQueueMs: 25,
+    });
+  });
+
+  it("counts compact structural repair separately from semantic repair duration", () => {
+    const trace = createRuntimeTrace({
+      requestId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a6",
+      roomId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2",
+      responseType: "full_itinerary",
+    });
+
+    trace.recordRepairAttempt();
+    trace.recordRepair(25);
+
+    expect(trace.complete({ state: "success" })).toMatchObject({
+      repairCount: 2,
+      repairMs: 25,
     });
   });
 

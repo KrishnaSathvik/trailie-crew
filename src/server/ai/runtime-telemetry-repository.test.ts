@@ -25,6 +25,7 @@ const record: TrailieRuntimeRecord = {
   toolObservations: {},
   providerCallCount: 1,
   validationMs: 2,
+  expansionMs: null,
   repairMs: null,
   repairCount: 0,
   evidenceBindingMs: null,
@@ -60,6 +61,20 @@ describe("runtime telemetry repository", () => {
     });
     await expect(repository.record(record)).rejects.toThrow(
       "runtime_telemetry_unavailable",
+    );
+  });
+
+  it("records a bounded Phase 8D expansion duration after the base telemetry row", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const repository = createRuntimeTelemetryRepository({ rpc });
+    await repository.record({ ...record, expansionMs: 7 });
+    expect(rpc).toHaveBeenNthCalledWith(
+      2,
+      "record_ai_runtime_expansion_metric",
+      {
+        target_request_id: record.requestId,
+        target_expansion_ms: 7,
+      },
     );
   });
 });

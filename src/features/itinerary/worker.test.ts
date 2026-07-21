@@ -137,6 +137,7 @@ function repository() {
   const calls = {
     claims: 0,
     generatedDrafts: 0,
+    drafts: [] as NonNullable<ItineraryGenerationContext["draft"]>[],
     reports: [] as string[],
     progress: [] as string[],
     evidence: [] as ItineraryGenerationContext["evidence"],
@@ -172,6 +173,7 @@ function repository() {
     async recordDraft(_id, value) {
       draft = value;
       calls.generatedDrafts += 1;
+      calls.drafts.push(structuredClone(value));
     },
     async recordEvidence(_id, value) {
       const id = `evidence:00000000-0000-4000-8000-${String(calls.evidence.length + 1).padStart(12, "0")}`;
@@ -199,6 +201,146 @@ function repository() {
 }
 
 describe("itinerary worker", () => {
+  it("validates a compact candidate and persists only its deterministic full expansion", async () => {
+    const { repo, calls } = repository();
+    await processItineraryGeneration("plan-compact", {
+      repository: repo,
+      provider: createFakeItineraryProvider(),
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+
+    expect(calls.drafts.length).toBeGreaterThan(0);
+    expect(calls.drafts[0]).toMatchObject({
+      schemaVersion: "1",
+      startDate: "2026-09-12",
+      endDate: "2026-09-13",
+    });
+    expect(calls.drafts[0].days).toHaveLength(2);
+    expect(calls.drafts[0].days[0]).toMatchObject({
+      id: "day:2026-09-12",
+    });
+    expect(calls.drafts[0].days[0].items[0]).toMatchObject({
+      id: "item:valley-walk",
+    });
+    expect(JSON.stringify(calls.drafts[0])).not.toContain("clientKey");
+  });
+
+  it("fails a compact candidate with incomplete date coverage without partial persistence", async () => {
+    const { repo, calls } = repository();
+    const provider = createFakeItineraryProvider();
+    const output = await provider.generate({
+      operationKey: "invalid-coverage",
+      model: "fixture",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1_000),
+    });
+    output.candidate.days = output.candidate.days.slice(0, 1);
+    await processItineraryGeneration("plan-invalid-coverage", {
+      repository: repo,
+      provider: { generate: async () => output, repair: provider.repair },
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+
+    expect(calls.generatedDrafts).toBe(0);
+    expect(calls.published).toBe(0);
+    expect(calls.failed).toEqual(["invalid_itinerary_response"]);
+  });
+
+  it("bounds a ten-day trip to three day-group calls and persists only the combined expansion", async () => {
+    const { repo, calls } = repository();
+    const dates = Array.from({ length: 10 }, (_, index) =>
+      new Date(Date.UTC(2026, 8, 1 + index)).toISOString().slice(0, 10),
+    );
+    const loadContext = repo.loadContext.bind(repo);
+    repo.loadContext = async (id) => {
+      const context = await loadContext(id);
+      return {
+        ...context,
+        approvedSummary: {
+          ...context.approvedSummary,
+          tripSnapshot: {
+            ...context.approvedSummary.tripSnapshot,
+            dateWindows: [`${dates[0]} to ${dates.at(-1)}`],
+          },
+          confirmedDecisions: [],
+          rejectedOptions: [],
+        },
+      };
+    };
+    const generate = vi.fn(async (input: { context: string }) => {
+      const group = JSON.parse(
+        input.context.match(/<DATE_GROUP>([^<]+)<\/DATE_GROUP>/)?.[1] ?? "[]",
+      ) as string[];
+      return {
+        candidate: {
+          schemaVersion: "1" as const,
+          title: "Ten days in Yosemite",
+          summary: "A bounded long-trip candidate for Yosemite.",
+          assumptions: [],
+          warnings: [],
+          days: group.map((date) => ({
+            date,
+            theme: `Yosemite on ${date}`,
+            locationArea: "Yosemite Valley",
+            items: [
+              {
+                clientKey: `day-${date}`,
+                type: "activity" as const,
+                title: `Yosemite activity ${date}`,
+                startTime: "10:00",
+                endTime: "12:00",
+                locationText: "Yosemite Valley",
+                sourceEntityHint: null,
+                shortDescription: "A measured activity in Yosemite.",
+                rationale: "Keeps the day intentionally bounded.",
+                bookingRequirement: "unknown" as const,
+                importantWarning: null,
+              },
+            ],
+            travelSegments: [],
+          })),
+        },
+        responseId: "response:chunk",
+        requestId: "request:chunk",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 200,
+          reasoningTokens: 0,
+          cachedInputTokens: 0,
+          totalTokens: 300,
+        },
+        structuralRepairCount: 0,
+      };
+    });
+    await processItineraryGeneration("plan-long", {
+      repository: repo,
+      provider: { generate, repair: vi.fn() } as never,
+      travelProvider: createUnavailableTravelProvider("unconfigured"),
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+
+    expect(generate).toHaveBeenCalledTimes(3);
+    expect(
+      generate.mock.calls.map(
+        ([input]) => input.context.match(/<DATE_GROUP>/g)?.length,
+      ),
+    ).toEqual([1, 1, 1]);
+    expect(calls.generatedDrafts).toBe(1);
+    expect(calls.drafts[0].days).toHaveLength(10);
+    expect(
+      new Set(
+        calls.drafts[0].days.flatMap((day) => day.items.map((item) => item.id)),
+      ).size,
+    ).toBe(10);
+    expect(calls.failed).toEqual([]);
+    expect(calls.published).toBe(1);
+  });
   it("normalizes a bounded natural-language planning date range for weather", () => {
     expect(parseItineraryDates(["July 22 through July 25, 2026"])).toEqual([
       "2026-07-22",
@@ -209,18 +351,12 @@ describe("itinerary worker", () => {
   });
 
   it("handles an empty day without crashing during evidence enrichment", async () => {
-    const output = await createFakeItineraryProvider().generate({
-      operationKey: "empty-day",
-      model: "gpt-5.6-sol",
-      safetyIdentifier: "safe",
-      context: "fixture",
-      signal: AbortSignal.timeout(1000),
-    });
-    output.itinerary.days[0].items = [];
-    output.itinerary.days[0].travelSegments = [];
+    const output = revisionItinerary();
+    output.days[0].items = [];
+    output.days[0].travelSegments = [];
     const { repo } = repository();
     await expect(
-      enrichWithTravelEvidence("plan-empty", output.itinerary, [], {
+      enrichWithTravelEvidence("plan-empty", output, [], {
         repository: repo,
         travelProvider: createUnavailableTravelProvider("unconfigured"),
         now: "2026-07-13T19:00:00.000Z",
@@ -507,15 +643,11 @@ describe("itinerary worker", () => {
       now: "2026-07-13T19:00:00.000Z",
     });
 
+    expect(generate.mock.calls[0][0].context).toContain("<OFFICIAL_EVIDENCE>");
     expect(generate.mock.calls[0][0].context).toContain(
-      "<LIVE_TRAVEL_EVIDENCE>",
+      '"type":"weather_forecast"',
     );
-    expect(generate.mock.calls[0][0].context).toContain(
-      '"evidenceType":"weather_forecast"',
-    );
-    expect(generate.mock.calls[0][0].context).toContain(
-      "<CANONICAL_DESTINATION>",
-    );
+    expect(generate.mock.calls[0][0].context).toContain("<DESTINATION>");
     expect(generate.mock.calls[0][0].context).toContain(resolutionId);
     if (repair.mock.calls.length)
       expect(repair.mock.calls[0][0].context).toContain(resolutionId);

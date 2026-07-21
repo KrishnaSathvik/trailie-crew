@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { itinerarySchema } from "@trailie/schemas";
 import {
   buildItineraryRequest,
+  parseCompactItineraryProviderOutput,
   runWithOneStructuralRepair,
 } from "./openai-provider";
 import { createFakeItineraryProvider } from "./provider";
@@ -34,12 +34,13 @@ describe("itinerary provider boundary", () => {
       model: "gpt-5.6-sol",
       safetyIdentifier: "safe-id",
       context: "approved context",
+      dayCount: 4,
     });
     expect(request).toMatchObject({
       model: "gpt-5.6-sol",
       reasoning: { effort: "low" },
       store: false,
-      max_output_tokens: 8_000,
+      max_output_tokens: 2_600,
       safety_identifier: "safe-id",
     });
     expect(request).not.toHaveProperty("tools");
@@ -47,8 +48,22 @@ describe("itinerary provider boundary", () => {
     expect(request.text.format).toMatchObject({
       type: "json_schema",
       strict: true,
-      name: "trailie_itinerary",
+      name: "trailie_compact_itinerary_v1",
     });
+    const schema = JSON.stringify(request.text.format.schema);
+    expect(schema).not.toMatch(
+      /travelers|arrivals|departures|latitude|longitude|evidenceRefs|validationMetadata|providerMetadata/,
+    );
+  });
+
+  it("fails truncated compact output structurally without returning partial data", () => {
+    expect(() =>
+      parseCompactItineraryProviderOutput({
+        schemaVersion: "1",
+        title: "Partial",
+        days: [],
+      }),
+    ).toThrow("invalid_itinerary_response");
   });
 
   it("produces a deterministic conflict and repairs it exactly once", async () => {
@@ -60,20 +75,19 @@ describe("itinerary provider boundary", () => {
       context: "Yosemite September 12",
       signal: AbortSignal.timeout(1000),
     });
-    expect(itinerarySchema.safeParse(generated.itinerary).success).toBe(true);
-    expect(generated.itinerary.days[0].items[1].startTime).toBe("16:00");
+    expect(generated.candidate.days[0].items[1].startTime).toBe("16:00");
     const repaired = await provider.repair({
       operationKey: "plan:1:repair",
       model: "gpt-5.6-sol",
       safetyIdentifier: "safe",
       context: JSON.stringify({
-        draft: generated.itinerary,
+        draft: generated.candidate,
         issues: ["route_timing_impossible"],
       }),
       signal: AbortSignal.timeout(1000),
     });
-    expect(repaired.itinerary.days[0].items[1].startTime).toBe("17:30");
-    expect(repaired.itinerary.title).toBe(generated.itinerary.title);
+    expect(repaired.candidate.days[0].items[1].startTime).toBe("17:30");
+    expect(repaired.candidate.title).toBe(generated.candidate.title);
   });
 
   it("supports invalid, unrepairable, and provider-failure fixtures", async () => {
@@ -95,7 +109,7 @@ describe("itinerary provider boundary", () => {
       context: "fixture",
       signal: AbortSignal.timeout(1000),
     });
-    expect(JSON.stringify(unrepairable.itinerary)).toContain(
+    expect(JSON.stringify(unrepairable.candidate)).toContain(
       "Las Vegas casino",
     );
   });
