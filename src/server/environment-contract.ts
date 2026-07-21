@@ -94,24 +94,27 @@ export const environmentVariableContract = [
     validationRule: "platform-set runtime identifier",
   }),
   variable("SUPABASE_PROJECT_REF", "DATABASE", {
-    required: hosted,
+    required: production,
     rotationOwner: "Database owner",
-    validationRule: "20 lowercase letters; must match Supabase URL",
+    validationRule:
+      "exact promoted Production reference; prohibited in Preview until staging exists",
   }),
   variable("PRODUCTION_SUPABASE_PROJECT_REF", "DATABASE", {
-    required: hosted,
+    required: production,
     rotationOwner: "Database owner",
-    validationRule: "20 lowercase letters; never the Preview reference",
+    validationRule: "exact promoted Production reference",
   }),
   publicVariable("NEXT_PUBLIC_SUPABASE_URL", "PUBLIC", {
-    required: hosted,
+    required: production,
     rotationOwner: "Database owner",
-    validationRule: "HTTPS Supabase project URL matching APP_ENV",
+    validationRule:
+      "Production project URL; prohibited in Preview until staging exists",
   }),
   publicVariable("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "PUBLIC", {
-    required: hosted,
+    required: production,
     rotationOwner: "Database owner",
-    validationRule: "environment-specific publishable key",
+    validationRule:
+      "Production publishable key; prohibited in Preview until staging exists",
   }),
   publicVariable("NEXT_PUBLIC_SITE_URL", "PUBLIC", {
     required: everywhere,
@@ -119,7 +122,7 @@ export const environmentVariableContract = [
     safeDefault: "http://127.0.0.1:3000 (local only)",
   }),
   variable("SUPABASE_SECRET_KEY", "DATABASE", {
-    required: hosted,
+    required: production,
     rotationOwner: "Database owner",
     validationRule:
       "server key with at least 20 characters; differs from public key",

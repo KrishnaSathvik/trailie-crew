@@ -7,7 +7,7 @@ import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
 
 type EnvironmentSource = Record<string, string | undefined>;
 
-export const PREVIEW_SUPABASE_PROJECT_REF = "tkccksmiuucdstvvfglp";
+export const PRODUCTION_SUPABASE_PROJECT_REF = "tkccksmiuucdstvvfglp";
 export const PREVIEW_VERCEL_PROJECT_NAME = "trailie-crew-preview";
 export const PRODUCTION_VERCEL_PROJECT_NAME = "trailie-crew-production";
 export const PREVIEW_SITE_URL = "https://preview.trailiecrew.com";
@@ -92,40 +92,49 @@ export function parseDeploymentEnvironment(source: EnvironmentSource) {
     } as const;
   }
 
-  if (
-    !values.DEPLOYMENT_PROJECT_NAME ||
-    !values.SUPABASE_PROJECT_REF ||
-    !values.PRODUCTION_SUPABASE_PROJECT_REF ||
-    !values.NEXT_PUBLIC_SUPABASE_URL ||
-    !values.NEXT_PUBLIC_SITE_URL
-  )
-    throw new Error("Hosted environment identity is incomplete.");
-  if (
-    projectRefFromUrl(values.NEXT_PUBLIC_SUPABASE_URL) !==
-    values.SUPABASE_PROJECT_REF
-  )
-    throw new Error("Supabase URL and project reference do not match.");
-
   if (appEnv === "preview") {
     if (values.VERCEL_ENV !== "preview")
       throw new Error("Preview APP_ENV requires VERCEL_ENV=preview.");
     if (values.DEPLOYMENT_PROJECT_NAME !== PREVIEW_VERCEL_PROJECT_NAME)
       throw new Error("Preview must use the Preview Vercel project.");
-    if (values.SUPABASE_PROJECT_REF !== PREVIEW_SUPABASE_PROJECT_REF)
-      throw new Error("Preview must use the Preview Supabase project.");
-    if (values.SUPABASE_PROJECT_REF === values.PRODUCTION_SUPABASE_PROJECT_REF)
-      throw new Error("Preview cannot use the Production Supabase project.");
     if (values.NEXT_PUBLIC_SITE_URL !== PREVIEW_SITE_URL)
       throw new Error("Preview must use the Preview hostname.");
+    const previewDatabaseVariables = [
+      "SUPABASE_PROJECT_REF",
+      "PRODUCTION_SUPABASE_PROJECT_REF",
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_SECRET_KEY",
+    ];
+    for (const name of previewDatabaseVariables) {
+      if (source[name]?.trim())
+        throw new Error(
+          `Preview database access is disabled until a staging project exists: ${name}.`,
+        );
+    }
   } else {
+    if (
+      !values.DEPLOYMENT_PROJECT_NAME ||
+      !values.SUPABASE_PROJECT_REF ||
+      !values.PRODUCTION_SUPABASE_PROJECT_REF ||
+      !values.NEXT_PUBLIC_SUPABASE_URL ||
+      !values.NEXT_PUBLIC_SITE_URL
+    )
+      throw new Error("Production environment identity is incomplete.");
+    if (
+      projectRefFromUrl(values.NEXT_PUBLIC_SUPABASE_URL) !==
+      values.SUPABASE_PROJECT_REF
+    )
+      throw new Error("Supabase URL and project reference do not match.");
     if (values.VERCEL_ENV !== "production")
       throw new Error("Production APP_ENV requires VERCEL_ENV=production.");
     if (values.DEPLOYMENT_PROJECT_NAME !== PRODUCTION_VERCEL_PROJECT_NAME)
       throw new Error("Production must use the Production Vercel project.");
-    if (values.SUPABASE_PROJECT_REF === PREVIEW_SUPABASE_PROJECT_REF)
-      throw new Error("Production cannot use the Preview Supabase project.");
-    if (values.SUPABASE_PROJECT_REF !== values.PRODUCTION_SUPABASE_PROJECT_REF)
-      throw new Error("Production must use the Production Supabase project.");
+    if (
+      values.SUPABASE_PROJECT_REF !== PRODUCTION_SUPABASE_PROJECT_REF ||
+      values.PRODUCTION_SUPABASE_PROJECT_REF !== PRODUCTION_SUPABASE_PROJECT_REF
+    )
+      throw new Error("Production must use the promoted Supabase project.");
     if (values.NEXT_PUBLIC_SITE_URL !== PRODUCTION_SITE_URL)
       throw new Error("Production must use the Production hostname.");
     for (const name of productionForbiddenVariables) {

@@ -1,4 +1,4 @@
-export const PREVIEW_SUPABASE_PROJECT_REF = "tkccksmiuucdstvvfglp";
+export const PRODUCTION_SUPABASE_PROJECT_REF = "tkccksmiuucdstvvfglp";
 export const PREVIEW_VERCEL_PROJECT_NAME = "trailie-crew-preview";
 export const PRODUCTION_VERCEL_PROJECT_NAME = "trailie-crew-production";
 
@@ -9,15 +9,10 @@ function requireValue(source, name) {
 }
 
 export function assertHostedAcceptanceTarget(source) {
-  if (source.APP_ENV !== "preview")
-    throw new Error("Hosted acceptance is restricted to Preview APP_ENV.");
-  if (source.VERCEL_PROJECT_NAME !== PREVIEW_VERCEL_PROJECT_NAME)
-    throw new Error("Hosted acceptance requires the Preview Vercel project.");
-  if (source.SUPABASE_PROJECT_REF !== PREVIEW_SUPABASE_PROJECT_REF)
-    throw new Error("Hosted acceptance requires the Preview Supabase project.");
-  const productionRef = requireValue(source, "PRODUCTION_SUPABASE_PROJECT_REF");
-  if (productionRef === PREVIEW_SUPABASE_PROJECT_REF)
-    throw new Error("Preview and Production Supabase references must differ.");
+  void source;
+  throw new Error(
+    "Hosted acceptance is disabled until a separate staging Supabase project exists.",
+  );
 }
 
 export function assertLocalDatabaseTarget(source) {
@@ -38,11 +33,11 @@ export function assertProductionReleaseTarget(source) {
   const projectRef = requireValue(source, "SUPABASE_PROJECT_REF");
   const productionRef = requireValue(source, "PRODUCTION_SUPABASE_PROJECT_REF");
   if (
-    projectRef === PREVIEW_SUPABASE_PROJECT_REF ||
-    projectRef !== productionRef
+    projectRef !== PRODUCTION_SUPABASE_PROJECT_REF ||
+    productionRef !== PRODUCTION_SUPABASE_PROJECT_REF
   )
     throw new Error(
-      "Production release requires the isolated Supabase project.",
+      "Production release requires the promoted Supabase project.",
     );
   if (source.PRODUCTION_RELEASE_APPROVED !== "true")
     throw new Error("Production release requires explicit manual approval.");
