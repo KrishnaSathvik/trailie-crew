@@ -102,6 +102,7 @@ describe("focused-answer OpenAI boundary", () => {
       }) => {
         store: boolean;
         input: string;
+        max_output_tokens: number;
         text: {
           format: {
             schema: {
@@ -120,6 +121,7 @@ describe("focused-answer OpenAI boundary", () => {
     });
 
     expect(request.store).toBe(false);
+    expect(request.max_output_tokens).toBe(1_800);
     expect(request.input).toContain("<DETECTED_INTENT>direct_question");
     expect(JSON.stringify(request.text.format.schema)).not.toContain(
       "destination_options",

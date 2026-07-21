@@ -62,7 +62,7 @@ export function buildFocusedAnswerRequest(input: {
         createTrailieResponseDraftV1SchemaForBlocks(policy.outputBlocks),
       ),
     },
-    max_output_tokens: 900,
+    max_output_tokens: 1_800,
     safety_identifier: input.safetyIdentifier,
     store: false,
   };
