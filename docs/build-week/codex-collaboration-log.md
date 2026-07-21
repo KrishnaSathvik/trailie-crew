@@ -541,3 +541,48 @@ Production was untouched. Phase 8C verdict:
 **startup, first-token, and planning-summary optimization pass; full-itinerary
 acceptance fails at the main structured-model stage.** Production hardening and
 Production readiness remain blocked on a successful hosted itinerary sample.
+
+## 2026-07-20 — Phase 8D compact itinerary generation contract
+
+The former one-shot generation contract exposed 167 fields, 23 nested objects,
+167 required fields, 20 enums, and about 19,172 schema characters (roughly
+4,793 schema tokens). `CompactItineraryCandidateV1` reduces model generation to
+26 decision/connection fields, three nested objects, 26 required fields, three
+enums, and about 2,893 schema characters (roughly 724 schema tokens), an 85%
+schema reduction. Database/version/evidence IDs, coordinates, provider and
+persistence metadata, timestamps, privacy/map/booking projections, derived
+durations/order/day numbers, and UI-only fields are now added by deterministic
+server expansion into the unchanged full itinerary contract. Only the expanded
+full contract is persisted or sent to clients.
+
+Generation uses a concise approved-summary/evidence prompt, 2–3 essential
+items per day, 240-character narrative bounds, and day-based output caps of
+1,500/2,200/2,800/3,200 tokens. The approved structured itinerary route is
+primary and a distinct approved structured fast route is started as a bounded
+2.5-second hedge inside the existing 45-second deadline; the loser is
+cancelled and use is logged safely. Structural validation precedes expansion,
+the complete existing semantic validator follows expansion, and at most one
+single-model compact repair remains available. Repeated meals no longer cause
+false duplicate-activity repair, while exact repeated activities remain
+blocked. Validated core preview persists before optional map, route, evidence,
+and booking enrichment; compact JSON and partial drafts are never exposed.
+
+On protected hosted acceptance deployment
+`dpl_BK5oy54jc22aGSW6xfvSFF9tG7Tq`, all eight ordinary 3-, 5-, and 7-day
+itineraries completed (100%). Telemetry total was p50/p95/max
+18.613/23.200/23.200 seconds; preview-ready was
+18.593/23.180/23.180 seconds; model generation was
+16.710/21.371/21.371 seconds. Expansion was p50/p95/max 4/11/11 ms and semantic
+validation 36/49/49 ms. Input tokens were p50/p95 2,163/2,183 and output tokens
+1,685/2,155; all eight used zero repairs. Browser preview-ready was
+p50/p95/max 18.660/23.572/23.572 seconds. The prior full contract failed 3/3 at
+46.430–47.004 seconds before validation, so ordinary itinerary acceptance now
+passes with no main-generation timeout.
+
+The separately bounded 10-day chunk case terminated safely with
+`model_timeout` at 46.076 seconds before draft persistence, making the complete
+matrix 8/9 (88.9%). This is the remaining documented long-trip limitation;
+ordinary Phase 8D acceptance passes, but 10-day hosted chunk completion remains
+for later work. Vercel Authentication stayed enabled, temporary bypass count
+returned to zero, and Production was untouched. Phase 8D verdict: **the ordinary
+itinerary release blocker is cleared; Production hardening was not started.**
