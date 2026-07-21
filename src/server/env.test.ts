@@ -28,21 +28,18 @@ describe("server environment validation", () => {
     );
   });
 
-  it("accepts only the isolated Preview identity", () => {
+  it("keeps Preview database-free until staging exists", () => {
     expect(
       parseDeploymentEnvironment({
         APP_ENV: "preview",
         VERCEL_ENV: "preview",
         DEPLOYMENT_PROJECT_NAME: "trailie-crew-preview",
-        SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
-        PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
-        NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
         NEXT_PUBLIC_SITE_URL: "https://preview.trailiecrew.com",
       }),
     ).toMatchObject({
       appEnv: "preview",
       projectName: "trailie-crew-preview",
-      supabaseProjectRef: "tkccksmiuucdstvvfglp",
+      supabaseProjectRef: undefined,
       siteUrl: "https://preview.trailiecrew.com",
     });
     expect(() =>
@@ -50,12 +47,10 @@ describe("server environment validation", () => {
         APP_ENV: "preview",
         VERCEL_ENV: "preview",
         DEPLOYMENT_PROJECT_NAME: "trailie-crew-preview",
-        SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
-        PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
-        NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+        SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
         NEXT_PUBLIC_SITE_URL: "https://preview.trailiecrew.com",
       }),
-    ).toThrow("Preview must use the Preview Supabase project");
+    ).toThrow("Preview database access is disabled");
   });
 
   it("requires the exact locked-down Production identity", () => {
@@ -63,9 +58,9 @@ describe("server environment validation", () => {
       APP_ENV: "production",
       VERCEL_ENV: "production",
       DEPLOYMENT_PROJECT_NAME: "trailie-crew-production",
-      SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
-      PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
-      NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+      SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+      PRODUCTION_SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+      NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
       NEXT_PUBLIC_SITE_URL: "https://app.trailiecrew.com",
       AI_GENERATION_ENABLED: "false",
       TRAVEL_PROVIDERS_ENABLED: "false",
@@ -76,16 +71,17 @@ describe("server environment validation", () => {
     expect(parseDeploymentEnvironment(production)).toMatchObject({
       appEnv: "production",
       projectName: "trailie-crew-production",
-      supabaseProjectRef: "abcdefghijklmnopqrst",
+      supabaseProjectRef: "tkccksmiuucdstvvfglp",
       siteUrl: "https://app.trailiecrew.com",
     });
     expect(() =>
       parseDeploymentEnvironment({
         ...production,
-        SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
-        NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
+        SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+        PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+        NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
       }),
-    ).toThrow("Production cannot use the Preview Supabase project");
+    ).toThrow("Production must use the promoted Supabase project");
     expect(() =>
       parseDeploymentEnvironment({
         ...production,
