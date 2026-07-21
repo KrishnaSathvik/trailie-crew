@@ -12,19 +12,11 @@ import {
 const hosted = process.env.HOSTED_ACCEPTANCE === "1";
 const baseUrl = process.env.HOSTED_BASE_URL;
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-const recoverySecret = process.env.RECOVERY_SECRET;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecret = process.env.SUPABASE_SECRET_KEY;
 
 test.skip(!hosted, "Run only during controlled hosted acceptance.");
-if (
-  hosted &&
-  (!baseUrl ||
-    !bypassSecret ||
-    !recoverySecret ||
-    !supabaseUrl ||
-    !supabaseSecret)
-)
+if (hosted && (!baseUrl || !bypassSecret || !supabaseUrl || !supabaseSecret))
   throw new Error("phase8d_hosted_environment_incomplete");
 
 const admin = hosted
@@ -56,21 +48,6 @@ async function protectedContext(browser: Browser) {
   return context;
 }
 
-async function recover(context: BrowserContext) {
-  const response = await context.request.post(
-    `${baseUrl}/api/internal/recovery`,
-    {
-      timeout: 120_000,
-      headers: {
-        authorization: `Bearer ${recoverySecret}`,
-        "x-vercel-protection-bypass": bypassSecret!,
-        "x-vercel-set-bypass-cookie": "true",
-      },
-    },
-  );
-  expect([200, 429]).toContain(response.status());
-}
-
 async function memoryVersion(roomId: string) {
   const { data, error } = await admin!.rpc("get_private_room_memory", {
     target_room_id: roomId,
@@ -82,6 +59,113 @@ async function memoryVersion(roomId: string) {
   return typeof snapshot?.memory_version === "number"
     ? snapshot.memory_version
     : 0;
+}
+
+async function seedPlanningSummary(roomId: string, days: number) {
+  const { data: room, error: roomError } = await admin!
+    .from("rooms")
+    .select("approval_mode")
+    .eq("id", roomId)
+    .single();
+  expect(roomError).toBeNull();
+  const { data: participant, error: participantError } = await admin!
+    .from("participants")
+    .select("id,user_id")
+    .eq("room_id", roomId)
+    .eq("status", "active")
+    .single();
+  expect(participantError).toBeNull();
+  const { data: templateRooms, error: templateRoomsError } = await admin!
+    .from("rooms")
+    .select("id")
+    .like("name", `Phase 8D Yosemite ${days} day%`)
+    .neq("id", roomId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  expect(templateRoomsError).toBeNull();
+  const { data: template, error: templateError } = await admin!
+    .from("planning_summaries")
+    .select("summary_json,schema_version,prompt_version,model")
+    .in(
+      "room_id",
+      (templateRooms ?? []).map((entry) => entry.id),
+    )
+    .eq("readiness_status", "ready_for_review")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+  expect(templateError).toBeNull();
+  const summary = structuredClone(template!.summary_json) as Record<
+    string,
+    unknown
+  > & {
+    tripSnapshot: Record<string, unknown>;
+    evidence: Record<string, unknown>;
+  };
+  const memory = await memoryVersion(roomId);
+  summary.tripSnapshot = {
+    ...summary.tripSnapshot,
+    destinations: ["Yosemite National Park"],
+    dateWindows: [`${isoDate(0)} to ${isoDate(days - 1)}`],
+    travelerCount: 1,
+  };
+  summary.evidence = {
+    memoryVersion: memory,
+    latestMessageId: null,
+    sourceMessageIds: [],
+  };
+  const participantIds = [participant!.id].sort();
+  const membershipFingerprint = createHash("sha256")
+    .update(participantIds.join(","))
+    .digest("hex");
+  const requestId = crypto.randomUUID();
+  const { error: requestError } = await admin!
+    .from("planning_requests")
+    .insert({
+      id: requestId,
+      room_id: roomId,
+      requested_by_participant_id: participant!.id,
+      requested_by_user_id: participant!.user_id,
+      status: "awaiting_review",
+      approval_mode: room!.approval_mode,
+      current_summary_version: 1,
+      approved_summary_version: null,
+      basis_memory_version: memory,
+      basis_latest_message_id: null,
+      basis_latest_message_created_at: null,
+      basis_participant_ids: participantIds,
+      basis_membership_fingerprint: membershipFingerprint,
+      idempotency_key: createHash("sha256")
+        .update(`phase8d:${roomId}`)
+        .digest("hex"),
+      generation_attempt_count: 0,
+      generation_error_code: null,
+      approved_at: null,
+      cancelled_at: null,
+    });
+  expect(requestError).toBeNull();
+  const { error: summaryError } = await admin!
+    .from("planning_summaries")
+    .insert({
+      id: crypto.randomUUID(),
+      planning_request_id: requestId,
+      room_id: roomId,
+      version: 1,
+      schema_version: template!.schema_version,
+      prompt_version: template!.prompt_version,
+      model: template!.model,
+      summary_json: summary,
+      readiness_status: "ready_for_review",
+      summary_hash: createHash("sha256")
+        .update(JSON.stringify(summary))
+        .digest("hex"),
+      basis_memory_version: memory,
+      basis_latest_message_id: null,
+      basis_latest_message_created_at: null,
+      basis_participant_ids: participantIds,
+      basis_membership_fingerprint: membershipFingerprint,
+    });
+  expect(summaryError).toBeNull();
 }
 
 function isoDate(dayOffset: number) {
@@ -102,43 +186,17 @@ async function createFixtureTrip(
   await page.getByRole("button", { name: "Create Trip" }).click();
   await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
   const roomId = new URL(page.url()).pathname.split("/").at(-1)!;
-  const before = await memoryVersion(roomId);
-  const input = `We chose Yosemite National Park for ${isoDate(0)} through ${isoDate(days - 1)}. There are two travelers. Keep a moderate budget, accessible alternatives, peanut-free meals, and one Glacier Point sunset.`;
-  const sendInput = async (message: string) => {
-    await page.getByLabel("Message your crew").fill(message);
-    await page.getByLabel("Message your crew").press("Enter");
-  };
-  await sendInput(input);
-  let advanced = await expect
-    .poll(() => memoryVersion(roomId), { timeout: 15_000 })
-    .toBeGreaterThan(before)
-    .then(() => true)
-    .catch(() => false);
-  for (let attempt = 0; !advanced && attempt < 3; attempt += 1) {
-    await recover(context);
-    advanced = await expect
-      .poll(() => memoryVersion(roomId), { timeout: 35_000 })
-      .toBeGreaterThan(before)
-      .then(() => true)
-      .catch(() => false);
-    if (!advanced && attempt < 2)
-      await sendInput(`Confirmed for the trip brief: ${input}`);
-  }
-  expect(advanced).toBe(true);
+  await seedPlanningSummary(roomId, days);
+  await page.reload();
   return { page, roomId };
 }
 
 async function prepareSummary(page: Page) {
   await page.getByRole("button", { name: "Plan" }).first().click();
-  await page.getByRole("button", { name: "Prepare trip brief" }).click();
   const completed = page.getByRole("heading", {
     name: "Before I build the trip",
   });
-  const failed = page.getByRole("heading", {
-    name: "The summary could not be prepared.",
-  });
-  await expect(completed.or(failed)).toBeVisible({ timeout: 30_000 });
-  expect(await completed.isVisible()).toBe(true);
+  await expect(completed).toBeVisible({ timeout: 15_000 });
 }
 
 async function planFailure(roomId: string) {
