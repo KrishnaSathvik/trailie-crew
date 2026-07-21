@@ -590,48 +590,67 @@ itinerary release blocker is cleared; Production hardening was not started.**
 ## 2026-07-21 — Phase 9A Production infrastructure bootstrap
 
 The environment topology is now explicit: Local uses the local application and
-local Supabase; Preview uses Vercel `trailie-crew-preview`
-(`prj_8VfR8A6S4G63mZIVNVuCUPQKWLwi`) and Supabase
-`tkccksmiuucdstvvfglp`; Production uses the new empty Vercel project
-`trailie-crew-production` (`prj_UHv658VeaSYiLnK629s9XbkETBS8`) and still
-awaits an independently billed Supabase project. Both Vercel projects require
-Vercel Authentication and have zero bypasses. Production has no Git link and
-no deployment; release remains an exact-commit, manually approved workflow
-whose migration and deployment steps are deliberately disabled in Phase 9A.
+local Supabase; Preview is the protected Vercel project `trailie-crew-preview`
+(`prj_8VfR8A6S4G63mZIVNVuCUPQKWLwi`) with no hosted database; Production is the
+empty Vercel project `trailie-crew-production`
+(`prj_UHv658VeaSYiLnK629s9XbkETBS8`) backed by the promoted, prelaunch-only
+Supabase project `trailie-crew` (`tkccksmiuucdstvvfglp`, `us-east-1`). Both
+Vercel projects require Vercel Authentication and have zero bypasses. The final
+credential-bearing Preview deployment and `hosted-acceptance` custom environment
+were deleted after promotion; Preview now has zero variables, targets, custom
+environments, or custom domains. Production has no deployment; release remains
+an exact-commit, manually approved workflow whose migration and deployment steps
+are deliberately disabled in Phase 9A.
 
-`app.trailiecrew.com` is associated with Production and
-`preview.trailiecrew.com` with Preview. Vercel DNS now has explicit `A` records
-for `app` and `preview` to `76.76.21.21`; DNS resolution/hostname smoke remains
-pending propagation. Root landing and `www` redirect routing are not attached.
+`app.trailiecrew.com` is associated with Production. The Preview hostname is
+detached and its custom environment variables were removed; its existing DNS
+record is inert until a future staging database is approved. Vercel DNS has
+explicit `A` records for `app` and `preview` to `76.76.21.21`. Root landing and
+`www` redirect routing are not attached.
 Production URL, legal URL, contact-address, CSP/origin, secure-cookie, and
 Turnstile hostname/action/expiry contracts are implemented. The role mailboxes
-are not claimed operational; delivery verification is a launch blocker.
+have Cloudflare inbound forwarding configured according to the owner; an actual
+delivery check and outbound sender configuration remain launch gates.
 
 The typed environment inventory covers Public, Server-only, Provider, Auth,
 Security, Observability, Recovery, Email, and Database variables without
-values. Production has only 15 independent non-secret bootstrap controls;
-Supabase keys, recovery/cron secrets, provider credentials, real Turnstile
-keys, email credentials, analytics, and alert webhooks were not copied from
-Preview. Startup and command guards reject Preview/Production project mixing,
-test fixtures and bypasses, fake/dummy provider credentials, Production reset,
-and hosted acceptance outside the exact Preview stack.
+values. Production has 29 Production-scoped variables: the bootstrap controls,
+promoted Supabase reference/URL/public/server keys, four newly generated
+sensitive recovery/cron/cleanup/AI-safety secrets, and five repository-approved
+model-routing identifiers. AI, travel, and maps remain disabled. Real provider,
+Turnstile, email-provider, analytics, and alert credentials were not copied from
+Preview and were not replaced with placeholders.
+Startup and command guards require the exact promoted Production reference,
+reject all database credentials in Preview, reject test fixtures and bypasses,
+block Production reset, and disable hosted acceptance until a separate staging
+database exists.
 
-The repository has 36 ordered migrations, state checksum
+Before cleanup, a chmod-600 schema/data/roles snapshot and SHA-256 manifest was
+captured under ignored `.local/backups/phase9a-precleanup-20260721`. The
+repository has 36 ordered migrations, state checksum
 `6d8e5ef6dbf1ae4dd8afc858d67425d791b0daa3b5b13dcc2aa747d85f363af2`,
-and two reviewed historical constraint drops. Preview has all 36 migrations,
-55 RLS-enabled application tables (38 private tables also forced), 203 safe
-`SECURITY DEFINER` functions with no unsafe `search_path`, no storage objects,
-no Edge Functions, and no Edge Function secrets. Production migrations, Auth
-redirects, RLS/grant checks, emptiness checks, and backup verification remain
-blocked on Production Supabase creation. PITR remains disabled/unapproved;
-the initial decision is paid daily backups plus off-site logical dumps and a
-timed restore drill (RPO up to 24 hours), unless stronger paid PITR is approved.
+and two reviewed historical constraint drops. The promoted project retains all
+36 migrations, 55 RLS-enabled application tables (38 private tables also
+forced), 203 safe `SECURITY DEFINER` functions with no unsafe `search_path`, no
+storage objects, no Edge Functions, and no Edge Function secrets. All auth and
+application data was deleted transactionally; every application table is empty
+except the single required `private.ai_quota_settings` configuration row.
+Production Site URL/redirect configuration and the exposed database-password
+and API-key rotation remain gated on Supabase Dashboard or PAT access; the
+database password was removed from `.env.local` after all read-only checks.
+Backup inspection reports no physical backups and PITR disabled, so a Pro
+upgrade/backup decision is a launch blocker. The minimum plan is Pro daily
+backups plus an off-site logical dump and timed restore drill (initial RPO up to
+24 hours); PITR was not enabled.
 
-Verification passed format, lint, typecheck, 844/844 Vitest tests, 24 pgTAP
-files with 775 assertions, migration verification, production build, client
-bundle/server-secret scan, and `git diff --check`. Remaining Phase 9A blockers
-are Production Supabase billing/password storage, independent Production
-database/Auth secrets, real Turnstile keys, GitHub authentication and protected
-environment approval, DNS propagation smoke, external alerts, mailbox delivery,
-and the later controlled Production smoke/rollback gate. Production exposure
-status: **no Production deployment and no invited traffic**.
+Verification passes formatting, lint, typecheck, 844/844 Vitest tests, all 36
+remote migrations, 24 transaction-wrapped remote pgTAP files with 775
+assertions, remote database lint, production build, dependency audit, client
+bundle/server-secret scan, and `git diff --check`. A post-pgTAP emptiness audit
+confirmed zero users, sessions, storage objects, or trip data; all RLS,
+`search_path`, and private-grant checks remain clean. Remaining blockers are the
+database-password/API-key rotation and Auth URLs, a Pro backup decision, real
+Turnstile, provider/budget, email-provider, and external-alert credentials,
+GitHub Production approval, and the controlled protected smoke/rollback gate.
+Production exposure status: **no Production deployment and no invited
+traffic**.
