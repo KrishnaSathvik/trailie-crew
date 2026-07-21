@@ -51,47 +51,78 @@ export interface ItineraryProvider {
   repair(input: ItineraryProviderInput): Promise<ItineraryProviderOutput>;
 }
 
-const compatibleFallbackCodes = new Set<ItineraryErrorCode>([
-  "model_timeout",
-  "model_rate_limited",
-  "model_unavailable",
-]);
-
 export function withCompatibleItineraryFallback(
   provider: ItineraryProvider,
   input: {
     fallbackModel: string;
-    onFallback?: (reason: ItineraryErrorCode) => void;
+    hedgeDelayMs?: number;
+    onFallback?: (reason: string) => void;
   },
 ): ItineraryProvider {
-  async function run(
-    method: "generate" | "repair",
-    request: ItineraryProviderInput,
-  ) {
-    try {
-      return await provider[method](request);
-    } catch (error) {
-      if (
-        !(error instanceof ItineraryProviderError) ||
-        !error.retryable ||
-        !compatibleFallbackCodes.has(error.code) ||
-        input.fallbackModel === request.model
-      )
-        throw error;
-      input.onFallback?.(error.code);
-      const output = await provider[method]({
+  async function generate(request: ItineraryProviderInput) {
+    if (input.fallbackModel === request.model)
+      return provider.generate(request);
+    const primaryController = new AbortController();
+    const fallbackController = new AbortController();
+    let fallbackStarted = false;
+    const withRequestSignal = (controller: AbortController) =>
+      AbortSignal.any([request.signal, controller.signal]);
+    const primary = provider
+      .generate({
         ...request,
-        model: input.fallbackModel,
-      });
+        signal: withRequestSignal(primaryController),
+      })
+      .then((output) => ({ output }));
+    const fallback = (async () => {
+      const delayMs = Math.max(0, input.hedgeDelayMs ?? 2_500);
+      if (delayMs > 0)
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, delayMs);
+          fallbackController.signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              reject(new DOMException("Aborted", "AbortError"));
+            },
+            { once: true },
+          );
+        });
+      if (fallbackController.signal.aborted)
+        throw new DOMException("Aborted", "AbortError");
+      fallbackStarted = true;
+      input.onFallback?.("hedged_compatible_route");
       return {
-        ...output,
-        providerCallCount: (output.providerCallCount ?? 1) + 1,
+        output: await provider.generate({
+          ...request,
+          model: input.fallbackModel,
+          allowStructuralRepair: false,
+          signal: withRequestSignal(fallbackController),
+        }),
       };
+    })();
+    try {
+      const winner = await Promise.any([primary, fallback]);
+      return {
+        ...winner.output,
+        providerCallCount:
+          (winner.output.providerCallCount ?? 1) + (fallbackStarted ? 1 : 0),
+      };
+    } catch (error) {
+      if (error instanceof AggregateError) {
+        const providerError = error.errors.find(
+          (entry) => entry instanceof ItineraryProviderError,
+        );
+        if (providerError) throw providerError;
+      }
+      throw error;
+    } finally {
+      primaryController.abort();
+      fallbackController.abort();
     }
   }
   return {
-    generate: (request) => run("generate", request),
-    repair: (request) => run("repair", request),
+    generate,
+    repair: (request) => provider.repair(request),
   };
 }
 

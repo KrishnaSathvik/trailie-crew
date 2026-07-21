@@ -134,7 +134,7 @@ describe("itinerary provider boundary", () => {
     ).rejects.toThrow("invalid_itinerary_response");
   });
 
-  it("falls back once to a distinct approved compatible model on provider unavailability", async () => {
+  it("hedges compact generation once with a distinct approved compatible model", async () => {
     const fallbackOutput = await createFakeItineraryProvider().generate({
       operationKey: "fallback-fixture",
       model: "approved-fallback",
@@ -143,11 +143,22 @@ describe("itinerary provider boundary", () => {
       signal: AbortSignal.timeout(1_000),
     });
     const models: string[] = [];
+    let primaryWasAborted = false;
     const provider = {
       generate: vi.fn(async (input) => {
         models.push(input.model);
-        if (input.model === "approved-primary")
-          throw new ItineraryProviderError("model_unavailable", true);
+        if (input.model === "approved-primary") {
+          return new Promise<never>((_resolve, reject) =>
+            input.signal.addEventListener(
+              "abort",
+              () => {
+                primaryWasAborted = true;
+                reject(new ItineraryProviderError("model_timeout", true));
+              },
+              { once: true },
+            ),
+          );
+        }
         return fallbackOutput;
       }),
       repair: vi.fn(),
@@ -155,6 +166,7 @@ describe("itinerary provider boundary", () => {
     const onFallback = vi.fn();
     const wrapped = withCompatibleItineraryFallback(provider, {
       fallbackModel: "approved-fallback",
+      hedgeDelayMs: 0,
       onFallback,
     });
 
@@ -168,6 +180,33 @@ describe("itinerary provider boundary", () => {
 
     expect(models).toEqual(["approved-primary", "approved-fallback"]);
     expect(result.providerCallCount).toBe(2);
-    expect(onFallback).toHaveBeenCalledWith("model_unavailable");
+    expect(onFallback).toHaveBeenCalledWith("hedged_compatible_route");
+    expect(primaryWasAborted).toBe(true);
+  });
+
+  it("keeps compact repair to one model call", async () => {
+    const base = createFakeItineraryProvider();
+    const provider = {
+      generate: vi.fn(),
+      repair: vi.fn((input) => base.repair(input)),
+    };
+    const onFallback = vi.fn();
+    const wrapped = withCompatibleItineraryFallback(provider, {
+      fallbackModel: "approved-fallback",
+      hedgeDelayMs: 0,
+      onFallback,
+    });
+
+    await wrapped.repair({
+      operationKey: "single-repair",
+      model: "approved-primary",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1_000),
+    });
+
+    expect(provider.repair).toHaveBeenCalledTimes(1);
+    expect(provider.repair.mock.calls[0]?.[0].model).toBe("approved-primary");
+    expect(onFallback).not.toHaveBeenCalled();
   });
 });
