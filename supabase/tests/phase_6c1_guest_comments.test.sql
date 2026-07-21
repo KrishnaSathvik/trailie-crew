@@ -294,6 +294,7 @@ create temporary table deletable_suggestion as
     repeat('e',64),'plan',null,'general',
     'Temporary idea','This one will be deleted.',null,null,null
   ) payload;
+grant select on stale_item_suggestion, stale_plan_suggestion, dismissible_suggestion to authenticated;
 select throws_ok(
   format(
     'select public.update_guest_suggestion(%L,%L,%L,%L,null,null,null)',
@@ -339,12 +340,13 @@ create temporary table stale_warning as
     'c6120000-0000-4000-8000-000000000002',
     false
   ) payload;
+reset role;
 select is((select payload->>'requiresRebaseConfirmation' from stale_warning),'true','stale suggestion never auto-converts');
-select like(
-  (select payload->>'warning' from stale_warning),
-  'This suggestion was made on Version 1. The trip is now on Version 2.%',
+select ok(
+  (select payload->>'warning' from stale_warning) like 'This suggestion was made on Version 1. The trip is now on Version 2.%',
   'stale warning identifies original and current versions'
 );
+set local role authenticated;
 select throws_ok(
   format(
     'select public.convert_guest_suggestion(%L,%L,true)',
@@ -394,9 +396,8 @@ select is(
   'draft',
   'conversion does not auto-approve the normal revision request'
 );
-select like(
-  (select request_text from public.plan_change_requests where id=((select payload->>'revisionRequestId' from converted_suggestion)::uuid)),
-  'Guest suggestion % from Version 1; rebased to Version 2 by Alex.%',
+select ok(
+  (select request_text from public.plan_change_requests where id=((select payload->>'revisionRequestId' from converted_suggestion)::uuid)) like 'Guest suggestion % from Version 1; rebased to Version 2 by Alex.%',
   'revision copy records original version, rebased version, confirmer, and guest suggestion attribution'
 );
 select is((select payload->>'status' from dismissed_suggestion),'dismissed','member can dismiss an open suggestion');

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyCaptchaForGuestInvite } from "@/features/security/captcha-server";
 import { cookies } from "next/headers";
 import {
   createGuestComment,
@@ -24,6 +25,9 @@ import {
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: vi.fn(),
+}));
+vi.mock("@/features/security/captcha-server", () => ({
+  verifyCaptchaForGuestInvite: vi.fn(),
 }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("./repository", () => ({
@@ -87,6 +91,7 @@ describe("guest comment server actions", () => {
       get: cookieGet,
       set: cookieSet,
     } as never);
+    vi.mocked(verifyCaptchaForGuestInvite).mockResolvedValue(undefined);
   });
 
   it("creates Viewer or Commenter links while sending only SHA-256 to SQL", async () => {
@@ -174,6 +179,7 @@ describe("guest comment server actions", () => {
     const result = await beginGuestSessionAction({
       inviteToken: "A".repeat(43),
       displayName: "Jordan",
+      captchaToken: "captcha-token",
     });
 
     expect(result).toEqual({ ok: true, data: { redirectTo: "/guest/plan" } });
@@ -187,6 +193,10 @@ describe("guest comment server actions", () => {
       }),
     );
     expect(JSON.stringify(cookieSet.mock.calls)).not.toContain("A".repeat(43));
+    expect(verifyCaptchaForGuestInvite).toHaveBeenCalledWith({
+      token: "captcha-token",
+      inviteFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
   });
 
   it("validates plain text and uses only the scoped cookie for guest mutations", async () => {

@@ -6,7 +6,9 @@ import { CaptchaChallenge } from "./captcha-challenge";
 describe("CaptchaChallenge", () => {
   it("announces deterministic completion accessibly", async () => {
     const onToken = vi.fn();
-    render(<CaptchaChallenge onToken={onToken} testMode />);
+    render(
+      <CaptchaChallenge onToken={onToken} action="create_trip" testMode />,
+    );
     await waitFor(() =>
       expect(onToken).toHaveBeenCalledWith("trailie-test-captcha"),
     );
@@ -14,7 +16,9 @@ describe("CaptchaChallenge", () => {
   });
 
   it("reports unavailable configuration without exposing a secret", () => {
-    render(<CaptchaChallenge onToken={vi.fn()} siteKey="" />);
+    render(
+      <CaptchaChallenge onToken={vi.fn()} action="create_trip" siteKey="" />,
+    );
     expect(screen.getByRole("status")).toHaveTextContent(/unavailable/i);
     expect(document.body.textContent).not.toContain("secret");
   });
@@ -32,9 +36,18 @@ describe("CaptchaChallenge", () => {
       remove: vi.fn(),
     };
     render(
-      <CaptchaChallenge onToken={onToken} siteKey="site-key" scriptReady />,
+      <CaptchaChallenge
+        onToken={onToken}
+        action="join_trip"
+        siteKey="site-key"
+        scriptReady
+      />,
     );
     await waitFor(() => expect(onToken).toHaveBeenLastCalledWith(""));
+    expect(window.turnstile.render).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ action: "join_trip" }),
+    );
     expect(screen.getByRole("button", { name: /retry/i })).toBeVisible();
   });
 });

@@ -11,6 +11,13 @@ vi.mock("next/navigation", () => ({
 vi.mock("../actions", () => ({
   beginGuestSessionAction: vi.fn(),
 }));
+vi.mock("@/features/security/components/captcha-challenge", () => ({
+  CaptchaChallenge: ({ onToken }: { onToken: (token: string) => void }) => (
+    <button type="button" onClick={() => onToken("captcha-token")}>
+      Complete security check
+    </button>
+  ),
+}));
 
 describe("guest display-name entry", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -25,6 +32,7 @@ describe("guest display-name entry", () => {
     fireEvent.change(screen.getByLabelText("Your display name"), {
       target: { value: "Jordan" },
     });
+    fireEvent.click(screen.getByRole("button", { name: /security check/i }));
     fireEvent.click(
       screen.getByRole("button", { name: "View Plan Version 1" }),
     );
@@ -32,6 +40,7 @@ describe("guest display-name entry", () => {
       expect(beginGuestSessionAction).toHaveBeenCalledWith({
         inviteToken: "A".repeat(43),
         displayName: "Jordan",
+        captchaToken: "captcha-token",
       }),
     );
     expect(replace).toHaveBeenCalledWith("/guest/plan");
@@ -46,6 +55,7 @@ describe("guest display-name entry", () => {
     fireEvent.change(screen.getByLabelText("Your display name"), {
       target: { value: "Jordan" },
     });
+    fireEvent.click(screen.getByRole("button", { name: /security check/i }));
     fireEvent.click(
       screen.getByRole("button", { name: "View Plan Version 1" }),
     );

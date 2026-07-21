@@ -53,11 +53,11 @@ describe("public shared itinerary", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
       "href",
-      "/privacy",
+      "https://trailiecrew.com/privacy",
     );
     expect(screen.getByRole("link", { name: "Accuracy" })).toHaveAttribute(
       "href",
-      "/accuracy",
+      "https://trailiecrew.com/accuracy",
     );
     expect(container.textContent).not.toMatch(
       /Maya|Chicago|evidence:|validator/i,

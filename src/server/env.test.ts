@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseDeploymentEnvironment,
   parseCaptchaEnv,
   parseCleanupEnv,
   parseOpenAIEnv,
@@ -17,6 +18,100 @@ const publicValues = {
 };
 
 describe("server environment validation", () => {
+  it("defaults only non-Vercel execution to local", () => {
+    expect(parseDeploymentEnvironment({})).toMatchObject({
+      appEnv: "local",
+      siteUrl: "http://127.0.0.1:3000",
+    });
+    expect(() => parseDeploymentEnvironment({ VERCEL_ENV: "preview" })).toThrow(
+      "APP_ENV is required",
+    );
+  });
+
+  it("accepts only the isolated Preview identity", () => {
+    expect(
+      parseDeploymentEnvironment({
+        APP_ENV: "preview",
+        VERCEL_ENV: "preview",
+        DEPLOYMENT_PROJECT_NAME: "trailie-crew-preview",
+        SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+        PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+        NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
+        NEXT_PUBLIC_SITE_URL: "https://preview.trailiecrew.com",
+      }),
+    ).toMatchObject({
+      appEnv: "preview",
+      projectName: "trailie-crew-preview",
+      supabaseProjectRef: "tkccksmiuucdstvvfglp",
+      siteUrl: "https://preview.trailiecrew.com",
+    });
+    expect(() =>
+      parseDeploymentEnvironment({
+        APP_ENV: "preview",
+        VERCEL_ENV: "preview",
+        DEPLOYMENT_PROJECT_NAME: "trailie-crew-preview",
+        SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+        PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+        NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+        NEXT_PUBLIC_SITE_URL: "https://preview.trailiecrew.com",
+      }),
+    ).toThrow("Preview must use the Preview Supabase project");
+  });
+
+  it("requires the exact locked-down Production identity", () => {
+    const production = {
+      APP_ENV: "production",
+      VERCEL_ENV: "production",
+      DEPLOYMENT_PROJECT_NAME: "trailie-crew-production",
+      SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+      PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
+      NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+      NEXT_PUBLIC_SITE_URL: "https://app.trailiecrew.com",
+      AI_GENERATION_ENABLED: "false",
+      TRAVEL_PROVIDERS_ENABLED: "false",
+      MAPBOX_MAPS_ENABLED: "false",
+      MAPBOX_GEOCODING_STORAGE_MODE: "disabled",
+    };
+
+    expect(parseDeploymentEnvironment(production)).toMatchObject({
+      appEnv: "production",
+      projectName: "trailie-crew-production",
+      supabaseProjectRef: "abcdefghijklmnopqrst",
+      siteUrl: "https://app.trailiecrew.com",
+    });
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+        NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
+      }),
+    ).toThrow("Production cannot use the Preview Supabase project");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        CAPTCHA_TEST_MODE: "true",
+      }),
+    ).toThrow("Production-only configuration forbids CAPTCHA_TEST_MODE");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        CRON_EVIDENCE: "fixture",
+      }),
+    ).toThrow("Production-only configuration forbids CRON_EVIDENCE");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        OPENAI_API_KEY: "dummy-provider-key",
+      }),
+    ).toThrow("Production credential OPENAI_API_KEY is not real");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        AI_GENERATION_ENABLED: "true",
+      }),
+    ).toThrow("Production must start with AI generation disabled");
+  });
+
   it("requires a distinct Supabase server secret", () => {
     expect(
       parseServerSupabaseEnv({
@@ -103,10 +198,24 @@ describe("server environment validation", () => {
     expect(
       parseCaptchaEnv({
         TURNSTILE_SECRET_KEY: "turnstile-secret",
+        TURNSTILE_EXPECTED_HOSTNAME: "app.trailiecrew.com",
         SUPABASE_AUTH_CAPTCHA_ENABLED: "true",
+        APP_ENV: "production",
         NODE_ENV: "production",
       }),
-    ).toMatchObject({ authCaptchaEnabled: true, testMode: false });
+    ).toMatchObject({
+      authCaptchaEnabled: true,
+      expectedHostname: "app.trailiecrew.com",
+      testMode: false,
+    });
+    expect(() =>
+      parseCaptchaEnv({
+        TURNSTILE_SECRET_KEY: "turnstile-secret",
+        TURNSTILE_EXPECTED_HOSTNAME: "preview.trailiecrew.com",
+        SUPABASE_AUTH_CAPTCHA_ENABLED: "true",
+        APP_ENV: "production",
+      }),
+    ).toThrow();
     expect(() =>
       parseCaptchaEnv({ CAPTCHA_TEST_MODE: "true", NODE_ENV: "production" }),
     ).toThrow();
