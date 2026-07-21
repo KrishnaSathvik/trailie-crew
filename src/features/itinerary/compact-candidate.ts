@@ -145,6 +145,35 @@ export function combineCompactItineraryChunks(
   });
 }
 
+export function scopeCompactItineraryChunkKeys(
+  value: CompactItineraryCandidateV1,
+  groupIndex: number,
+) {
+  const candidate = compactItineraryCandidateV1Schema.parse(value);
+  const keys = new Map<string, string>();
+  for (const [dayIndex, day] of candidate.days.entries())
+    for (const [itemIndex, item] of day.items.entries())
+      keys.set(
+        item.clientKey,
+        `g${groupIndex + 1}-d${dayIndex + 1}-i${itemIndex + 1}`,
+      );
+  return compactItineraryCandidateV1Schema.parse({
+    ...candidate,
+    days: candidate.days.map((day) => ({
+      ...day,
+      items: day.items.map((item) => ({
+        ...item,
+        clientKey: keys.get(item.clientKey)!,
+      })),
+      travelSegments: day.travelSegments.map((segment) => ({
+        ...segment,
+        fromItemKey: keys.get(segment.fromItemKey)!,
+        toItemKey: keys.get(segment.toItemKey)!,
+      })),
+    })),
+  });
+}
+
 function safeClientKey(id: string, used: Set<string>) {
   const raw = id
     .replace(/^[^:]+:/, "")
@@ -431,7 +460,12 @@ export function expandCompactItineraryCandidate(input: {
     days,
     restaurants,
     unresolvedItems: candidate.warnings,
-    assumptions: candidate.assumptions,
+    assumptions: unique([
+      ...candidate.assumptions,
+      ...input.approvedSummary.confirmedDecisions.map(
+        (decision) => decision.detail,
+      ),
+    ]).slice(0, 32),
     validationMetadata: {
       validatorVersion: ITINERARY_VALIDATOR_VERSION,
       validatedAt: null,

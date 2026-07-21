@@ -10,6 +10,7 @@ import {
   compactItineraryOutputTokenLimit,
   expandCompactItineraryCandidate,
   planCompactItineraryGeneration,
+  scopeCompactItineraryChunkKeys,
   validateCompactItineraryCandidate,
 } from "./compact-candidate";
 import { projectPublicItinerary } from "@/features/sharing/public-projection";
@@ -78,7 +79,17 @@ describe("compact itinerary deterministic expansion", () => {
     const candidate = makeCandidate();
     const input = {
       candidate,
-      approvedSummary: summary,
+      approvedSummary: {
+        ...summary,
+        confirmedDecisions: [
+          {
+            id: "confirmed:sunset",
+            label: "Must do",
+            detail: "Glacier Point sunset",
+            sourceMessageIds: [],
+          },
+        ],
+      },
       travelers: [
         { id: "traveler:one", displayName: "Riley", role: "host" as const },
         { id: "traveler:two", displayName: "Sam", role: "member" as const },
@@ -129,6 +140,7 @@ describe("compact itinerary deterministic expansion", () => {
       checkInDate: "2026-09-12",
       checkOutDate: "2026-09-13",
     });
+    expect(first.assumptions).toContain("Glacier Point sunset");
   });
 
   it("derives route endpoints, durations, ordering, and empty evidence/map state", () => {
@@ -302,5 +314,17 @@ describe("compact itinerary sizing and bounded long-trip generation", () => {
         ["2026-09-12", "2026-09-13"],
       ),
     ).toThrow("compact_itinerary_duplicate_key");
+
+    const scoped = combineCompactItineraryChunks(
+      [
+        scopeCompactItineraryChunkKeys(first, 0),
+        scopeCompactItineraryChunkKeys(makeCandidate(["2026-09-13"]), 1),
+      ],
+      ["2026-09-12", "2026-09-13"],
+    );
+    expect(scoped.days.map((day) => day.items[0].clientKey)).toEqual([
+      "g1-d1-i1",
+      "g2-d1-i1",
+    ]);
   });
 });

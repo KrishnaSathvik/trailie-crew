@@ -23,7 +23,10 @@ import { createCorrelationId } from "@/server/operations/logger";
 import { createAdminSupabaseClient } from "@/server/supabase/admin";
 import type { CompactItineraryCandidateV1 } from "@trailie/schemas";
 import { createOpenAIItineraryProvider } from "./openai-provider";
-import { createFakeItineraryProvider } from "./provider";
+import {
+  createFakeItineraryProvider,
+  withCompatibleItineraryFallback,
+} from "./provider";
 import { createItineraryRepository } from "./repository";
 import { processItineraryGeneration } from "./worker";
 import { withCancellationPolling } from "./cancellation-monitor";
@@ -53,23 +56,27 @@ async function withSlot(task: () => Promise<void>) {
 
 export async function drainItineraryGeneration(id: string) {
   const env = requireAiGeneration(parseOpenAIEnv(process.env));
+  const runtimeRouter = createTrailieRuntimeRouter({
+    fast: env.conversationModel,
+    reasoning: env.flagshipModel,
+    planning: env.planningModel,
+    itinerary: env.itineraryModel,
+  });
   const route = assertStructuredItineraryRoute(
-    createTrailieRuntimeRouter({
-      fast: env.conversationModel,
-      reasoning: env.flagshipModel,
-      planning: env.planningModel,
-      itinerary: env.itineraryModel,
-    }).route({
+    runtimeRouter.route({
       intent: "create_itinerary",
       request: "compact itinerary",
       complexity: "full_itinerary",
     }),
   );
+  const fallbackRoute = assertStructuredItineraryRoute(
+    runtimeRouter.compactItineraryFallback(),
+  );
   const selectedModel = route.model;
   if (!selectedModel) throw new Error("itinerary_model_route_unavailable");
   const travelEnvironment = parseTravelProviderEnv(process.env);
   const quotaSubject = await resolveAiQuotaSubject("itinerary", id);
-  const provider =
+  const baseProvider =
     env.provider === "fake"
       ? createFakeItineraryProvider({
           scenario:
@@ -162,6 +169,13 @@ export async function drainItineraryGeneration(id: string) {
       ],
     },
     async (runtimeTrace) => {
+      const provider =
+        env.provider === "fake"
+          ? baseProvider
+          : withCompatibleItineraryFallback(baseProvider, {
+              fallbackModel: fallbackRoute.model!,
+              onFallback: (reason) => runtimeTrace.recordFallback(reason),
+            });
       await withCancellationPolling({
         intervalMs: 750,
         isCancelled: async () => {

@@ -143,6 +143,18 @@ describe("Trailie runtime routing policy", () => {
     });
   });
 
+  it("exposes only the approved structured itinerary route as compact fallback", () => {
+    expect(
+      assertStructuredItineraryRoute(router.compactItineraryFallback()),
+    ).toMatchObject({
+      complexity: "full_itinerary",
+      route: "reasoning_planning",
+      model: "configured-itinerary",
+      reason: "compact_itinerary_approved_fallback",
+      structuredContract: true,
+    });
+  });
+
   it("uses the configured fast contract route for a planning summary", () => {
     expect(
       router.route({

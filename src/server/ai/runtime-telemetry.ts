@@ -174,6 +174,7 @@ export function createRuntimeTrace(input: {
   let providerCallCount = 0;
   let modelGenerationDurationMs = 0;
   let repairCount = 0;
+  let fallbackReason: string | null = null;
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
   let estimatedCost: number | null = null;
@@ -260,6 +261,9 @@ export function createRuntimeTrace(input: {
     recordRepairAttempt(count = 1) {
       repairCount += Math.max(Math.min(Math.round(count), 1), 0);
     },
+    recordFallback(reason: string) {
+      fallbackReason = safeReason(reason);
+    },
     setUsage(value: {
       inputTokens: number | null;
       outputTokens: number | null;
@@ -327,7 +331,7 @@ export function createRuntimeTrace(input: {
         estimatedCost,
         cancellationReason: safeReason(value.cancellationReason),
         timeoutReason: safeReason(value.timeoutReason),
-        fallbackReason: safeReason(value.fallbackReason),
+        fallbackReason: safeReason(value.fallbackReason) ?? fallbackReason,
         successState: value.state,
       };
     },

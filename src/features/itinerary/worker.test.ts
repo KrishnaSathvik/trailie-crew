@@ -238,9 +238,11 @@ describe("itinerary worker", () => {
       signal: AbortSignal.timeout(1_000),
     });
     output.candidate.days = output.candidate.days.slice(0, 1);
+    output.structuralRepairCount = 1;
+    const repair = vi.fn(provider.repair);
     await processItineraryGeneration("plan-invalid-coverage", {
       repository: repo,
-      provider: { generate: async () => output, repair: provider.repair },
+      provider: { generate: async () => output, repair },
       travelProvider: createFakeTravelProvider({ scenario: "valid" }),
       safetyIdentifier: "safe",
       now: "2026-07-13T19:00:00.000Z",
@@ -249,6 +251,38 @@ describe("itinerary worker", () => {
     expect(calls.generatedDrafts).toBe(0);
     expect(calls.published).toBe(0);
     expect(calls.failed).toEqual(["invalid_itinerary_response"]);
+    expect(repair).not.toHaveBeenCalled();
+  });
+
+  it("uses the one compact repair for post-schema date coverage before expansion", async () => {
+    const { repo, calls } = repository();
+    const fixture = createFakeItineraryProvider();
+    const generated = await fixture.generate({
+      operationKey: "date-repair-fixture",
+      model: "gpt-5.6-terra",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1_000),
+    });
+    generated.candidate.days[0].date = "2026-09-11";
+    const provider = {
+      generate: vi.fn().mockResolvedValue(generated),
+      repair: vi.fn(fixture.repair),
+    };
+
+    await processItineraryGeneration("plan-date-repair", {
+      repository: repo,
+      provider,
+      travelProvider: createFakeTravelProvider({ scenario: "valid" }),
+      safetyIdentifier: "safe",
+      now: "2026-07-13T19:00:00.000Z",
+    });
+
+    expect(provider.generate).toHaveBeenCalledTimes(1);
+    expect(provider.repair).toHaveBeenCalledTimes(1);
+    expect(calls.generatedDrafts).toBe(1);
+    expect(calls.published).toBe(1);
+    expect(calls.failed).toEqual([]);
   });
 
   it("bounds a ten-day trip to three day-group calls and persists only the combined expansion", async () => {

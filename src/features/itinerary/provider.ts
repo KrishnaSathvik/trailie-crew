@@ -51,6 +51,50 @@ export interface ItineraryProvider {
   repair(input: ItineraryProviderInput): Promise<ItineraryProviderOutput>;
 }
 
+const compatibleFallbackCodes = new Set<ItineraryErrorCode>([
+  "model_timeout",
+  "model_rate_limited",
+  "model_unavailable",
+]);
+
+export function withCompatibleItineraryFallback(
+  provider: ItineraryProvider,
+  input: {
+    fallbackModel: string;
+    onFallback?: (reason: ItineraryErrorCode) => void;
+  },
+): ItineraryProvider {
+  async function run(
+    method: "generate" | "repair",
+    request: ItineraryProviderInput,
+  ) {
+    try {
+      return await provider[method](request);
+    } catch (error) {
+      if (
+        !(error instanceof ItineraryProviderError) ||
+        !error.retryable ||
+        !compatibleFallbackCodes.has(error.code) ||
+        input.fallbackModel === request.model
+      )
+        throw error;
+      input.onFallback?.(error.code);
+      const output = await provider[method]({
+        ...request,
+        model: input.fallbackModel,
+      });
+      return {
+        ...output,
+        providerCallCount: (output.providerCallCount ?? 1) + 1,
+      };
+    }
+  }
+  return {
+    generate: (request) => run("generate", request),
+    repair: (request) => run("repair", request),
+  };
+}
+
 const unknownCost = {
   status: "unknown" as const,
   currency: "USD",

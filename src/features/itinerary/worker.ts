@@ -55,6 +55,7 @@ import {
   compactItineraryCandidateFromItinerary,
   expandCompactItineraryCandidate,
   planCompactItineraryGeneration,
+  scopeCompactItineraryChunkKeys,
   validateCompactItineraryCandidate,
 } from "./compact-candidate";
 
@@ -982,7 +983,10 @@ export async function processItineraryGeneration(
         providerDurationMs,
         totalDurationMs: Date.now() - workflowStartedAt,
         retryCount: Math.max(input.attempt - 1, 0),
-        repairCount: input.repairCount,
+        repairCount: Math.min(
+          input.repairCount + (output.structuralRepairCount ?? 0),
+          1,
+        ),
         structuralRepairCount: output.structuralRepairCount ?? 0,
       } satisfies ProviderAttemptExecutionResult<CompactItineraryCandidateV1>;
     };
@@ -1144,32 +1148,64 @@ export async function processItineraryGeneration(
           const outputs: ItineraryProviderOutput[] = [];
           let structuralRepairAvailable = true;
           for (const [index, dates] of generationPlan.groups.entries()) {
-            const generated = await dependencies.provider.generate({
+            let generated = await dependencies.provider.generate({
               operationKey:
                 generationPlan.mode === "single"
                   ? `${id}:generate`
                   : `${id}:generate:chunk:${index + 1}`,
               model: dependencies.model ?? "gpt-5.6-sol",
               safetyIdentifier: dependencies.safetyIdentifier,
-              context: `${baseContext}\n<DATE_GROUP>${JSON.stringify(dates)}</DATE_GROUP>`,
+              context: `${baseContext}\n<DATE_GROUP>${JSON.stringify(dates)}</DATE_GROUP>\n<DATE_GROUP_RULE>Return exactly one day for each DATE_GROUP value in that order and no other dates.</DATE_GROUP_RULE>`,
               dayCount: dates.length,
               allowStructuralRepair: structuralRepairAvailable,
               signal,
             });
-            structuralRepairAvailable =
-              structuralRepairAvailable &&
-              (generated.structuralRepairCount ?? 0) === 0;
-            const validChunk = validateCompactItineraryCandidate(
+            let validChunk = validateCompactItineraryCandidate(
               generated.candidate,
               dates,
               allowedSourceEntityIds,
             );
-            if (!validChunk.success)
-              throw new ItineraryProviderError(
-                "invalid_itinerary_response",
-                false,
+            if (!validChunk.success) {
+              if (
+                !structuralRepairAvailable ||
+                (generated.structuralRepairCount ?? 0) > 0
+              )
+                throw new ItineraryProviderError(
+                  "invalid_itinerary_response",
+                  false,
+                );
+              const repaired = await dependencies.provider.repair({
+                operationKey: `${id}:generate:compact-repair`,
+                model: dependencies.model ?? "gpt-5.6-sol",
+                safetyIdentifier: dependencies.safetyIdentifier,
+                context: `${baseContext}\n<DATE_GROUP>${JSON.stringify(dates)}</DATE_GROUP>\n<COMPACT_DRAFT>${JSON.stringify(generated.candidate)}</COMPACT_DRAFT>\n<STRUCTURAL_REPAIR>Return exactly one day for each DATE_GROUP value in that order. Use only supported OFFICIAL_PLACES ids for sourceEntityHint; otherwise use null. Preserve the candidate content while fixing Stage 1 structure.</STRUCTURAL_REPAIR>`,
+                dayCount: dates.length,
+                allowStructuralRepair: false,
+                signal,
+              });
+              validChunk = validateCompactItineraryCandidate(
+                repaired.candidate,
+                dates,
+                allowedSourceEntityIds,
               );
-            chunks.push(validChunk.data);
+              if (!validChunk.success)
+                throw new ItineraryProviderError("repair_failed", false);
+              generated = {
+                ...combineProviderOutputs(
+                  [generated, repaired],
+                  validChunk.data,
+                ),
+                structuralRepairCount: 1,
+              };
+            }
+            structuralRepairAvailable =
+              structuralRepairAvailable &&
+              (generated.structuralRepairCount ?? 0) === 0;
+            chunks.push(
+              generationPlan.mode === "chunked"
+                ? scopeCompactItineraryChunkKeys(validChunk.data, index)
+                : validChunk.data,
+            );
             outputs.push(generated);
           }
           return combineProviderOutputs(

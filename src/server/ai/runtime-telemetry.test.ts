@@ -99,6 +99,20 @@ describe("Trailie runtime telemetry", () => {
     });
   });
 
+  it("retains a safely classified fallback reason on successful completion", () => {
+    const trace = createRuntimeTrace({
+      requestId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a7",
+      roomId: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950a2",
+      responseType: "full_itinerary",
+    });
+    trace.recordFallback("model_unavailable");
+
+    expect(trace.complete({ state: "success" })).toMatchObject({
+      successState: "success",
+      fallbackReason: "model_unavailable",
+    });
+  });
+
   it("counts provider fallbacks without resetting the first model start", () => {
     let clock = 2_000;
     const trace = createRuntimeTrace({

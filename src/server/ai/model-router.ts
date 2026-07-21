@@ -128,6 +128,15 @@ export function createTrailieRuntimeRouter(
 ) {
   assertRuntimeConfiguration(configuration);
   return {
+    compactItineraryFallback(): TrailieRuntimeRouteDecision {
+      return {
+        complexity: "full_itinerary",
+        route: "reasoning_planning",
+        model: configuration.itinerary,
+        reason: "compact_itinerary_approved_fallback",
+        structuredContract: true,
+      };
+    },
     route(input: {
       intent: TrailieIntent;
       request: string;

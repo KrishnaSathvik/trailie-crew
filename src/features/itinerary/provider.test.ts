@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildItineraryRequest,
   parseCompactItineraryProviderOutput,
   runWithOneStructuralRepair,
 } from "./openai-provider";
-import { createFakeItineraryProvider } from "./provider";
+import {
+  createFakeItineraryProvider,
+  ItineraryProviderError,
+  withCompatibleItineraryFallback,
+} from "./provider";
 
 describe("itinerary provider boundary", () => {
   it("classifies platform timeout errors as model timeouts", async () => {
@@ -128,5 +132,42 @@ describe("itinerary provider boundary", () => {
         throw new Error("invalid_itinerary_response");
       }),
     ).rejects.toThrow("invalid_itinerary_response");
+  });
+
+  it("falls back once to a distinct approved compatible model on provider unavailability", async () => {
+    const fallbackOutput = await createFakeItineraryProvider().generate({
+      operationKey: "fallback-fixture",
+      model: "approved-fallback",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1_000),
+    });
+    const models: string[] = [];
+    const provider = {
+      generate: vi.fn(async (input) => {
+        models.push(input.model);
+        if (input.model === "approved-primary")
+          throw new ItineraryProviderError("model_unavailable", true);
+        return fallbackOutput;
+      }),
+      repair: vi.fn(),
+    };
+    const onFallback = vi.fn();
+    const wrapped = withCompatibleItineraryFallback(provider, {
+      fallbackModel: "approved-fallback",
+      onFallback,
+    });
+
+    const result = await wrapped.generate({
+      operationKey: "fallback",
+      model: "approved-primary",
+      safetyIdentifier: "safe",
+      context: "fixture",
+      signal: AbortSignal.timeout(1_000),
+    });
+
+    expect(models).toEqual(["approved-primary", "approved-fallback"]);
+    expect(result.providerCallCount).toBe(2);
+    expect(onFallback).toHaveBeenCalledWith("model_unavailable");
   });
 });
