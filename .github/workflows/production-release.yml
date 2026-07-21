@@ -113,8 +113,11 @@ jobs:
       - name: Deterministic tests
         run: pnpm test
 
+      # `build:local` wraps the build in a local Supabase shim that forces
+      # APP_ENV=local, the fake AI provider, CAPTCHA test mode, and the
+      # deterministic map adapter. It cannot validate a Production build.
       - name: Production build preflight
-        run: pnpm build:local
+        run: pnpm build
 
       - name: Require a clean tracked workspace
         run: |

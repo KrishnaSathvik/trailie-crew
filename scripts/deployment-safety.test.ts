@@ -211,5 +211,9 @@ describe("deployment command safety", () => {
     expect(workflow).toContain("git diff --cached --exit-code");
     expect(workflow).toContain('OUTBOUND_EMAIL_ENABLED: "false"');
     expect(workflow).toContain('OPERATIONAL_ALERTS_ENABLED: "false"');
+    // The local Supabase shim forces APP_ENV=local, fake AI, CAPTCHA test mode,
+    // and the deterministic map adapter, so it can never gate a Production build.
+    expect(workflow).toContain("run: pnpm build\n");
+    expect(workflow).not.toContain("pnpm build:local");
   });
 });
