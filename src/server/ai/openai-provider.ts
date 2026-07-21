@@ -1,7 +1,6 @@
 import "server-only";
 
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import {
   createTrailieResponseDraftV1SchemaForBlocks,
   trailieResponseDraftV1Schema,
@@ -20,31 +19,17 @@ import { StructuredBodyExtractor } from "@/server/ai/streaming-body";
 import { extractUsage } from "@/server/ai/usage";
 import { normalizeProviderError } from "@/server/ai/reliability-policy";
 import { logOperation } from "@/server/operations/logger";
+import { createProviderCompatibleZodTextFormat } from "@/server/ai/provider-compatible-schema";
 
 const focusedAnswerModelSchema = trailieResponseDraftV1Schema;
-
-function omitProviderFormatAnnotations(value: unknown): unknown {
-  if (Array.isArray(value))
-    return value.map((item) => omitProviderFormatAnnotations(item));
-  if (typeof value !== "object" || value === null) return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => key !== "format")
-      .map(([key, entryValue]) => [
-        key,
-        omitProviderFormatAnnotations(entryValue),
-      ]),
-  );
-}
 
 function createFocusedAnswerTextFormat(
   schema: ReturnType<typeof createTrailieResponseDraftV1SchemaForBlocks>,
 ) {
-  const format = zodTextFormat(schema, "trailie_focused_answer");
-  format.schema = omitProviderFormatAnnotations(
-    format.schema,
-  ) as typeof format.schema;
-  return format;
+  return createProviderCompatibleZodTextFormat(
+    schema,
+    "trailie_focused_answer",
+  );
 }
 
 export function buildFocusedAnswerRequest(input: {

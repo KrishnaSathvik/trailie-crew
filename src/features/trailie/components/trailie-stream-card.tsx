@@ -93,7 +93,7 @@ export function TrailieStreamCard({
         <p className="text-muted-foreground mt-2 text-sm">Stopped</p>
       ) : null}
       {body ? (
-        <div className="mt-2 break-words">
+        <div className="mt-2 break-words" data-testid="trailie-stream-output">
           <SafeMarkdownView markdown={body} />
         </div>
       ) : null}

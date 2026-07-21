@@ -88,6 +88,7 @@ export function ChatExperience({
   const [composerKey, setComposerKey] = useState(0);
   const [trailieAnswer, setTrailieAnswer] = useState<{
     source: TrailieInvocationSource;
+    invocationId: string | null;
     body: string;
     status: "answering" | "retrying" | "recovering" | "stopped" | "failed";
     stage: TrailieProgressStage;
@@ -303,6 +304,33 @@ export function ChatExperience({
       return [...withoutRetry, optimistic];
     });
     setReplyingTo(null);
+    const optimisticTrailieDecision = detectTrailieInvocation({
+      body,
+      replyTargetType,
+    });
+    let optimisticTrailieController: AbortController | null = null;
+    if (optimisticTrailieDecision.invoked && !trailieAbortRef.current) {
+      optimisticTrailieController = new AbortController();
+      trailieAbortRef.current = optimisticTrailieController;
+      setTrailieAnswer({
+        source: { id: clientMessageId, body, replyTargetType },
+        invocationId: null,
+        body: "",
+        status: "answering",
+        stage: "reading_conversation",
+        errorCode: null,
+        retryable: false,
+      });
+    }
+    const discardOptimisticTrailie = () => {
+      if (!optimisticTrailieController) return;
+      optimisticTrailieController.abort();
+      if (trailieAbortRef.current === optimisticTrailieController)
+        trailieAbortRef.current = null;
+      setTrailieAnswer((current) =>
+        current?.source.id === clientMessageId ? null : current,
+      );
+    };
     let result;
     try {
       result = await sendMessageAction({
@@ -313,6 +341,7 @@ export function ChatExperience({
         replyToMessageId: optimistic.replyToMessageId,
       });
     } catch {
+      discardOptimisticTrailie();
       setMessages((current) =>
         current.map((message) =>
           message.clientMessageId === clientMessageId
@@ -324,6 +353,7 @@ export function ChatExperience({
       return false;
     }
     if (!result.ok) {
+      discardOptimisticTrailie();
       setMessages((current) =>
         current.map((message) =>
           message.clientMessageId === clientMessageId
@@ -336,44 +366,68 @@ export function ChatExperience({
     }
     setMessages((current) => mergeRoomMessages(current, [result.data]));
     setError(null);
-    const decision = detectTrailieInvocation({
-      body: result.data.body,
-      replyTargetType,
-    });
-    if (decision.invoked) {
-      enqueueTrailie({
-        id: result.data.id,
-        body: result.data.body,
-        replyTargetType,
-      });
+    if (optimisticTrailieDecision.invoked) {
+      enqueueTrailie(
+        {
+          id: result.data.id,
+          body: result.data.body,
+          replyTargetType,
+        },
+        optimisticTrailieController ?? undefined,
+      );
     }
     return true;
   }
 
-  function enqueueTrailie(source: TrailieInvocationSource) {
+  function enqueueTrailie(
+    source: TrailieInvocationSource,
+    optimisticController?: AbortController,
+  ) {
     if (queuedTrailieSourcesRef.current.has(source.id)) return;
     queuedTrailieSourcesRef.current.add(source.id);
     const queued = trailieQueueRef.current
       .catch(() => undefined)
       .then(async () => {
-        if (mountedRef.current) await invokeTrailie(source);
+        if (mountedRef.current)
+          await invokeTrailie(source, optimisticController);
       })
       .finally(() => queuedTrailieSourcesRef.current.delete(source.id));
     trailieQueueRef.current = queued;
     void queued;
   }
 
-  async function invokeTrailie(source: TrailieInvocationSource) {
-    const controller = new AbortController();
+  async function invokeTrailie(
+    source: TrailieInvocationSource,
+    optimisticController?: AbortController,
+  ) {
+    const controller = optimisticController ?? new AbortController();
     trailieAbortRef.current = controller;
-    setTrailieAnswer({
-      source,
-      body: "",
-      status: "answering",
-      stage: "reading_conversation",
-      errorCode: null,
-      retryable: false,
-    });
+    if (controller.signal.aborted) {
+      setTrailieAnswer((current) =>
+        current
+          ? {
+              ...current,
+              source,
+              status: "stopped",
+              retryable: true,
+            }
+          : current,
+      );
+      return;
+    }
+    setTrailieAnswer((current) =>
+      optimisticController && current
+        ? { ...current, source }
+        : {
+            source,
+            invocationId: null,
+            body: "",
+            status: "answering",
+            stage: "reading_conversation",
+            errorCode: null,
+            retryable: false,
+          },
+    );
     const slowTimer = window.setTimeout(() => {
       setTrailieAnswer((current) =>
         current &&
@@ -389,6 +443,7 @@ export function ChatExperience({
           : current,
       );
     }, 300);
+    let terminalEventReceived = false;
     try {
       for await (const event of invokeTrailieStream({
         roomId: data.room.id,
@@ -396,7 +451,11 @@ export function ChatExperience({
         sourceMessageId: source.id,
         signal: controller.signal,
       })) {
-        if (event.type === "text_delta") {
+        if (event.type === "invocation_started") {
+          setTrailieAnswer((current) =>
+            current ? { ...current, invocationId: event.invocationId } : null,
+          );
+        } else if (event.type === "text_delta") {
           setTrailieAnswer((current) =>
             current ? { ...current, body: current.body + event.delta } : null,
           );
@@ -413,12 +472,14 @@ export function ChatExperience({
             current ? { ...current, body: "", status: "recovering" } : null,
           );
         } else if (event.type === "response_completed") {
+          terminalEventReceived = true;
           setTrailieAnswer((current) =>
             current ? { ...current, body: event.response.message } : null,
           );
           await refreshLatest();
           setTrailieAnswer(null);
         } else if (event.type === "response_failed") {
+          terminalEventReceived = true;
           setTrailieAnswer((current) =>
             current
               ? {
@@ -438,6 +499,18 @@ export function ChatExperience({
               : null,
           );
         }
+      }
+      if (!terminalEventReceived && !controller.signal.aborted) {
+        setTrailieAnswer((current) =>
+          current
+            ? {
+                ...current,
+                status: "failed",
+                errorCode: "invocation_failed",
+                retryable: true,
+              }
+            : null,
+        );
       }
     } catch {
       if (controller.signal.aborted) {

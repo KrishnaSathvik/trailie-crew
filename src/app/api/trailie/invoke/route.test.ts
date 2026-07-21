@@ -2,6 +2,30 @@ import { expect, it } from "vitest";
 
 import { parseRoomMemory } from "./route";
 
+it("selects only policy-required database context for a simple answer", async () => {
+  const routeModule = (await import("./route")) as Record<string, unknown>;
+  expect(routeModule.selectFocusedContextLoads).toBeTypeOf("function");
+  const select = routeModule.selectFocusedContextLoads as (
+    intent: string,
+  ) => Record<string, boolean>;
+  expect(select("direct_question")).toEqual({
+    room: false,
+    memory: false,
+    currentPlan: false,
+    planning: false,
+    revision: false,
+    versionHistory: false,
+    approvals: false,
+  });
+  expect(select("trip_context_question")).toMatchObject({
+    memory: true,
+    currentPlan: false,
+    planning: false,
+    revision: false,
+    versionHistory: false,
+  });
+});
+
 it("normalizes the private memory RPC wrapper into bounded context input", () => {
   const roomId = "b1741efc-ae50-4015-9cff-fdfaa1deb94e";
   const result = parseRoomMemory(roomId, {

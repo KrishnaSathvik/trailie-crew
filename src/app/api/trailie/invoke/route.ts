@@ -6,6 +6,7 @@ import {
   trailieResponseDraftV1Schema,
   trailieResponseV1Schema,
   trailieStreamEventSchema,
+  type TrailieIntent,
   type TrailieProgressStage,
   tripPlanViewSchema,
   type TrailieResponseV1,
@@ -176,6 +177,19 @@ const contextSectionNames = new Set<TrailieContextSection>([
   "selected_flights",
   "evidence",
 ]);
+
+export function selectFocusedContextLoads(intent: TrailieIntent) {
+  const required = new Set(getTrailieIntentPolicy(intent).requiredContext);
+  return {
+    room: required.has("trip"),
+    memory: required.has("shared_trip_context") || required.has("crew_signals"),
+    currentPlan: required.has("current_plan"),
+    planning: required.has("planning") || required.has("approvals"),
+    revision: required.has("revision") || required.has("approvals"),
+    versionHistory: required.has("version_history"),
+    approvals: required.has("approvals"),
+  };
+}
 
 function jsonError(code: string, status: number) {
   return Response.json({ code }, { status });
@@ -450,6 +464,7 @@ export async function POST(request: Request) {
     intent,
     request: decision.normalizedRequest,
   });
+  const contextLoads = selectFocusedContextLoads(intent);
   const [
     roomResult,
     memoryResult,
@@ -458,46 +473,69 @@ export async function POST(request: Request) {
     revisionResult,
     versionResult,
   ] = await Promise.all([
-    client.from("rooms").select("*").eq("id", parsed.data.roomId).maybeSingle(),
-    admin.rpc("get_private_room_memory", {
-      target_room_id: parsed.data.roomId,
-    }),
-    client.rpc("get_trip_plan", {
-      target_room_id: parsed.data.roomId,
-    }),
-    client
-      .from("planning_requests")
-      .select("*")
-      .eq("room_id", parsed.data.roomId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    client
-      .from("plan_change_requests")
-      .select("*")
-      .eq("room_id", parsed.data.roomId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    client.rpc("list_plan_versions", {
-      target_room_id: parsed.data.roomId,
-    }),
+    contextLoads.room
+      ? client
+          .from("rooms")
+          .select("*")
+          .eq("id", parsed.data.roomId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    contextLoads.memory
+      ? admin.rpc("get_private_room_memory", {
+          target_room_id: parsed.data.roomId,
+        })
+      : Promise.resolve({ data: null, error: null }),
+    contextLoads.currentPlan
+      ? client.rpc("get_trip_plan", {
+          target_room_id: parsed.data.roomId,
+        })
+      : Promise.resolve({ data: null, error: null }),
+    contextLoads.planning
+      ? client
+          .from("planning_requests")
+          .select("*")
+          .eq("room_id", parsed.data.roomId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    contextLoads.revision
+      ? client
+          .from("plan_change_requests")
+          .select("*")
+          .eq("room_id", parsed.data.roomId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    contextLoads.versionHistory
+      ? client.rpc("list_plan_versions", {
+          target_room_id: parsed.data.roomId,
+        })
+      : Promise.resolve({ data: [], error: null }),
   ]);
-  if (roomResult.error || !roomResult.data || memoryResult.error) {
+  if (
+    (contextLoads.room && (roomResult.error || !roomResult.data)) ||
+    (contextLoads.memory && memoryResult.error)
+  ) {
     logOperation("trailie_ai.context_failed", {
       correlationId,
       workflow: "focused_answer",
       status: "failed",
-      errorCode: roomResult.error
-        ? `room_context_unavailable:${roomResult.error.code ?? "unknown"}`
-        : memoryResult.error
-          ? "memory_context_unavailable"
-          : "room_context_missing",
+      errorCode:
+        contextLoads.room && roomResult.error
+          ? `room_context_unavailable:${roomResult.error.code ?? "unknown"}`
+          : contextLoads.memory && memoryResult.error
+            ? "memory_context_unavailable"
+            : "room_context_missing",
     });
     return jsonError("context_unavailable", 503);
   }
 
-  const memory = parseRoomMemory(parsed.data.roomId, memoryResult.data);
+  const memory = parseRoomMemory(
+    parsed.data.roomId,
+    contextLoads.memory ? memoryResult.data : {},
+  );
   if (!memory.success) {
     logOperation("trailie_ai.context_failed", {
       correlationId,
@@ -508,13 +546,13 @@ export async function POST(request: Request) {
     return jsonError("context_unavailable", 503);
   }
   const [planningApprovalsResult, revisionApprovalsResult] = await Promise.all([
-    planningResult.data
+    contextLoads.approvals && planningResult.data
       ? client
           .from("planning_approvals")
           .select("participant_id,decision")
           .eq("planning_request_id", planningResult.data.id)
       : Promise.resolve({ data: [], error: null }),
-    revisionResult.data
+    contextLoads.approvals && revisionResult.data
       ? client
           .from("plan_change_approvals")
           .select("participant_id,decision")
@@ -550,7 +588,6 @@ export async function POST(request: Request) {
     return jsonError("context_unavailable", 503);
   }
   const requestedSections = new Set<TrailieContextSection>([
-    "trip",
     "requester_permissions",
     "recent_messages",
     ...intentPolicy.requiredContext.filter(
@@ -702,11 +739,17 @@ export async function POST(request: Request) {
     ),
   });
   const trailieContext = buildTrailieContext({
-    trip: {
-      id: roomResult.data.id,
-      name: roomResult.data.name,
-      approvalMode: roomResult.data.approval_mode,
-    },
+    trip: roomResult.data
+      ? {
+          id: roomResult.data.id,
+          name: roomResult.data.name,
+          approvalMode: roomResult.data.approval_mode,
+        }
+      : {
+          id: parsed.data.roomId,
+          name: "Trip",
+          approvalMode: "all_active",
+        },
     requester: {
       participantId: participant.id,
       role: participant.role,

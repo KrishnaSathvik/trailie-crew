@@ -218,6 +218,77 @@ describe("ChatExperience", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 
+  it("shows Trailie activity before the message server action acknowledges", async () => {
+    const user = userEvent.setup();
+    let acknowledge:
+      | ((value: Awaited<ReturnType<typeof sendMessageAction>>) => void)
+      | undefined;
+    vi.mocked(sendMessageAction).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          acknowledge = resolve;
+        }) as ReturnType<typeof sendMessageAction>,
+    );
+
+    render(<ChatExperience data={data} onPresenceChange={vi.fn()} />);
+    await user.type(
+      screen.getByLabelText("Message your crew"),
+      "@Trailie help us pack",
+    );
+    const submit = user.keyboard("{Enter}");
+    try {
+      await waitFor(
+        () =>
+          expect(screen.getByText("Reading the conversation")).toBeVisible(),
+        { timeout: 250 },
+      );
+      expect(invokeTrailieStream).not.toHaveBeenCalled();
+    } finally {
+      acknowledge?.({ ok: false, error: "message_send_failed" });
+      await submit;
+    }
+  });
+
+  it("turns a stream that closes without a terminal event into a retryable failure", async () => {
+    const user = userEvent.setup();
+    vi.mocked(sendMessageAction).mockImplementation(async (input) => ({
+      ok: true,
+      data: {
+        id: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950c0",
+        roomId: data.room.id,
+        participantId: data.currentParticipant.id,
+        messageType: "user",
+        body: (input as { body: string }).body,
+        clientMessageId: (input as { clientMessageId: string }).clientMessageId,
+        replyToMessageId: null,
+        sender: {
+          participantId: data.currentParticipant.id,
+          displayName: "Maya",
+          role: "host",
+        },
+        reply: null,
+        reactions: [],
+        createdAt: "2026-07-13T18:01:00.000Z",
+        editedAt: null,
+        deletedAt: null,
+      },
+    }));
+    vi.mocked(invokeTrailieStream).mockImplementation(async function* () {
+      return;
+    });
+
+    render(<ChatExperience data={data} onPresenceChange={vi.fn()} />);
+    await user.type(
+      screen.getByLabelText("Message your crew"),
+      "@Trailie answer briefly{enter}",
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Trailie could not answer just now",
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+
   it("rolls an optimistic reaction back when the mutation fails", async () => {
     const user = userEvent.setup();
     vi.mocked(toggleReactionAction).mockResolvedValue({
