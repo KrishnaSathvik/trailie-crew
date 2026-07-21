@@ -52,6 +52,9 @@ jobs:
       PRIVACY_EMAIL: privacy@trailiecrew.com
       SECURITY_EMAIL: security@trailiecrew.com
     steps:
+      - name: Require workflow dispatch from main
+        run: test "$GITHUB_REF" = "refs/heads/main"
+
       - name: Validate exact commit input
         shell: bash
         run: |
@@ -64,6 +67,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Require selected commit on origin/main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$PRODUCTION_RELEASE_COMMIT" origin/main
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -102,6 +111,11 @@ jobs:
 
       - name: Production build preflight
         run: pnpm build:local
+
+      - name: Require a clean tracked workspace
+        run: |
+          git diff --exit-code
+          git diff --cached --exit-code
 
       # Production migration and deploy steps remain intentionally disabled in
       # Phase 9A. Enable them only after the final launch gate approves database

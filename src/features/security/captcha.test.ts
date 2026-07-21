@@ -31,6 +31,18 @@ describe("CAPTCHA verifier", () => {
     } satisfies Partial<CaptchaVerificationError>);
   });
 
+  it("rejects an oversized token before provider traffic", async () => {
+    const deps = dependencies();
+    const verify = createCaptchaVerifier(deps);
+    await expect(
+      verify({ token: "x".repeat(2049), purpose: "create_trip", user }),
+    ).rejects.toMatchObject({ code: "captcha_invalid" });
+    await expect(
+      verify({ token: "é".repeat(1025), purpose: "create_trip", user }),
+    ).rejects.toMatchObject({ code: "captcha_invalid" });
+    expect(deps.fetch).not.toHaveBeenCalled();
+  });
+
   it("uses a deterministic adapter only when explicitly enabled", async () => {
     const deps = dependencies({ testMode: true });
     const verify = createCaptchaVerifier(deps);

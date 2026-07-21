@@ -65,6 +65,42 @@ describe("external operational alerts", () => {
     ).toThrow();
   });
 
+  it("includes only the canonical application link in Production alerts", () => {
+    const configuration = parseOperationalAlertEnv({
+      OPERATIONAL_ALERT_WEBHOOK_URL: "https://alerts.example.test/trailie",
+      OPERATIONAL_ALERT_OWNER: "platform-on-call",
+      ALERT_ENVIRONMENT: "production",
+      NEXT_PUBLIC_SITE_URL: "https://app.trailiecrew.com",
+    });
+    expect(
+      buildOperationalAlert("database.failed", {}, configuration),
+    ).toMatchObject({
+      environment: "production",
+      applicationUrl: "https://app.trailiecrew.com",
+    });
+    expect(() =>
+      parseOperationalAlertEnv({
+        OPERATIONAL_ALERT_WEBHOOK_URL: "https://alerts.example.test/trailie",
+        OPERATIONAL_ALERT_OWNER: "platform-on-call",
+        ALERT_ENVIRONMENT: "production",
+        NEXT_PUBLIC_SITE_URL: "https://preview.trailiecrew.com",
+      }),
+    ).toThrow(/canonical/i);
+  });
+
+  it("does not treat a local optimized runtime as a Production deployment", () => {
+    expect(
+      parseOperationalAlertEnv({
+        APP_ENV: "local",
+        NODE_ENV: "production",
+        NEXT_PUBLIC_SITE_URL: "https://local.example.test",
+      }),
+    ).toMatchObject({
+      enabled: false,
+      applicationUrl: "https://local.example.test",
+    });
+  });
+
   it("delivers once with bounded headers and never forwards metadata", async () => {
     const fetcher = vi
       .fn()
@@ -84,6 +120,7 @@ describe("external operational alerts", () => {
             webhookSecret: "secret-header-value",
             environment: "preview",
             owner: "platform-on-call",
+            applicationUrl: "https://preview.trailiecrew.com",
           },
           fetcher,
         },
@@ -113,6 +150,7 @@ describe("external operational alerts", () => {
             webhookSecret: null,
             environment: "development",
             owner: "unassigned",
+            applicationUrl: null,
           },
           fetcher,
         },

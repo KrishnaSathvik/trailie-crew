@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -62,5 +64,18 @@ describe("deployment command safety", () => {
         SUPABASE_AUTH_CAPTCHA_ENABLED: "false",
       }),
     ).toThrow(/missing|CAPTCHA/i);
+  });
+
+  it("pins Production release to a clean commit reachable from origin/main", () => {
+    const workflow = readFileSync(
+      ".github/workflows/production-release.yml",
+      "utf8",
+    );
+    expect(workflow).toContain('test "$GITHUB_REF" = "refs/heads/main"');
+    expect(workflow).toContain(
+      'git merge-base --is-ancestor "$PRODUCTION_RELEASE_COMMIT" origin/main',
+    );
+    expect(workflow).toContain("git diff --exit-code");
+    expect(workflow).toContain("git diff --cached --exit-code");
   });
 });

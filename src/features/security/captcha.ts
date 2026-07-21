@@ -63,6 +63,8 @@ export function createCaptchaVerifier<Action extends CaptchaAction>(
     const normalizedToken = token.trim();
     if (!normalizedToken)
       throw new CaptchaVerificationError("captcha_required");
+    if (new TextEncoder().encode(normalizedToken).byteLength > 2_048)
+      throw new CaptchaVerificationError("captcha_invalid");
 
     const expiresAt = new Date(
       dependencies.now().getTime() + 2 * 60 * 1000,

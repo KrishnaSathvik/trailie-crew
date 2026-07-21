@@ -13,6 +13,11 @@ const alertEnvironmentSchema = z.object({
   OPERATIONAL_ALERT_WEBHOOK_SECRET: z.string().min(16).max(512).optional(),
   OPERATIONAL_ALERT_OWNER: z.string().trim().min(2).max(100).optional(),
   ALERT_ENVIRONMENT: z.string().trim().min(1).max(50).optional(),
+  NEXT_PUBLIC_SITE_URL: z
+    .url()
+    .refine((value) => new URL(value).protocol === "https:")
+    .optional(),
+  APP_ENV: z.enum(["local", "preview", "production"]).optional(),
   VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
@@ -25,16 +30,27 @@ export function parseOperationalAlertEnv(source: EnvironmentSource) {
   const values = alertEnvironmentSchema.parse(source);
   if (values.OPERATIONAL_ALERT_WEBHOOK_URL && !values.OPERATIONAL_ALERT_OWNER)
     throw new Error("Operational alert owner is required.");
+  const environment =
+    values.ALERT_ENVIRONMENT ??
+    values.VERCEL_ENV ??
+    values.NODE_ENV ??
+    "development";
+  const isProductionDeployment =
+    values.APP_ENV === "production" ||
+    values.ALERT_ENVIRONMENT === "production" ||
+    values.VERCEL_ENV === "production";
+  if (
+    isProductionDeployment &&
+    values.NEXT_PUBLIC_SITE_URL !== "https://app.trailiecrew.com"
+  )
+    throw new Error("Production alerts require the canonical application URL.");
   return {
     enabled: Boolean(values.OPERATIONAL_ALERT_WEBHOOK_URL),
     webhookUrl: values.OPERATIONAL_ALERT_WEBHOOK_URL ?? null,
     webhookSecret: values.OPERATIONAL_ALERT_WEBHOOK_SECRET ?? null,
-    environment:
-      values.ALERT_ENVIRONMENT ??
-      values.VERCEL_ENV ??
-      values.NODE_ENV ??
-      "development",
+    environment,
     owner: values.OPERATIONAL_ALERT_OWNER ?? "unassigned",
+    applicationUrl: values.NEXT_PUBLIC_SITE_URL ?? null,
   } as const;
 }
 
@@ -69,7 +85,11 @@ function severity(event: string, status: unknown) {
 export function buildOperationalAlert(
   event: string,
   metadata: AlertMetadata,
-  context: { environment: string; owner: string },
+  context: {
+    environment: string;
+    owner: string;
+    applicationUrl?: string | null;
+  },
 ) {
   const counts = numericTree(metadata.counts);
   return {
@@ -78,6 +98,9 @@ export function buildOperationalAlert(
     severity: severity(event, metadata.status),
     environment: safeCode(context.environment, 50) ?? "unknown",
     owner: safeCode(context.owner, 100) ?? "unassigned",
+    ...(context.applicationUrl
+      ? { applicationUrl: context.applicationUrl }
+      : {}),
     ...(safeCode(metadata.correlationId, 100)
       ? { correlationId: safeCode(metadata.correlationId, 100)! }
       : {}),
