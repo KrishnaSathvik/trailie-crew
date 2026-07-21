@@ -586,3 +586,52 @@ ordinary Phase 8D acceptance passes, but 10-day hosted chunk completion remains
 for later work. Vercel Authentication stayed enabled, temporary bypass count
 returned to zero, and Production was untouched. Phase 8D verdict: **the ordinary
 itinerary release blocker is cleared; Production hardening was not started.**
+
+## 2026-07-21 — Phase 9A Production infrastructure bootstrap
+
+The environment topology is now explicit: Local uses the local application and
+local Supabase; Preview uses Vercel `trailie-crew-preview`
+(`prj_8VfR8A6S4G63mZIVNVuCUPQKWLwi`) and Supabase
+`tkccksmiuucdstvvfglp`; Production uses the new empty Vercel project
+`trailie-crew-production` (`prj_UHv658VeaSYiLnK629s9XbkETBS8`) and still
+awaits an independently billed Supabase project. Both Vercel projects require
+Vercel Authentication and have zero bypasses. Production has no Git link and
+no deployment; release remains an exact-commit, manually approved workflow
+whose migration and deployment steps are deliberately disabled in Phase 9A.
+
+`app.trailiecrew.com` is associated with Production and
+`preview.trailiecrew.com` with Preview. Vercel DNS now has explicit `A` records
+for `app` and `preview` to `76.76.21.21`; DNS resolution/hostname smoke remains
+pending propagation. Root landing and `www` redirect routing are not attached.
+Production URL, legal URL, contact-address, CSP/origin, secure-cookie, and
+Turnstile hostname/action/expiry contracts are implemented. The role mailboxes
+are not claimed operational; delivery verification is a launch blocker.
+
+The typed environment inventory covers Public, Server-only, Provider, Auth,
+Security, Observability, Recovery, Email, and Database variables without
+values. Production has only 15 independent non-secret bootstrap controls;
+Supabase keys, recovery/cron secrets, provider credentials, real Turnstile
+keys, email credentials, analytics, and alert webhooks were not copied from
+Preview. Startup and command guards reject Preview/Production project mixing,
+test fixtures and bypasses, fake/dummy provider credentials, Production reset,
+and hosted acceptance outside the exact Preview stack.
+
+The repository has 36 ordered migrations, state checksum
+`6d8e5ef6dbf1ae4dd8afc858d67425d791b0daa3b5b13dcc2aa747d85f363af2`,
+and two reviewed historical constraint drops. Preview has all 36 migrations,
+55 RLS-enabled application tables (38 private tables also forced), 203 safe
+`SECURITY DEFINER` functions with no unsafe `search_path`, no storage objects,
+no Edge Functions, and no Edge Function secrets. Production migrations, Auth
+redirects, RLS/grant checks, emptiness checks, and backup verification remain
+blocked on Production Supabase creation. PITR remains disabled/unapproved;
+the initial decision is paid daily backups plus off-site logical dumps and a
+timed restore drill (RPO up to 24 hours), unless stronger paid PITR is approved.
+
+Verification passed format, lint, typecheck, 844/844 Vitest tests, 24 pgTAP
+files with 775 assertions, migration verification, production build, client
+bundle/server-secret scan, and `git diff --check`. Remaining Phase 9A blockers
+are Production Supabase billing/password storage, independent Production
+database/Auth secrets, real Turnstile keys, GitHub authentication and protected
+environment approval, DNS propagation smoke, external alerts, mailbox delivery,
+and the later controlled Production smoke/rollback gate. Production exposure
+status: **no Production deployment and no invited traffic**.
