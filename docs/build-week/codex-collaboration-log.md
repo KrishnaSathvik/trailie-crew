@@ -472,3 +472,68 @@ reasoning/planning route is far outside the itinerary target. Production
 hardening is not authorized; the next optimization is reducing
 reasoning-provider generation/repair latency and completing a fresh bounded
 hosted matrix after the terminal-state fix.
+
+## 2026-07-20 — Phase 8C planning performance optimization
+
+Started from accepted Phase 8B commit `b2bf92c`. The fresh pre-change hosted
+trace measured normal chat at 1.648-second p50 total and 1.019-second p50 first
+token, planning summary at 46.834 seconds, and itinerary generation failing
+after a 181.644-second main-model call. The critical path was delayed by a
+server-acknowledged activity card, unconditional broad focused-answer reads, a
+high-reasoning planning-summary contract, sequential evidence follow-ups, and
+a high-reasoning 12,000-token itinerary contract with up to another full
+repair call.
+
+Phase 8C now renders Trailie activity optimistically and reconciles the durable
+request ID; a missing stream terminal event becomes a retryable failure. Simple
+answers load only intent-required context. Planning summary uses the configured
+fast route, a 9,000-character context, low reasoning, an 1,800-token strict
+contract, one bounded provider call where available, and 750 ms result polling.
+Itinerary generation uses low reasoning, an 8,000-token/28,000-character
+generation context, a 44,000-character repair context, and one total repair
+budget across structural and semantic repair. Planning, generation, and repair
+calls have 18/45/20-second product recovery bounds; abort timeouts are reported
+as timeouts, not provider outages.
+
+Independent NPS/RIDB/weather/daylight follow-ups, geocoding, routes, and
+evidence stores are parallelized. Required route feasibility now
+precedes a membership-only validated core preview; optional place, map, and
+booking enrichment follows without exposing draft evidence publicly or moving
+the room's published version. Cancellation polls durable state every 750 ms and
+aborts active model/provider work. Structured telemetry now records actual
+context, model, validation, repair, map/evidence, persistence, usage, and final
+render-ready stages. Generation, cancellation, blocked, failed, and timeout
+paths all end in an explicit terminal state.
+
+Focused verification passed 146 Vitest cases plus the worker/telemetry follow-up
+set, 36 Phase 8B/8C pgTAP checks, formatting, lint, typecheck, production build,
+client-bundle/secret scans, and `git diff --check`. Context and output reductions
+preserve approval, schema, feasibility, evidence, privacy, version, and
+publication gates. No raw structured draft is published; private preview data
+is unavailable to anonymous/public share projections.
+
+The bounded protected-hosted sample contains exactly 10 simple answers, five
+planning summaries, and three itineraries. Simple answers completed at
+p50/p95/max 1.644/2.816/3.131 seconds, with first token at
+0.844/1.245 seconds and conservative server-visible state at 156/288 ms. Thus
+first token passes; immediate state is **close** (p50 misses by 6 ms, p95
+passes). Simple usage was 17,398 input and 978 output tokens; cost was not
+reported. Planning summaries completed at p50/p95/max
+4.794/8.926/8.926 seconds (**pass**), using 10,402 input and 3,576 output tokens
+in total, with no failures, fallbacks, or external travel-provider calls.
+
+All three itineraries reached a terminal failure at 46.430–47.004 seconds,
+before validation or repair and without publication. The selected
+reasoning/planning route did not return its strict structured response within
+the 45-second main-model bound; the browser no longer waits beyond 300 seconds,
+but a fast failure is not itinerary acceptance. The smallest next fix is a
+materially more compact generation contract or an approved structured-capable
+route that reliably returns the complete schema inside the remaining latency
+budget—not weaker validation or a longer hidden wait.
+
+Protected deployment `dpl_XpweBzN1aFWF47ybAGBfsy6fT4i4` is Ready on
+`hosted-acceptance`. Vercel Authentication remains enabled, temporary bypass
+count returned to zero, and Production was untouched. Phase 8C verdict:
+**startup, first-token, and planning-summary optimization pass; full-itinerary
+acceptance fails at the main structured-model stage.** Production hardening and
+Production readiness remain blocked on a successful hosted itinerary sample.
