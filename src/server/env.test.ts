@@ -124,9 +124,9 @@ describe("server environment validation", () => {
     expect(() =>
       parseDeploymentEnvironment({
         ...production,
-        MAPBOX_MAPS_ENABLED: "true",
+        MAPBOX_MAPS_ENABLED: undefined,
       }),
-    ).toThrow("Production maps must remain disabled");
+    ).toThrow("Production map switch is required");
     expect(() =>
       parseDeploymentEnvironment({
         ...production,
@@ -147,6 +147,78 @@ describe("server environment validation", () => {
         MAPBOX_GEOCODING_STORAGE_MODE: "disabled",
       }),
     ).toMatchObject({ appEnv: "production" });
+  });
+
+  it("allows Production maps only as a complete, separately credentialed surface", () => {
+    const safeMaps = {
+      APP_ENV: "production",
+      VERCEL_ENV: "production",
+      DEPLOYMENT_PROJECT_NAME: "trailie-crew-production",
+      SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+      PRODUCTION_SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+      NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
+      NEXT_PUBLIC_SITE_URL: "https://app.trailiecrew.com",
+      AI_GENERATION_ENABLED: "true",
+      TRAVEL_PROVIDERS_ENABLED: "true",
+      MAPBOX_MAPS_ENABLED: "true",
+      MAPBOX_GEOCODING_STORAGE_MODE: "temporary",
+      NEXT_PUBLIC_MAPBOX_MAP_TOKEN: "pk.browser-restricted-to-app-host",
+      MAPBOX_ACCESS_TOKEN: "sk.server-only-provider-token",
+    };
+
+    expect(parseDeploymentEnvironment(safeMaps)).toMatchObject({
+      appEnv: "production",
+      projectName: "trailie-crew-production",
+    });
+    expect(
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        MAPBOX_GEOCODING_STORAGE_MODE: "disabled",
+      }),
+    ).toMatchObject({ appEnv: "production" });
+
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        NEXT_PUBLIC_MAPBOX_MAP_TOKEN: undefined,
+      }),
+    ).toThrow("Production maps require a public Mapbox browser token");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        NEXT_PUBLIC_MAPBOX_MAP_TOKEN: "sk.not-a-browser-token",
+      }),
+    ).toThrow("Production maps require a public Mapbox browser token");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        MAPBOX_ACCESS_TOKEN: undefined,
+      }),
+    ).toThrow("Production maps require the server Mapbox token");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        MAPBOX_ACCESS_TOKEN: "pk.browser-restricted-to-app-host",
+      }),
+    ).toThrow("Production maps require distinct Mapbox tokens");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        MAPBOX_MAP_ADAPTER: "deterministic",
+      }),
+    ).toThrow("Production maps require the Mapbox renderer");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        MAPBOX_GEOCODING_STORAGE_MODE: "permanent",
+      }),
+    ).toThrow("Production permanent geocoding is disabled");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...safeMaps,
+        TRAVEL_DISABLED_PROVIDERS: "mapbox",
+      }),
+    ).toThrow("Production maps require an enabled Mapbox provider");
   });
 
   it("requires a distinct Supabase server secret", () => {
@@ -403,5 +475,35 @@ describe("server environment validation", () => {
         TRAVEL_DISABLED_PROVIDERS: "mapbox",
       }),
     ).toThrow("Travel provider server configuration is incomplete.");
+  });
+
+  it("couples enabled maps to an enabled, credentialed Mapbox provider", () => {
+    expect(() =>
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        MAPBOX_MAPS_ENABLED: "true",
+        MAPBOX_ACCESS_TOKEN: "sk.server-only-provider-token",
+        NPS_API_KEY: "nps-test",
+        OPENWEATHER_API_KEY: "openweather-test",
+        RIDB_API_KEY: "ridb-test",
+        TRAVEL_DISABLED_PROVIDERS: "mapbox",
+      }),
+    ).toThrow("Enabled maps require an enabled Mapbox provider.");
+    expect(() =>
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "false",
+        MAPBOX_MAPS_ENABLED: "true",
+      }),
+    ).toThrow("Enabled maps require the server Mapbox token.");
+    expect(
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        MAPBOX_MAPS_ENABLED: "false",
+        NPS_API_KEY: "nps-test",
+        OPENWEATHER_API_KEY: "openweather-test",
+        RIDB_API_KEY: "ridb-test",
+        TRAVEL_DISABLED_PROVIDERS: "mapbox",
+      }),
+    ).toMatchObject({ enabled: true, disabledProviders: ["mapbox"] });
   });
 });

@@ -33,7 +33,50 @@ const deploymentEnvironmentSchema = z.object({
   MAPBOX_GEOCODING_STORAGE_MODE: z
     .enum(["disabled", "temporary", "permanent"])
     .optional(),
+  MAPBOX_MAP_ADAPTER: z.string().trim().min(1).optional(),
+  NEXT_PUBLIC_MAPBOX_MAP_TOKEN: z.string().trim().min(1).optional(),
+  MAPBOX_ACCESS_TOKEN: z.string().trim().min(1).optional(),
+  TRAVEL_DISABLED_PROVIDERS: z.string().trim().optional(),
 });
+
+type DeploymentEnvironmentValues = z.infer<typeof deploymentEnvironmentSchema>;
+
+export function parseDisabledTravelProviders(value: string | undefined) {
+  return [
+    ...new Set(
+      (value ?? "")
+        .split(",")
+        .map((provider) => provider.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/**
+ * Browser maps are permitted in Production only as a complete, separately
+ * credentialed Mapbox surface. Every condition here is independently sufficient
+ * to disable maps, so a partially configured map can never reach a real user.
+ */
+function assertProductionMapSafety(values: DeploymentEnvironmentValues) {
+  const browserToken = values.NEXT_PUBLIC_MAPBOX_MAP_TOKEN;
+  const serverToken = values.MAPBOX_ACCESS_TOKEN;
+  if (!browserToken?.startsWith("pk."))
+    throw new Error("Production maps require a public Mapbox browser token.");
+  if (!serverToken)
+    throw new Error("Production maps require the server Mapbox token.");
+  if (browserToken === serverToken)
+    throw new Error("Production maps require distinct Mapbox tokens.");
+  if (values.MAPBOX_MAP_ADAPTER && values.MAPBOX_MAP_ADAPTER !== "mapbox")
+    throw new Error("Production maps require the Mapbox renderer.");
+  if (values.MAPBOX_GEOCODING_STORAGE_MODE === "permanent")
+    throw new Error("Production permanent geocoding is disabled.");
+  if (
+    parseDisabledTravelProviders(values.TRAVEL_DISABLED_PROVIDERS).includes(
+      "mapbox",
+    )
+  )
+    throw new Error("Production maps require an enabled Mapbox provider.");
+}
 
 const productionForbiddenVariables = [
   "CAPTCHA_TEST_MODE",
@@ -155,12 +198,14 @@ export function parseDeploymentEnvironment(source: EnvironmentSource) {
       throw new Error("Production-only configuration forbids fake maps.");
     if (!values.AI_GENERATION_ENABLED || !values.TRAVEL_PROVIDERS_ENABLED)
       throw new Error("Production provider switches are required.");
-    if (values.MAPBOX_MAPS_ENABLED !== "false")
-      throw new Error("Production maps must remain disabled.");
+    if (!values.MAPBOX_MAPS_ENABLED)
+      throw new Error("Production map switch is required.");
     if (!values.MAPBOX_GEOCODING_STORAGE_MODE)
       throw new Error("Production geocoding storage mode is required.");
     if (values.MAPBOX_GEOCODING_STORAGE_MODE === "permanent")
       throw new Error("Production permanent geocoding is disabled.");
+    if (values.MAPBOX_MAPS_ENABLED === "true")
+      assertProductionMapSafety(values);
   }
 
   return {
@@ -290,6 +335,10 @@ const captchaEnvSchema = z.object({
 
 const travelProviderEnvSchema = z.object({
   TRAVEL_PROVIDERS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  MAPBOX_MAPS_ENABLED: z
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
@@ -427,13 +476,9 @@ export function parseCaptchaEnv(source: EnvironmentSource) {
 
 export function parseTravelProviderEnv(source: EnvironmentSource) {
   const values = travelProviderEnvSchema.parse(source);
-  const disabledProviders = [
-    ...new Set(
-      values.TRAVEL_DISABLED_PROVIDERS.split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
-    ),
-  ];
+  const disabledProviders = parseDisabledTravelProviders(
+    values.TRAVEL_DISABLED_PROVIDERS,
+  );
   if (
     disabledProviders.some(
       (provider) =>
@@ -441,6 +486,12 @@ export function parseTravelProviderEnv(source: EnvironmentSource) {
     )
   )
     throw new Error("Unknown disabled travel provider.");
+  // Browser maps and the Mapbox provider are one enablement decision: a rendered
+  // map with a disabled provider would show markers it can never verify.
+  if (values.MAPBOX_MAPS_ENABLED && disabledProviders.includes("mapbox"))
+    throw new Error("Enabled maps require an enabled Mapbox provider.");
+  if (values.MAPBOX_MAPS_ENABLED && !values.MAPBOX_ACCESS_TOKEN)
+    throw new Error("Enabled maps require the server Mapbox token.");
   if (
     values.TRAVEL_PROVIDER_ROOM_DAILY_LIMIT >
     values.TRAVEL_PROVIDER_GLOBAL_DAILY_LIMIT

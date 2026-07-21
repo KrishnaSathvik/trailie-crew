@@ -1,5 +1,8 @@
 export type MapUnavailableReason =
-  "maps_disabled" | "browser_token_missing" | "server_token_reused";
+  | "maps_disabled"
+  | "browser_token_missing"
+  | "server_token_missing"
+  | "server_token_reused";
 
 export type MapConfiguration = Readonly<{
   enabled: boolean;
@@ -76,10 +79,16 @@ export function parseMapConfiguration(
     };
   if (!browserToken.startsWith("pk."))
     throw new Error("A public Mapbox token is required for browser maps.");
-  if (
-    environment.MAPBOX_ACCESS_TOKEN?.trim() &&
-    browserToken === environment.MAPBOX_ACCESS_TOKEN.trim()
-  )
+  const serverToken = environment.MAPBOX_ACCESS_TOKEN?.trim() || null;
+  if (serverToken === null)
+    return {
+      enabled: false,
+      browserToken: null,
+      styleUrl,
+      unavailableReason: "server_token_missing",
+      adapter,
+    };
+  if (browserToken === serverToken)
     return {
       enabled: false,
       browserToken: null,

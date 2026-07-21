@@ -192,11 +192,13 @@ export const environmentVariableContract = [
   }),
   variable("MAPBOX_MAPS_ENABLED", "PROVIDER", {
     required: everywhere,
-    validationRule: "true | false; false for Production bootstrap",
+    validationRule:
+      "true | false; true in Production requires distinct pk. browser and server tokens, the mapbox renderer, non-permanent geocoding, and an enabled Mapbox provider",
     safeDefault: "false",
   }),
   variable("MAPBOX_MAP_ADAPTER", "PROVIDER", {
-    validationRule: "mapbox | fake; fake forbidden in Production",
+    validationRule:
+      "mapbox | deterministic; only mapbox is permitted in Production",
     safeDefault: "mapbox",
   }),
   variable("MAPBOX_STYLE_URL", "PROVIDER", {
@@ -279,20 +281,26 @@ export const environmentVariableContract = [
     safeDefault: "25",
   }),
 
-  variable("OPERATIONAL_ALERT_WEBHOOK_URL", "OBSERVABILITY", {
+  variable("OPERATIONAL_ALERTS_ENABLED", "OBSERVABILITY", {
     required: production,
     rotationOwner: "Operations owner",
-    validationRule: "HTTPS endpoint dedicated to Production",
+    validationRule: "true | false; declared explicitly for every release",
+    safeDefault: "false",
+  }),
+  variable("OPERATIONAL_ALERT_WEBHOOK_URL", "OBSERVABILITY", {
+    rotationOwner: "Operations owner",
+    validationRule:
+      "HTTPS endpoint dedicated to Production; required only when OPERATIONAL_ALERTS_ENABLED=true",
   }),
   variable("OPERATIONAL_ALERT_WEBHOOK_SECRET", "OBSERVABILITY", {
-    required: production,
     rotationOwner: "Operations owner",
-    validationRule: "independent Production signing secret",
+    validationRule:
+      "independent Production signing secret; required only when OPERATIONAL_ALERTS_ENABLED=true",
   }),
   variable("OPERATIONAL_ALERT_OWNER", "OBSERVABILITY", {
-    required: production,
     rotationOwner: "Operations owner",
-    validationRule: "named monitored owner or rotation",
+    validationRule:
+      "named monitored owner or rotation; required only when OPERATIONAL_ALERTS_ENABLED=true",
   }),
   variable("ALERT_ENVIRONMENT", "OBSERVABILITY", {
     required: hosted,
@@ -303,15 +311,21 @@ export const environmentVariableContract = [
     validationRule: "Production-only stream; private content prohibited",
   }),
 
-  variable("EMAIL_PROVIDER_API_KEY", "EMAIL", {
+  variable("OUTBOUND_EMAIL_ENABLED", "EMAIL", {
     required: production,
     rotationOwner: "Support owner",
-    validationRule: "Production credential with least privilege",
+    validationRule: "true | false; declared explicitly for every release",
+    safeDefault: "false",
+  }),
+  variable("EMAIL_PROVIDER_API_KEY", "EMAIL", {
+    rotationOwner: "Support owner",
+    validationRule:
+      "Production credential with least privilege; required only when OUTBOUND_EMAIL_ENABLED=true",
   }),
   variable("EMAIL_FROM_ADDRESS", "EMAIL", {
-    required: production,
     rotationOwner: "Support owner",
-    validationRule: "verified trailiecrew.com sender",
+    validationRule:
+      "verified trailiecrew.com sender; required only when OUTBOUND_EMAIL_ENABLED=true",
   }),
   variable("SUPPORT_EMAIL", "EMAIL", {
     required: production,

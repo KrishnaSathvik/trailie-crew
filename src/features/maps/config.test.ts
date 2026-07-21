@@ -79,6 +79,29 @@ describe("parseMapConfiguration", () => {
     });
   });
 
+  it("fails closed when the server token is missing and never exposes it", () => {
+    expect(
+      parseMapConfiguration({
+        MAPBOX_MAPS_ENABLED: "true",
+        NEXT_PUBLIC_MAPBOX_MAP_TOKEN: "pk.browser-map-only",
+      }),
+    ).toMatchObject({
+      enabled: false,
+      browserToken: null,
+      unavailableReason: "server_token_missing",
+    });
+    const configuration = parseMapConfiguration({
+      MAPBOX_MAPS_ENABLED: "true",
+      NEXT_PUBLIC_MAPBOX_MAP_TOKEN: "pk.browser-map-only",
+      MAPBOX_ACCESS_TOKEN: "sk.server-only-provider-token",
+    });
+    expect(configuration).toMatchObject({
+      enabled: true,
+      browserToken: "pk.browser-map-only",
+    });
+    expect(JSON.stringify(configuration)).not.toContain("sk.");
+  });
+
   it("rejects arbitrary style URLs and secret browser tokens", () => {
     expect(() =>
       parseMapConfiguration({
