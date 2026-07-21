@@ -116,4 +116,31 @@ describe("createTravelProviderRegistry", () => {
       evidence: [{ errorState: { code: "provider_disabled" } }],
     });
   });
+
+  it("does not construct or require credentials for a disabled provider", async () => {
+    const registry = createTravelProviderRegistry({
+      mode: "live",
+      environment: {
+        enabled: true,
+        mapboxAccessToken: null,
+        mapboxGeocodingStorageMode: "temporary",
+        npsApiKey: "nps-test",
+        openWeatherApiKey: "weather-test",
+        ridbApiKey: "ridb-test",
+        disabledProviders: ["mapbox"],
+        roomDailyLimit: 200,
+        globalDailyLimit: 5000,
+      },
+    });
+
+    expect(registry.parks.providerId).toBe("nps");
+    expect(registry.weather.providerId).toBe("openweather");
+    expect(registry.recreation.providerId).toBe("ridb");
+    await expect(
+      registry.geocoding.geocode({ query: "Yosemite", locale: "en-US" }),
+    ).resolves.toMatchObject({
+      state: "unavailable",
+      evidence: [{ errorState: { code: "provider_disabled" } }],
+    });
+  });
 });

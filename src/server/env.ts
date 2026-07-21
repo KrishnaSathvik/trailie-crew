@@ -153,14 +153,14 @@ export function parseDeploymentEnvironment(source: EnvironmentSource) {
       throw new Error("Production-only configuration forbids fake AI.");
     if (source.MAPBOX_MAP_ADAPTER === "fake")
       throw new Error("Production-only configuration forbids fake maps.");
-    if (values.AI_GENERATION_ENABLED !== "false")
-      throw new Error("Production must start with AI generation disabled.");
-    if (values.TRAVEL_PROVIDERS_ENABLED !== "false")
-      throw new Error("Production must start with travel providers disabled.");
+    if (!values.AI_GENERATION_ENABLED || !values.TRAVEL_PROVIDERS_ENABLED)
+      throw new Error("Production provider switches are required.");
     if (values.MAPBOX_MAPS_ENABLED !== "false")
-      throw new Error("Production must start with maps disabled.");
-    if (values.MAPBOX_GEOCODING_STORAGE_MODE !== "disabled")
-      throw new Error("Production geocoding must start disabled.");
+      throw new Error("Production maps must remain disabled.");
+    if (!values.MAPBOX_GEOCODING_STORAGE_MODE)
+      throw new Error("Production geocoding storage mode is required.");
+    if (values.MAPBOX_GEOCODING_STORAGE_MODE === "permanent")
+      throw new Error("Production permanent geocoding is disabled.");
   }
 
   return {
@@ -448,10 +448,11 @@ export function parseTravelProviderEnv(source: EnvironmentSource) {
     throw new Error("Travel provider limits are invalid.");
   if (
     values.TRAVEL_PROVIDERS_ENABLED &&
-    (!values.MAPBOX_ACCESS_TOKEN ||
-      !values.NPS_API_KEY ||
-      !values.OPENWEATHER_API_KEY ||
-      !values.RIDB_API_KEY)
+    ((!disabledProviders.includes("mapbox") && !values.MAPBOX_ACCESS_TOKEN) ||
+      (!disabledProviders.includes("nps") && !values.NPS_API_KEY) ||
+      (!disabledProviders.includes("openweather") &&
+        !values.OPENWEATHER_API_KEY) ||
+      (!disabledProviders.includes("ridb") && !values.RIDB_API_KEY))
   )
     throw new Error("Travel provider server configuration is incomplete.");
   return {

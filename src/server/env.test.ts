@@ -100,12 +100,53 @@ describe("server environment validation", () => {
         OPENAI_API_KEY: "dummy-provider-key",
       }),
     ).toThrow("Production credential OPENAI_API_KEY is not real");
+  });
+
+  it("allows controlled Production providers while preserving launch kill switches", () => {
+    const production = {
+      APP_ENV: "production",
+      VERCEL_ENV: "production",
+      DEPLOYMENT_PROJECT_NAME: "trailie-crew-production",
+      SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+      PRODUCTION_SUPABASE_PROJECT_REF: "tkccksmiuucdstvvfglp",
+      NEXT_PUBLIC_SUPABASE_URL: "https://tkccksmiuucdstvvfglp.supabase.co",
+      NEXT_PUBLIC_SITE_URL: "https://app.trailiecrew.com",
+      AI_GENERATION_ENABLED: "true",
+      TRAVEL_PROVIDERS_ENABLED: "true",
+      MAPBOX_MAPS_ENABLED: "false",
+      MAPBOX_GEOCODING_STORAGE_MODE: "temporary",
+    };
+
+    expect(parseDeploymentEnvironment(production)).toMatchObject({
+      appEnv: "production",
+      projectName: "trailie-crew-production",
+    });
     expect(() =>
       parseDeploymentEnvironment({
         ...production,
-        AI_GENERATION_ENABLED: "true",
+        MAPBOX_MAPS_ENABLED: "true",
       }),
-    ).toThrow("Production must start with AI generation disabled");
+    ).toThrow("Production maps must remain disabled");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        MAPBOX_GEOCODING_STORAGE_MODE: "permanent",
+      }),
+    ).toThrow("Production permanent geocoding is disabled");
+    expect(() =>
+      parseDeploymentEnvironment({
+        ...production,
+        AI_GENERATION_ENABLED: undefined,
+      }),
+    ).toThrow("Production provider switches are required");
+    expect(
+      parseDeploymentEnvironment({
+        ...production,
+        AI_GENERATION_ENABLED: "false",
+        TRAVEL_PROVIDERS_ENABLED: "false",
+        MAPBOX_GEOCODING_STORAGE_MODE: "disabled",
+      }),
+    ).toMatchObject({ appEnv: "production" });
   });
 
   it("requires a distinct Supabase server secret", () => {
@@ -336,5 +377,31 @@ describe("server environment validation", () => {
         TRAVEL_DISABLED_PROVIDERS: "unknown",
       }),
     ).toThrow("Unknown disabled travel provider.");
+  });
+
+  it("requires credentials only for travel providers that are enabled", () => {
+    expect(
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        MAPBOX_GEOCODING_STORAGE_MODE: "temporary",
+        NPS_API_KEY: "nps-test",
+        OPENWEATHER_API_KEY: "openweather-test",
+        RIDB_API_KEY: "ridb-test",
+        TRAVEL_DISABLED_PROVIDERS: "mapbox",
+      }),
+    ).toMatchObject({
+      enabled: true,
+      mapboxAccessToken: null,
+      mapboxGeocodingStorageMode: "temporary",
+      disabledProviders: ["mapbox"],
+    });
+    expect(() =>
+      parseTravelProviderEnv({
+        TRAVEL_PROVIDERS_ENABLED: "true",
+        OPENWEATHER_API_KEY: "openweather-test",
+        RIDB_API_KEY: "ridb-test",
+        TRAVEL_DISABLED_PROVIDERS: "mapbox",
+      }),
+    ).toThrow("Travel provider server configuration is incomplete.");
   });
 });

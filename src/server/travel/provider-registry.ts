@@ -60,44 +60,36 @@ export function createTravelProviderRegistry(
   }
   const { mapboxAccessToken, npsApiKey, openWeatherApiKey, ridbApiKey } =
     configuration.environment;
-  if (!mapboxAccessToken || !npsApiKey || !openWeatherApiKey || !ridbApiKey)
-    throw new Error("travel_provider_configuration_incomplete");
-  const registry: TravelProviderRegistry = {
-    geocoding: createMapboxAdapter({
-      accessToken: mapboxAccessToken,
-      geocodingStorageMode:
-        configuration.environment.mapboxGeocodingStorageMode,
-    }),
-    weather: createOpenWeatherAdapter({ apiKey: openWeatherApiKey }),
-    parks: createNpsAdapter({ apiKey: npsApiKey }),
-    recreation: createRidbAdapter({ apiKey: ridbApiKey }),
-  };
   const disabled = new Set(configuration.environment.disabledProviders);
+  if (
+    (!disabled.has("mapbox") && !mapboxAccessToken) ||
+    (!disabled.has("nps") && !npsApiKey) ||
+    (!disabled.has("openweather") && !openWeatherApiKey) ||
+    (!disabled.has("ridb") && !ridbApiKey)
+  )
+    throw new Error("travel_provider_configuration_incomplete");
+  const unavailable = (providerId: string) =>
+    createUnavailableTravelProviderAdapter({
+      providerId,
+      reason: "provider_disabled",
+    });
   return {
     geocoding: disabled.has("mapbox")
-      ? createUnavailableTravelProviderAdapter({
-          providerId: "mapbox",
-          reason: "provider_disabled",
-        })
-      : registry.geocoding,
+      ? unavailable("mapbox")
+      : createMapboxAdapter({
+          accessToken: mapboxAccessToken!,
+          geocodingStorageMode:
+            configuration.environment.mapboxGeocodingStorageMode,
+        }),
     weather: disabled.has("openweather")
-      ? createUnavailableTravelProviderAdapter({
-          providerId: "openweather",
-          reason: "provider_disabled",
-        })
-      : registry.weather,
+      ? unavailable("openweather")
+      : createOpenWeatherAdapter({ apiKey: openWeatherApiKey! }),
     parks: disabled.has("nps")
-      ? createUnavailableTravelProviderAdapter({
-          providerId: "nps",
-          reason: "provider_disabled",
-        })
-      : registry.parks,
+      ? unavailable("nps")
+      : createNpsAdapter({ apiKey: npsApiKey! }),
     recreation: disabled.has("ridb")
-      ? createUnavailableTravelProviderAdapter({
-          providerId: "ridb",
-          reason: "provider_disabled",
-        })
-      : registry.recreation,
+      ? unavailable("ridb")
+      : createRidbAdapter({ apiKey: ridbApiKey! }),
   };
 }
 

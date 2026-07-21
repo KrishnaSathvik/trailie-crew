@@ -755,3 +755,36 @@ budgets/alerts, WAF validation, GitHub review settings, Cloudflare A records,
 Mapbox release decision, manual accessibility, and protected rollback exercise
 remain launch blockers. Production exposure status remains **zero deployments,
 zero bypasses, Vercel Authentication enabled, and no invited traffic**.
+
+### Step 4E — Production provider enablement
+
+Production now has `AI_GENERATION_ENABLED=true`,
+`TRAVEL_PROVIDERS_ENABLED=true`, and the existing OpenAI route unchanged:
+itinerary/planning use `gpt-5.6-sol`, memory uses `gpt-5.6-luna`, and focused
+conversation remains on `gpt-5.6-terra`. NPS, RIDB, and OpenWeather are enabled
+through the global travel switch; the contract has no separate enable variables
+for them. `TRAVEL_DISABLED_PROVIDERS=mapbox` keeps the Mapbox provider fully
+disabled, `MAPBOX_MAPS_ENABLED=false` keeps browser maps disabled, and
+`MAPBOX_GEOCODING_STORAGE_MODE=temporary` prevents permanent mode. The existing
+room/global travel limits are explicitly pinned to 200/5,000 per day. Booking
+handoffs have no environment switch and remain limited to the existing HTTPS,
+approved-link, evidence, and no-completion-claim contracts. Outbound email,
+analytics, and unconfigured hotel/flight/restaurant/activity providers remain
+disabled.
+
+The Production identity guard now accepts either value of the mandatory AI and
+travel emergency switches, still rejects maps and permanent geocoding, and
+requires both switches to be present. Provider construction requires
+credentials only for providers not named in the existing disable list, so a
+disabled Mapbox cannot prevent NPS/RIDB/OpenWeather startup. Vercel contains two
+pre-existing names outside the typed contract: sensitive `MAPBOX_SERVER_TOKEN`
+cannot be read or renamed and must be re-entered later as `MAPBOX_ACCESS_TOKEN`
+before Mapbox can be enabled; unused `TURNSTILE_ENABLED` must also be removed by
+the owner. Neither variable is read by the application. OpenAI billing, model
+allowlist, monthly budget, and 50/75/90/100-percent alerts could not be verified
+without console access. Application AI quota values were not changed; the
+database service-only emergency switch remains the no-redeploy cutoff. Fresh
+verification passed 851 Vitest tests, 68 focused travel-provider tests, format,
+lint, typecheck, the optimized build, and `git diff --check`. Production still
+has zero deployments, zero bypasses, Vercel Authentication enabled, analytics
+disabled, and no invited traffic.
