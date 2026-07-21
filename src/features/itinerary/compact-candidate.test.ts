@@ -189,9 +189,9 @@ describe("compact itinerary deterministic expansion", () => {
 
   it("normalizes long compact rationale and warnings into full-contract short projections", () => {
     const candidate = makeCandidate(["2026-09-12"]);
-    candidate.days[0].items[0].rationale = "r".repeat(500);
-    candidate.days[0].items[0].importantWarning = "w".repeat(500);
-    candidate.warnings = ["c".repeat(500)];
+    candidate.days[0].items[0].rationale = "r".repeat(240);
+    candidate.days[0].items[0].importantWarning = "w".repeat(240);
+    candidate.warnings = ["c".repeat(240)];
 
     const expanded = expandCompactItineraryCandidate({
       candidate,
@@ -212,8 +212,8 @@ describe("compact itinerary deterministic expansion", () => {
     expect(
       expanded.days[0].warnings.every((value) => value.length <= 200),
     ).toBe(true);
-    expect(expanded.days[0].items[0].description).toContain("r".repeat(300));
-    expect(expanded.days[0].items[0].reservation.details).toHaveLength(500);
+    expect(expanded.days[0].items[0].description).toContain("r".repeat(240));
+    expect(expanded.days[0].items[0].reservation.details).toHaveLength(240);
   });
 
   it("keeps private lodging details out of the published projection", () => {
@@ -296,11 +296,11 @@ describe("compact itinerary sizing and bounded long-trip generation", () => {
     const limits = [2, 4, 7, 10].map((dayCount) =>
       compactItineraryOutputTokenLimit({ dayCount, itemCount: dayCount * 4 }),
     );
-    expect(limits).toEqual([1_800, 2_600, 4_000, 4_000]);
+    expect(limits).toEqual([1_500, 2_200, 3_200, 3_200]);
     expect(Math.max(...limits)).toBeLessThan(8_000);
     expect(
       compactItineraryOutputTokenLimit({ dayCount: 2, itemCount: 12 }),
-    ).toBe(2_400);
+    ).toBe(1_900);
   });
 
   it("keeps one call through seven days and bounds ten days to three groups", () => {

@@ -107,4 +107,12 @@ describe("CompactItineraryCandidateV1", () => {
       false,
     );
   });
+
+  it("bounds compact narrative fields to 240 characters", () => {
+    const verbose = candidate();
+    verbose.days[0].items[0].rationale = "r".repeat(241);
+    expect(compactItineraryCandidateV1Schema.safeParse(verbose).success).toBe(
+      false,
+    );
+  });
 });

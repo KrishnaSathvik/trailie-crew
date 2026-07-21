@@ -99,9 +99,16 @@ export function compactItineraryOutputTokenLimit(input: {
     Math.round(input.itemCount ?? dayCount * 4),
     dayCount,
   );
-  const base = dayCount <= 2 ? 1_800 : dayCount <= 4 ? 2_600 : 4_000;
-  const denseAdjustment = itemCount > dayCount * 5 ? 600 : 0;
-  return Math.min(base + denseAdjustment, 4_000);
+  const base =
+    dayCount <= 2
+      ? 1_500
+      : dayCount <= 4
+        ? 2_200
+        : dayCount === 5
+          ? 2_800
+          : 3_200;
+  const denseAdjustment = itemCount > dayCount * 5 ? 400 : 0;
+  return Math.min(base + denseAdjustment, 3_600);
 }
 
 export function planCompactItineraryGeneration(dates: readonly string[]) {
@@ -142,9 +149,9 @@ export function combineCompactItineraryChunks(
     summary: parsed[0].summary,
     assumptions: unique(parsed.flatMap((chunk) => chunk.assumptions)).slice(
       0,
-      16,
+      8,
     ),
-    warnings: unique(parsed.flatMap((chunk) => chunk.warnings)).slice(0, 16),
+    warnings: unique(parsed.flatMap((chunk) => chunk.warnings)).slice(0, 8),
     days: expectedDates.map((date) => byDate.get(date)!),
   });
 }

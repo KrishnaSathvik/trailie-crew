@@ -44,7 +44,7 @@ describe("itinerary provider boundary", () => {
       model: "gpt-5.6-sol",
       reasoning: { effort: "low" },
       store: false,
-      max_output_tokens: 2_600,
+      max_output_tokens: 2_200,
       safety_identifier: "safe-id",
     });
     expect(request).not.toHaveProperty("tools");

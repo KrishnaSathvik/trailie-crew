@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-const compactTextSchema = z.string().trim().min(1).max(500);
-const compactShortTextSchema = z.string().trim().min(1).max(200);
+const compactTextSchema = z.string().trim().min(1).max(240);
+const compactShortTextSchema = z.string().trim().min(1).max(120);
 const compactClientKeySchema = z
   .string()
   .trim()
@@ -71,8 +71,8 @@ export const compactItineraryDayV1Schema = z
     date: z.iso.date(),
     theme: compactShortTextSchema,
     locationArea: compactShortTextSchema,
-    items: z.array(compactItineraryItemV1Schema).min(1).max(24),
-    travelSegments: z.array(compactTravelSegmentV1Schema).max(24),
+    items: z.array(compactItineraryItemV1Schema).min(1).max(6),
+    travelSegments: z.array(compactTravelSegmentV1Schema).max(6),
   })
   .strict();
 
@@ -87,8 +87,8 @@ export const compactItineraryCandidateV1Schema = z
     schemaVersion: z.literal("1"),
     title: compactShortTextSchema,
     summary: compactTextSchema,
-    assumptions: z.array(compactTextSchema).max(16),
-    warnings: z.array(compactTextSchema).max(16),
+    assumptions: z.array(compactTextSchema).max(8),
+    warnings: z.array(compactTextSchema).max(8),
     days: z.array(compactItineraryDayV1Schema).min(1).max(12),
   })
   .strict()
