@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { parsePublicSupabaseEnv } from "@/lib/env-public";
 import { parseWorkflowReliabilityPolicy } from "@/server/ai/reliability-policy";
+import { absentWhenEmpty } from "@/server/env-values";
 
 type EnvironmentSource = Record<string, string | undefined>;
 
@@ -283,34 +284,24 @@ const openAIEnvSchema = z.object({
 
 const recoveryEnvSchema = z
   .object({
-    RECOVERY_SECRET: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.string().min(32).optional(),
-    ),
-    CRON_SECRET: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.string().min(16).optional(),
-    ),
+    RECOVERY_SECRET: absentWhenEmpty(z.string().min(32)),
+    CRON_SECRET: absentWhenEmpty(z.string().min(16)),
   })
   .refine((value) => value.RECOVERY_SECRET || value.CRON_SECRET);
 
 const cleanupEnvSchema = z
   .object({
-    CLEANUP_SECRET: z.string().min(32).optional(),
-    CRON_SECRET: z.string().min(16).optional(),
-    RECOVERY_SECRET: z.string().min(32).optional(),
-    ANONYMOUS_RETENTION_DAYS: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(3650)
-      .default(30),
-    ANONYMOUS_CLEANUP_BATCH_SIZE: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(25),
+    CLEANUP_SECRET: absentWhenEmpty(z.string().min(32)),
+    CRON_SECRET: absentWhenEmpty(z.string().min(16)),
+    RECOVERY_SECRET: absentWhenEmpty(z.string().min(32)),
+    ANONYMOUS_RETENTION_DAYS: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.coerce.number().int().min(1).max(3650).default(30),
+    ),
+    ANONYMOUS_CLEANUP_BATCH_SIZE: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.coerce.number().int().min(1).max(100).default(25),
+    ),
   })
   .refine(
     (value) =>

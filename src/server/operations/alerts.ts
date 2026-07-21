@@ -2,24 +2,26 @@ import "server-only";
 
 import { z } from "zod";
 
+import { absentWhenEmpty } from "@/server/env-values";
+
 type EnvironmentSource = Record<string, string | undefined>;
 type AlertMetadata = Record<string, unknown>;
 
+const httpsUrl = z
+  .url()
+  .refine((value) => new URL(value).protocol === "https:");
+
 const alertEnvironmentSchema = z.object({
-  OPERATIONAL_ALERT_WEBHOOK_URL: z
-    .url()
-    .refine((value) => new URL(value).protocol === "https:")
-    .optional(),
-  OPERATIONAL_ALERT_WEBHOOK_SECRET: z.string().min(16).max(512).optional(),
-  OPERATIONAL_ALERT_OWNER: z.string().trim().min(2).max(100).optional(),
-  ALERT_ENVIRONMENT: z.string().trim().min(1).max(50).optional(),
-  NEXT_PUBLIC_SITE_URL: z
-    .url()
-    .refine((value) => new URL(value).protocol === "https:")
-    .optional(),
-  APP_ENV: z.enum(["local", "preview", "production"]).optional(),
-  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
-  NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+  OPERATIONAL_ALERT_WEBHOOK_URL: absentWhenEmpty(httpsUrl),
+  OPERATIONAL_ALERT_WEBHOOK_SECRET: absentWhenEmpty(
+    z.string().min(16).max(512),
+  ),
+  OPERATIONAL_ALERT_OWNER: absentWhenEmpty(z.string().trim().min(2).max(100)),
+  ALERT_ENVIRONMENT: absentWhenEmpty(z.string().trim().min(1).max(50)),
+  NEXT_PUBLIC_SITE_URL: absentWhenEmpty(httpsUrl),
+  APP_ENV: absentWhenEmpty(z.enum(["local", "preview", "production"])),
+  VERCEL_ENV: absentWhenEmpty(z.enum(["development", "preview", "production"])),
+  NODE_ENV: absentWhenEmpty(z.enum(["development", "test", "production"])),
 });
 
 export type OperationalAlertConfiguration = ReturnType<
