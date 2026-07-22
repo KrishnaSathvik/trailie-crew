@@ -81,6 +81,8 @@ html {
      inflate text and reflow the page while the visual viewport changes. */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Allow scroll, block pinch-zoom gestures that would resize the layout. */
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -90,6 +92,7 @@ body {
   font-family: var(--font-geist-sans), Arial, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  touch-action: pan-x pan-y;
 }
 
 /* iOS Safari auto-zooms focused fields under 16px, which shifts the whole

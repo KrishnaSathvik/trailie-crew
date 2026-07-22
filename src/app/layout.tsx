@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { DisableMobileLayoutZoom } from "@/components/shared/disable-mobile-layout-zoom";
 import { TransientInviteProvider } from "@/features/trips/components/transient-invite-provider";
 import { productionApplicationUrl } from "@/server/site-configuration";
 import "@/styles/globals.css";
@@ -43,11 +44,12 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
 };
 
-/** Stable mobile layout viewport: device width, no auto-scale surprises.
- *  Zoom remains allowed for accessibility (see e2e accessibility zoom checks). */
+/** Lock the mobile layout scale so pinch / double-tap zoom cannot resize the app. */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 
@@ -57,6 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <DisableMobileLayoutZoom />
         <TransientInviteProvider>{children}</TransientInviteProvider>
       </body>
     </html>
