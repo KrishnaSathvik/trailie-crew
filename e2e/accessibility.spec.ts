@@ -59,6 +59,30 @@ test("landing, entry, and authenticated chat have no serious axe findings", asyn
   await expect(page.getByRole("button", { name: "People" })).toBeFocused();
   await expectNoSeriousAxeViolations(page, "mobile reduced-motion dark chat");
 
+  // iOS Safari auto-zooms inputs under 16px and reflows the layout. Keep the
+  // chat composer and viewport meta stable on the mobile shell.
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
+    "content",
+    /width=device-width/,
+  );
+  expect(
+    await page.locator("#crew-message").evaluate((element) => {
+      const size = Number.parseFloat(
+        window.getComputedStyle(element).fontSize,
+      );
+      return size >= 16;
+    }),
+  ).toBe(true);
+  expect(
+    await page.locator("html").evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return (
+        style.getPropertyValue("text-size-adjust") === "100%" ||
+        style.getPropertyValue("-webkit-text-size-adjust") === "100%"
+      );
+    }),
+  ).toBe(true);
+
   await page.evaluate(() => {
     document.documentElement.style.zoom = "2";
   });

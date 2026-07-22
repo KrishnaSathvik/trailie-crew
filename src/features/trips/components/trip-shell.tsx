@@ -16,6 +16,7 @@ import { BrandMark } from "@/components/shared/brand-mark";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { buttonClassName } from "@/components/ui/product-controls";
 import { CrewList } from "@/features/crew/components/crew-list";
+import { getActiveRoomParticipantsAction } from "@/features/crew/actions/crew-actions";
 import type { TripShellData } from "@/features/crew/queries/trip-crew";
 import { InvitePanel } from "@/features/trips/components/invite-panel";
 import { ChatExperience } from "@/features/chat/components/chat-experience";
@@ -35,7 +36,12 @@ const destinations = [
 type Area = "Chat" | "Plan" | "Map" | "Settings" | "Account";
 
 export function TripShell({ data }: { data: TripShellData }) {
-  const isHost = data.currentParticipant.role === "host";
+  const [participants, setParticipants] = useState(data.participants);
+  const [currentParticipant, setCurrentParticipant] = useState(
+    data.currentParticipant,
+  );
+  const liveData = { ...data, currentParticipant, participants };
+  const isHost = currentParticipant.role === "host";
   const [onlineParticipantIds, setOnlineParticipantIds] = useState<string[]>(
     [],
   );
@@ -46,6 +52,16 @@ export function TripShell({ data }: { data: TripShellData }) {
   const handlePresenceChange = useCallback((participantIds: string[]) => {
     setOnlineParticipantIds(participantIds);
   }, []);
+  const refreshCrew = useCallback(async () => {
+    const result = await getActiveRoomParticipantsAction(data.room.id);
+    if (!result.ok) return;
+    setParticipants(result.data);
+    setCurrentParticipant(
+      result.data.find(
+        (participant) => participant.id === data.currentParticipant.id,
+      ) ?? data.currentParticipant,
+    );
+  }, [data.currentParticipant, data.room.id]);
 
   useEffect(() => {
     if (!peopleOpen) return;
@@ -169,12 +185,16 @@ export function TripShell({ data }: { data: TripShellData }) {
           </div>
         </header>
         {area === "Chat" ? (
-          <ChatExperience data={data} onPresenceChange={handlePresenceChange} />
+          <ChatExperience
+            data={liveData}
+            onPresenceChange={handlePresenceChange}
+            onCrewChange={refreshCrew}
+          />
         ) : area === "Plan" || area === "Map" ? (
           <PlanExperience
             roomId={data.room.id}
-            participantId={data.currentParticipant.id}
-            participantRole={data.currentParticipant.role}
+            participantId={currentParticipant.id}
+            participantRole={currentParticipant.role}
             preferMap={area === "Map"}
             onOpenPlan={() => setArea("Plan")}
           />
@@ -196,7 +216,7 @@ export function TripShell({ data }: { data: TripShellData }) {
             roomId={data.room.id}
             roomName={data.room.name}
             roomCode={data.room.roomCode}
-            participants={data.participants}
+            participants={participants}
             onOpenPlan={() => setArea("Plan")}
           />
         ) : (
@@ -231,7 +251,7 @@ export function TripShell({ data }: { data: TripShellData }) {
       </section>
 
       <aside className="border-border bg-surface hidden border-l px-5 py-6 lg:sticky lg:top-0 lg:block lg:h-dvh lg:self-start lg:overflow-y-auto">
-        <CrewList data={data} onlineParticipantIds={onlineParticipantIds} />
+        <CrewList data={liveData} onlineParticipantIds={onlineParticipantIds} />
         {isHost ? (
           <div className="mt-8">
             <InvitePanel
@@ -276,7 +296,10 @@ export function TripShell({ data }: { data: TripShellData }) {
                 <span aria-hidden="true">×</span>
               </button>
             </div>
-            <CrewList data={data} onlineParticipantIds={onlineParticipantIds} />
+            <CrewList
+              data={liveData}
+              onlineParticipantIds={onlineParticipantIds}
+            />
           </aside>
         </div>
       ) : null}

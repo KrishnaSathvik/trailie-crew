@@ -579,7 +579,7 @@ export function PlanExperience({
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={500}
-              className="border-border mt-2 min-h-20 w-full rounded-md border bg-transparent p-3 text-sm"
+              className="border-border mt-2 min-h-20 w-full rounded-md border bg-transparent p-3 text-base"
             />
             <div className="mt-3 flex flex-wrap gap-2">
               <button

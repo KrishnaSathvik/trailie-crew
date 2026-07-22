@@ -77,6 +77,10 @@
 
 html {
   background: var(--background);
+  /* Keep layout stable on mobile zoom / orientation; browsers otherwise
+     inflate text and reflow the page while the visual viewport changes. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -86,6 +90,19 @@ body {
   font-family: var(--font-geist-sans), Arial, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* iOS Safari auto-zooms focused fields under 16px, which shifts the whole
+   app viewport in and out. Force at least 1rem on touch devices so utility
+   classes cannot reintroduce the jump. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+      [type="file"]
+    ):not([type="color"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 1rem !important;
+  }
 }
 
 button {

@@ -142,7 +142,10 @@ export function MessageList({
             {startsNewDay ? (
               <li className="my-4 flex items-center gap-3" aria-hidden="true">
                 <span className="border-border flex-1 border-t" />
-                <span className="text-muted-foreground text-xs font-medium">
+                <span
+                  suppressHydrationWarning
+                  className="text-muted-foreground text-xs font-medium"
+                >
                   {dayLabel(message.createdAt)}
                 </span>
                 <span className="border-border flex-1 border-t" />
@@ -239,6 +242,7 @@ export function MessageList({
                         </span>
                       ) : null}
                       <time
+                        suppressHydrationWarning
                         dateTime={message.createdAt}
                         className="font-mono text-[0.5625rem] tracking-wide"
                       >

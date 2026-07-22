@@ -109,4 +109,11 @@ describe("MessageComposer", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(onSend).not.toHaveBeenCalled();
   });
+
+  it("keeps the message field at 16px so mobile Safari will not auto-zoom", () => {
+    render(<MessageComposer onSend={vi.fn()} />);
+    const input = screen.getByLabelText("Message your crew");
+    expect(input.className).toMatch(/\btext-base\b/);
+    expect(input.className).not.toMatch(/\btext-sm\b/);
+  });
 });

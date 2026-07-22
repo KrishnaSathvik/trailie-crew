@@ -175,7 +175,7 @@ export function CommentThread({
                       maxLength={2000}
                       value={editBody}
                       onChange={(event) => setEditBody(event.target.value)}
-                      className="border-border min-h-20 w-full rounded-md border bg-transparent p-2 text-sm"
+                      className="border-border min-h-20 w-full rounded-md border bg-transparent p-2 text-base"
                     />
                     <button
                       type="button"
@@ -266,7 +266,7 @@ export function CommentThread({
             maxLength={2000}
             onChange={(event) => setBody(event.target.value)}
             placeholder="Add a plain-text comment"
-            className="border-border min-h-20 w-full rounded-md border bg-transparent p-2 text-sm"
+            className="border-border min-h-20 w-full rounded-md border bg-transparent p-2 text-base"
           />
           <button
             type="button"

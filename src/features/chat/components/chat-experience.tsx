@@ -65,9 +65,11 @@ function scrollToBottom(element: HTMLDivElement, behavior?: ScrollBehavior) {
 export function ChatExperience({
   data,
   onPresenceChange,
+  onCrewChange,
 }: {
   data: TripShellData;
   onPresenceChange: (participantIds: string[]) => void;
+  onCrewChange?: () => void;
 }) {
   const initialChronological = useMemo(
     () => [...data.initialMessages.messages].reverse(),
@@ -109,6 +111,12 @@ export function ChatExperience({
   const trailieQueueRef = useRef<Promise<void>>(Promise.resolve());
   const queuedTrailieSourcesRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
+  const followLatestRef = useRef(true);
+  const participantsRef = useRef(data.participants);
+
+  useEffect(() => {
+    participantsRef.current = data.participants;
+  }, [data.participants]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -118,9 +126,9 @@ export function ChatExperience({
   }, []);
 
   const refreshLatest = useCallback(async () => {
-    const wasNearBottom = historyRef.current
-      ? isNearMessageListBottom(historyRef.current)
-      : true;
+    const wasNearBottom =
+      followLatestRef.current ||
+      (historyRef.current ? isNearMessageListBottom(historyRef.current) : true);
     let result;
     try {
       result = await getRoomMessagesAction({
@@ -139,6 +147,7 @@ export function ChatExperience({
       mergeRoomMessages(current, [...result.data.messages].reverse()),
     );
     if (wasNearBottom) {
+      followLatestRef.current = true;
       window.requestAnimationFrame(() => {
         if (historyRef.current) scrollToBottom(historyRef.current);
       });
@@ -153,12 +162,6 @@ export function ChatExperience({
   }, []);
 
   useEffect(() => {
-    const knownParticipants = new Map(
-      data.participants.map((participant) => [
-        participant.id,
-        participant.displayName,
-      ]),
-    );
     let active = true;
     let subscribed = false;
     let client: ReturnType<typeof createBrowserSupabaseClient>;
@@ -181,13 +184,26 @@ export function ChatExperience({
     channelRef.current = channel;
 
     channel
-      .on("broadcast", { event: "chat_changed" }, () => void refreshLatest())
+      .on("broadcast", { event: "chat_changed" }, ({ payload }) => {
+        void refreshLatest();
+        if (
+          typeof payload === "object" &&
+          payload !== null &&
+          "kind" in payload &&
+          payload.kind === "crew"
+        )
+          onCrewChange?.();
+      })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const parsed = typingEventSchema.safeParse(payload);
+        const participant = parsed.success
+          ? participantsRef.current.find(
+              (candidate) => candidate.id === parsed.data.participantId,
+            )
+          : null;
         if (
           !parsed.success ||
-          knownParticipants.get(parsed.data.participantId) !==
-            parsed.data.displayName
+          participant?.displayName !== parsed.data.displayName
         )
           return;
         setTypingEvents((current) => [
@@ -198,6 +214,12 @@ export function ChatExperience({
         ]);
       })
       .on("presence", { event: "sync" }, () => {
+        const knownParticipants = new Map(
+          participantsRef.current.map((participant) => [
+            participant.id,
+            participant.displayName,
+          ]),
+        );
         const raw = channel.presenceState();
         const presences = Object.values(raw)
           .flat()
@@ -234,7 +256,10 @@ export function ChatExperience({
           setError((current) =>
             current === "realtime_unavailable" ? null : current,
           );
-          await refreshLatest();
+          await Promise.all([
+            refreshLatest(),
+            Promise.resolve(onCrewChange?.()),
+          ]);
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           setError("realtime_unavailable");
         }
@@ -253,11 +278,25 @@ export function ChatExperience({
   }, [
     data.currentParticipant.displayName,
     data.currentParticipant.id,
-    data.participants,
     data.room.id,
     onPresenceChange,
+    onCrewChange,
     refreshLatest,
   ]);
+
+  useEffect(() => {
+    function reconcileVisibleRoom() {
+      if (document.visibilityState !== "visible") return;
+      void refreshLatest();
+      onCrewChange?.();
+    }
+    document.addEventListener("visibilitychange", reconcileVisibleRoom);
+    window.addEventListener("focus", reconcileVisibleRoom);
+    return () => {
+      document.removeEventListener("visibilitychange", reconcileVisibleRoom);
+      window.removeEventListener("focus", reconcileVisibleRoom);
+    };
+  }, [onCrewChange, refreshLatest]);
 
   useEffect(() => {
     // Two frames, not one: the first lets the bubble layout settle (font
@@ -275,6 +314,47 @@ export function ChatExperience({
       if (inner) window.cancelAnimationFrame(inner);
     };
   }, []);
+
+  const persistedTrailieReply = trailieAnswer
+    ? messages.some(
+        (message) =>
+          message.messageType === "trailie" &&
+          message.replyToMessageId === trailieAnswer.source.id,
+      )
+    : false;
+  const visibleTrailieAnswer = persistedTrailieReply ? null : trailieAnswer;
+
+  useEffect(() => {
+    if (!followLatestRef.current) return;
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        if (historyRef.current) scrollToBottom(historyRef.current);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      if (inner) window.cancelAnimationFrame(inner);
+    };
+  }, [
+    messages.length,
+    visibleTrailieAnswer?.body,
+    visibleTrailieAnswer?.stage,
+  ]);
+
+  const activeTrailieSourceId = visibleTrailieAnswer?.source.id ?? null;
+  const activeTrailieStatus = visibleTrailieAnswer?.status ?? null;
+
+  useEffect(() => {
+    if (
+      !activeTrailieSourceId ||
+      !activeTrailieStatus ||
+      !["answering", "retrying", "recovering"].includes(activeTrailieStatus)
+    )
+      return;
+    const interval = window.setInterval(() => void refreshLatest(), 2_500);
+    return () => window.clearInterval(interval);
+  }, [activeTrailieSourceId, activeTrailieStatus, refreshLatest]);
 
   /** One click only opens the action menu — it does not react or reply. */
   function selectMessage(message: ClientRoomMessage) {
@@ -341,6 +421,8 @@ export function ChatExperience({
           deliveryState: "pending",
         };
 
+    followLatestRef.current = true;
+    setNewMessagesAvailable(false);
     setMessages((current) => {
       const withoutRetry = current.filter(
         (message) => message.id !== optimistic.id,
@@ -706,6 +788,11 @@ export function ChatExperience({
         ref={historyRef}
         className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
         aria-label="Trip conversation"
+        onScroll={() => {
+          if (!historyRef.current) return;
+          followLatestRef.current = isNearMessageListBottom(historyRef.current);
+          if (followLatestRef.current) setNewMessagesAvailable(false);
+        }}
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest(".message-row"))
             clearSelection();
@@ -741,15 +828,15 @@ export function ChatExperience({
             participants={data.participants}
             selectedMessageId={selectedMessageId}
           />
-          {trailieAnswer ? (
+          {visibleTrailieAnswer ? (
             <TrailieStreamCard
-              body={trailieAnswer.body}
-              status={trailieAnswer.status}
-              stage={trailieAnswer.stage}
-              errorCode={trailieAnswer.errorCode}
-              retryable={trailieAnswer.retryable}
+              body={visibleTrailieAnswer.body}
+              status={visibleTrailieAnswer.status}
+              stage={visibleTrailieAnswer.stage}
+              errorCode={visibleTrailieAnswer.errorCode}
+              retryable={visibleTrailieAnswer.retryable}
               onCancel={() => trailieAbortRef.current?.abort()}
-              onRetry={() => enqueueTrailie(trailieAnswer.source)}
+              onRetry={() => enqueueTrailie(visibleTrailieAnswer.source)}
             />
           ) : null}
         </div>

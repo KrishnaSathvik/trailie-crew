@@ -411,7 +411,7 @@ function ReviewPanel({
           onChange={(event) => setNote(event.target.value)}
           placeholder="Note required when requesting changes"
           maxLength={500}
-          className="border-border mt-5 min-h-24 w-full rounded-md border bg-transparent p-3 text-sm"
+          className="border-border mt-5 min-h-24 w-full rounded-md border bg-transparent p-3 text-base"
         />
       ) : null}
       {error ? (

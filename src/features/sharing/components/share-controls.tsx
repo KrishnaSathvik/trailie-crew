@@ -237,7 +237,7 @@ export function ShareControls({
                   id={`share-url-${tripPlanId}`}
                   readOnly
                   value={newUrl}
-                  className="border-border min-h-10 min-w-0 flex-1 rounded-md border bg-transparent px-3 font-mono text-xs"
+                  className="border-border min-h-10 min-w-0 flex-1 rounded-md border bg-transparent px-3 font-mono text-base"
                 />
                 <button
                   type="button"

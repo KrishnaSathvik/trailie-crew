@@ -1,14 +1,20 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getRoomMessagesAction,
   sendMessageAction,
   toggleReactionAction,
 } from "@/features/chat/actions/chat-actions";
 import { invokeTrailieStream } from "@/features/trailie/streaming/invoke-trailie";
 
 import { ChatExperience } from "./chat-experience";
+
+const realtimeHarness = vi.hoisted(() => ({
+  chatChanged: null as
+    null | ((event: { payload: Record<string, unknown> }) => void),
+}));
 
 vi.mock("@/features/chat/actions/chat-actions", () => ({
   sendMessageAction: vi.fn(),
@@ -23,7 +29,16 @@ vi.mock("@/features/trailie/streaming/invoke-trailie", () => ({
 vi.mock("@/lib/supabase/browser", () => ({
   createBrowserSupabaseClient: vi.fn(() => {
     const channel = {
-      on: vi.fn().mockReturnThis(),
+      on: vi.fn(function (
+        this: unknown,
+        kind: string,
+        filter: { event?: string },
+        callback: (event: { payload: Record<string, unknown> }) => void,
+      ) {
+        if (kind === "broadcast" && filter.event === "chat_changed")
+          realtimeHarness.chatChanged = callback;
+        return this;
+      }),
       subscribe: vi.fn().mockReturnThis(),
       track: vi.fn().mockResolvedValue("ok"),
       untrack: vi.fn().mockResolvedValue("ok"),
@@ -73,9 +88,30 @@ const data = {
 describe("ChatExperience", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    realtimeHarness.chatChanged = null;
+    vi.mocked(getRoomMessagesAction).mockResolvedValue({
+      ok: true,
+      data: { messages: [], hasMore: false, nextCursor: null },
+    });
     vi.mocked(invokeTrailieStream).mockImplementation(async function* () {
       return;
     });
+  });
+
+  it("notifies the shell when Realtime reports a crew membership change", async () => {
+    const onCrewChange = vi.fn();
+    render(
+      <ChatExperience
+        data={data}
+        onPresenceChange={vi.fn()}
+        onCrewChange={onCrewChange}
+      />,
+    );
+
+    await waitFor(() => expect(realtimeHarness.chatChanged).not.toBeNull());
+    realtimeHarness.chatChanged?.({ payload: { kind: "crew" } });
+
+    expect(onCrewChange).toHaveBeenCalledOnce();
   });
 
   it("renders an actionable empty conversation without a Trailie response", () => {
@@ -246,6 +282,92 @@ describe("ChatExperience", () => {
     } finally {
       acknowledge?.({ ok: false, error: "message_send_failed" });
       await submit;
+    }
+  });
+
+  it("reconciles a persisted Trailie reply while the client stream is still open", async () => {
+    const user = userEvent.setup();
+    const sourceId = "0198a0b2-07f0-7c80-9d5f-7f9cf7a950c5";
+    vi.mocked(sendMessageAction).mockImplementation(async (input) => ({
+      ok: true,
+      data: {
+        id: sourceId,
+        roomId: data.room.id,
+        participantId: data.currentParticipant.id,
+        messageType: "user",
+        body: (input as { body: string }).body,
+        clientMessageId: (input as { clientMessageId: string }).clientMessageId,
+        replyToMessageId: null,
+        sender: {
+          participantId: data.currentParticipant.id,
+          displayName: "Maya",
+          role: "host",
+        },
+        reply: null,
+        reactions: [],
+        createdAt: "2026-07-13T18:01:00.000Z",
+        editedAt: null,
+        deletedAt: null,
+      },
+    }));
+    vi.mocked(invokeTrailieStream).mockImplementation(async function* (input) {
+      yield { type: "invocation_started", invocationId: sourceId };
+      await new Promise<void>((resolve) =>
+        input.signal.addEventListener("abort", () => resolve(), { once: true }),
+      );
+    });
+
+    const view = render(
+      <ChatExperience data={data} onPresenceChange={vi.fn()} />,
+    );
+    try {
+      await user.type(
+        screen.getByLabelText("Message your crew"),
+        "@Trailie help us pack{enter}",
+      );
+      expect(screen.getByText("Reading the conversation")).toBeVisible();
+
+      vi.mocked(getRoomMessagesAction).mockResolvedValue({
+        ok: true,
+        data: {
+          messages: [
+            {
+              id: "0198a0b2-07f0-7c80-9d5f-7f9cf7a950c6",
+              roomId: data.room.id,
+              participantId: data.currentParticipant.id,
+              messageType: "trailie",
+              body: "Pack layers and rain protection.",
+              clientMessageId: null,
+              replyToMessageId: sourceId,
+              sender: {
+                participantId: data.currentParticipant.id,
+                displayName: "Maya",
+                role: "host",
+              },
+              reply: null,
+              reactions: [],
+              createdAt: "2026-07-13T18:01:10.000Z",
+              editedAt: null,
+              deletedAt: null,
+            },
+          ],
+          hasMore: false,
+          nextCursor: null,
+        },
+      });
+
+      await act(async () => {
+        realtimeHarness.chatChanged?.({ payload: { kind: "message" } });
+      });
+
+      expect(
+        await screen.findByText("Pack layers and rain protection."),
+      ).toBeVisible();
+      expect(
+        screen.queryByText("Reading the conversation"),
+      ).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
     }
   });
 

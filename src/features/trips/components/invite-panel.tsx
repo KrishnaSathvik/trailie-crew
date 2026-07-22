@@ -65,7 +65,7 @@ export function InvitePanel({
                 id="invite-url"
                 readOnly
                 value={inviteUrl}
-                className="border-border bg-background rounded-control focus-visible:ring-ring min-h-10 min-w-0 flex-1 border px-3 text-xs outline-none focus-visible:ring-2"
+                className="border-border bg-background rounded-control focus-visible:ring-ring min-h-10 min-w-0 flex-1 border px-3 text-base outline-none focus-visible:ring-2"
               />
               <button
                 type="button"
